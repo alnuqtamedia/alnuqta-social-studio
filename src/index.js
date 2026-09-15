@@ -95,11 +95,12 @@ The user may give commands such as:
 Always prioritize the user's requested transformation and output format.
 `;
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "content-type": "application/json; charset=utf-8"
+      "content-type": "application/json; charset=utf-8",
+      ...extraHeaders
     }
   });
 }
@@ -108,19 +109,64 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function shouldFallback(status, message = "") {
-  const text = String(message).toLowerCase();
+function containsFallbackMessage(value) {
+  const text = String(value || "").toLowerCase();
+
+  const fallbackPhrases = [
+    "high demand",
+    "spikes in demand",
+    "try again later",
+    "temporarily unavailable",
+    "service unavailable",
+    "resource exhausted",
+    "rate limit",
+    "rate_limit",
+    "overloaded",
+    "model is currently experiencing",
+    "currently experiencing high demand",
+    "please try again later"
+  ];
+
+  return fallbackPhrases.some((phrase) =>
+    text.includes(phrase)
+  );
+}
+
+function shouldFallback(status, data, message = "") {
+  if (
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  ) {
+    return true;
+  }
+
+  const serializedData = JSON.stringify(data || {});
 
   return (
-    status === 429 ||
-    status === 503 ||
-    text.includes("high demand") ||
-    text.includes("overloaded") ||
-    text.includes("temporarily unavailable") ||
-    text.includes("unavailable") ||
-    text.includes("try again later") ||
-    text.includes("resource exhausted") ||
-    text.includes("rate limit")
+    containsFallbackMessage(message) ||
+    containsFallbackMessage(serializedData)
+  );
+}
+
+function extractGeminiText(data) {
+  const parts =
+    data?.candidates?.[0]?.content?.parts || [];
+
+  return parts
+    .map((part) => part?.text || "")
+    .join("\n")
+    .trim();
+}
+
+function getGeminiErrorMessage(data) {
+  return (
+    data?.error?.message ||
+    data?.message ||
+    extractGeminiText(data) ||
+    "Gemini request failed"
   );
 }
 
@@ -141,7 +187,10 @@ export default {
 
       if (!env.GEMINI_API_KEY) {
         return jsonResponse(
-          { error: "GEMINI_API_KEY is not configured." },
+          {
+            error:
+              "GEMINI_API_KEY is not configured."
+          },
           500
         );
       }
@@ -149,120 +198,210 @@ export default {
       try {
         const body = await request.json();
 
-        const command = String(body.command || "").trim();
-        const currentContent = body.currentContent || {};
+        const command = String(
+          body.command || ""
+        ).trim();
+
+        const currentContent =
+          body.currentContent || {};
 
         if (!command) {
           return jsonResponse(
-            { error: "command is required" },
+            {
+              error: "command is required"
+            },
             400
           );
         }
 
         const configuredModel =
-          env.GEMINI_MODEL || MODEL_DEFAULT;
+          String(
+            env.GEMINI_MODEL ||
+              MODEL_DEFAULT
+          ).trim();
 
         const models = [
           configuredModel,
           ...FALLBACK_MODELS
         ].filter(
-          (model, index, list) =>
-            model && list.indexOf(model) === index
+          (model, index, array) =>
+            model &&
+            array.indexOf(model) === index
         );
 
         const prompt = `${SYSTEM}
 
 CURRENT STUDIO CONTENT:
-${JSON.stringify(currentContent, null, 2)}
+${JSON.stringify(
+  currentContent,
+  null,
+  2
+)}
 
 USER COMMAND:
 ${command}`;
 
-        let lastError = "Gemini request failed";
+        let lastError =
+          "Gemini request failed";
 
-        for (let i = 0; i < models.length; i++) {
-          const model = models[i];
+        let lastStatus = 503;
+
+        for (
+          let modelIndex = 0;
+          modelIndex < models.length;
+          modelIndex++
+        ) {
+          const model = models[modelIndex];
 
           try {
             const geminiUrl =
               `https://generativelanguage.googleapis.com/v1beta/models/` +
-              `${encodeURIComponent(model)}:generateContent?key=` +
-              `${encodeURIComponent(env.GEMINI_API_KEY)}`;
+              `${encodeURIComponent(
+                model
+              )}:generateContent?key=` +
+              `${encodeURIComponent(
+                env.GEMINI_API_KEY
+              )}`;
 
-            const geminiResponse = await fetch(
-              geminiUrl,
-              {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json"
-                },
-                body: JSON.stringify({
-                  contents: [
-                    {
-                      role: "user",
-                      parts: [
-                        {
-                          text: prompt
-                        }
-                      ]
+            const geminiResponse =
+              await fetch(
+                geminiUrl,
+                {
+                  method: "POST",
+                  headers: {
+                    "content-type":
+                      "application/json"
+                  },
+                  body: JSON.stringify({
+                    contents: [
+                      {
+                        role: "user",
+                        parts: [
+                          {
+                            text: prompt
+                          }
+                        ]
+                      }
+                    ],
+                    generationConfig: {
+                      responseMimeType:
+                        "application/json",
+                      responseSchema
                     }
-                  ],
-                  generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema
-                  }
-                })
-              }
-            );
+                  })
+                }
+              );
 
-            const data =
-              await geminiResponse.json();
+            let data = {};
 
-            if (!geminiResponse.ok) {
-              const message =
-                data?.error?.message ||
-                "Gemini request failed";
+            try {
+              data =
+                await geminiResponse.json();
+            } catch {
+              data = {};
+            }
 
-              lastError = message;
+            const message =
+              getGeminiErrorMessage(data);
 
-              const canFallback =
-                shouldFallback(
-                  geminiResponse.status,
-                  message
-                );
+            lastError = message;
+            lastStatus =
+              geminiResponse.status || 503;
 
-              if (canFallback && i < models.length - 1) {
-                await sleep(800);
+            /*
+             * IMPORTANT:
+             * Gemini can sometimes return the
+             * "high demand" message inside the
+             * response even when the HTTP status
+             * does not clearly indicate a failure.
+             *
+             * So we inspect the actual response
+             * body before deciding whether to stop.
+             */
+
+            const needsFallback =
+              shouldFallback(
+                geminiResponse.status,
+                data,
+                message
+              );
+
+            if (
+              !geminiResponse.ok ||
+              needsFallback
+            ) {
+              if (
+                modelIndex <
+                models.length - 1
+              ) {
+                await sleep(700);
                 continue;
               }
 
               return jsonResponse(
                 {
                   error: message,
-                  model
+                  model,
+                  fallbackExhausted:
+                    true
                 },
-                geminiResponse.status
+                lastStatus >= 400
+                  ? lastStatus
+                  : 503
               );
             }
 
             const text =
-              data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-              "";
+              extractGeminiText(data);
 
             if (!text) {
               lastError =
                 "Gemini returned an empty response.";
 
-              if (i < models.length - 1) {
+              if (
+                modelIndex <
+                models.length - 1
+              ) {
                 await sleep(500);
                 continue;
               }
 
               return jsonResponse(
                 {
-                  error: lastError
+                  error: lastError,
+                  model
                 },
                 502
+              );
+            }
+
+            /*
+             * Check the returned text itself.
+             * This catches cases where Gemini returns
+             * the high-demand message as normal text.
+             */
+
+            if (
+              containsFallbackMessage(text)
+            ) {
+              lastError = text;
+
+              if (
+                modelIndex <
+                models.length - 1
+              ) {
+                await sleep(700);
+                continue;
+              }
+
+              return jsonResponse(
+                {
+                  error: lastError,
+                  model,
+                  fallbackExhausted:
+                    true
+                },
+                503
               );
             }
 
@@ -274,27 +413,83 @@ ${command}`;
               lastError =
                 "Gemini returned invalid JSON.";
 
-              if (i < models.length - 1) {
+              if (
+                modelIndex <
+                models.length - 1
+              ) {
                 await sleep(500);
                 continue;
               }
 
               return jsonResponse(
                 {
-                  error: lastError
+                  error: lastError,
+                  model
                 },
                 502
               );
             }
 
-            return jsonResponse(result);
+            /*
+             * Final safety check:
+             * If the parsed JSON itself contains
+             * a high-demand message, fallback.
+             */
+
+            if (
+              containsFallbackMessage(
+                JSON.stringify(result)
+              )
+            ) {
+              lastError =
+                "Gemini model is currently under high demand.";
+
+              if (
+                modelIndex <
+                models.length - 1
+              ) {
+                await sleep(700);
+                continue;
+              }
+
+              return jsonResponse(
+                {
+                  error: lastError,
+                  model,
+                  fallbackExhausted:
+                    true
+                },
+                503
+              );
+            }
+
+            /*
+             * SUCCESS
+             *
+             * Return the AI result exactly as before.
+             * Add the model only as a response header
+             * so the frontend does not need to change.
+             */
+
+            return jsonResponse(
+              result,
+              200,
+              {
+                "x-gemini-model": model
+              }
+            );
           } catch (error) {
             lastError =
               error?.message ||
               "Gemini request failed";
 
-            if (i < models.length - 1) {
-              await sleep(800);
+            lastStatus = 503;
+
+            if (
+              modelIndex <
+              models.length - 1
+            ) {
+              await sleep(700);
               continue;
             }
           }
@@ -303,10 +498,11 @@ ${command}`;
         return jsonResponse(
           {
             error: lastError,
-            message:
-              "All Gemini fallback models failed."
+            fallbackExhausted: true
           },
-          503
+          lastStatus >= 400
+            ? lastStatus
+            : 503
         );
       } catch (error) {
         return jsonResponse(
