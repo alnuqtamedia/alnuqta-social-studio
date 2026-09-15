@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>استوديو تصاميم الهوية البصرية | النقطة Media</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            DEFAULT: '#0A1A2F',
+                            card: '#122238',
+                            light: '#1B2E4B'
+                        },
+                        brandRed: {
+                            DEFAULT: '#E31217',
+                            hover: '#C00F13'
+                        }
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                        tajawal: ['Tajawal', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- html2canvas for High-Res PNG Capture -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- JSZip for Batch Archive Downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Google Fonts: Cairo & Tajawal -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #071220;
+            color: #ffffff;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0A1A2F;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1B2E4B;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #E31217;
+        }
+
+        /* Fixed Dimensions for Canvas Preview Containers */
+        .preview-carousel {
+            width: 360px;
+            height: 640px;
+        }
+        .preview-yt-thumb {
+            width: 560px;
+            height: 315px;
+        }
+        .preview-yt-banner {
+            width: 640px;
+            height: 144px;
+        }
+        .preview-yt-avatar {
+            width: 320px;
+            height: 320px;
+        }
+
+        .bidi-ltr {
+            direction: ltr !important;
+            unicode-bidi: isolate !important;
+            display: inline-block;
+        }
+
+        /* Prevent HTML2Canvas Text Disconnection & Layout Shifts */
+        #export-target * {
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
+            text-rendering: optimizeLegibility;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Top Header -->
+    <header class="bg-navy border-b border-navy-light px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-lg shadow-lg shadow-brandRed/30">
+                .
+            </div>
+            <div>
+                <h1 class="font-cairo font-black text-lg leading-none tracking-wide text-white">النقطة <span class="text-brandRed">Media</span></h1>
+                <p class="text-xs text-gray-400 font-tajawal">استوديو التصميم وإنشاء القوالب البصرية الرسمية</p>
+            </div>
+        </div>
+
+        <!-- Export Status Indicator -->
+        <div id="export-status" class="hidden text-xs bg-brandRed/20 text-brandRed border border-brandRed/40 px-3 py-1.5 rounded-full flex items-center gap-2 animate-pulse font-cairo font-semibold">
+            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+            <span id="export-status-text">جاري معالجة وتصدير الصور...</span>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        
+        <!-- Left/Sidebar Control Panel -->
+        <aside class="w-full lg:w-96 bg-navy p-5 border-l border-navy-light flex flex-col gap-6 overflow-y-auto max-h-screen">
+            
+            <!-- Gemini AI Creative Director -->
+            <div class="bg-navy-card border border-brandRed/60 p-3.5 rounded-lg flex flex-col gap-2.5 shadow-lg shadow-brandRed/5">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold text-white font-cairo flex items-center gap-1.5">
+                        <i data-lucide="brain-circuit" class="w-4 h-4 text-brandRed"></i> Gemini — مساعد الإنتاج
+                    </label>
+                    <span id="ai-status-dot" class="text-[10px] text-emerald-400 font-tajawal">جاهز</span>
+                </div>
+                <p class="text-[10px] text-gray-400 font-tajawal leading-relaxed">اكتب أو احچي الأمر. المساعد ينفّذه على المحتوى الحالي ويضع النتيجة داخل القالب المناسب.</p>
+                <textarea id="ai-command-input" rows="3" dir="rtl" class="w-full bg-navy border border-navy-light rounded p-2 text-xs text-white focus:outline-none focus:border-brandRed font-tajawal resize-none" placeholder="مثال: حوّل هذا التحقيق إلى Carousel من 7 سلايدات
+أو: سوّي منه فيديو تيك توك 45 ثانية"></textarea>
+                <div class="grid grid-cols-[1fr_auto] gap-2">
+                    <button id="ai-run-btn" onclick="runGeminiStudioCommand()" class="py-2 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-bold text-xs flex items-center justify-center gap-1.5 transition shadow">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> تنفيذ الأمر
+                    </button>
+                    <button id="ai-voice-btn" onclick="toggleAIListening()" title="إدخال صوتي" class="px-3 py-2 bg-navy border border-navy-light hover:border-brandRed text-gray-200 rounded font-cairo text-xs transition">
+                        <i data-lucide="mic" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div id="ai-status" class="hidden text-[10px] rounded border border-navy-light bg-navy p-2 text-gray-300 font-tajawal"></div>
+            </div>
+
+            <!-- NEW: Automatic Script Input & Auto Distributor -->
+            <div class="bg-navy-card border border-brandRed/40 p-3.5 rounded-lg flex flex-col gap-2.5 shadow-md">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold text-white font-cairo flex items-center gap-1.5">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-brandRed"></i> موزع السكريبت الآلي
+                    </label>
+                    <span class="text-[10px] text-gray-400 font-tajawal">إدخال سريع</span>
+                </div>
+                <textarea id="raw-script-input" rows="4" class="w-full bg-navy border border-navy-light rounded p-2 text-xs text-white focus:outline-none focus:border-brandRed font-tajawal resize-none" placeholder="أدخل النص هنا.. يمكنك الفصل بين السلايدات بـ (---) أو ترك سطر فارغ بين كل شريحة وأخرى"></textarea>
+                <button onclick="processAndDistributeScript()" class="w-full py-2 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-bold text-xs flex items-center justify-center gap-1.5 transition shadow">
+                    <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> تطبيق وتوزيع السكريبت على التصميم
+                </button>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div>
+                <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">اختر نوع التصميم:</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="switchTab('carousel')" id="tab-btn-carousel" class="tab-btn py-2.5 px-3 rounded text-xs font-cairo font-bold bg-brandRed text-white transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="layers" class="w-4 h-4"></i> سلايدات التحقيقات
+                    </button>
+                    <button onclick="switchTab('tiktok')" id="tab-btn-tiktok" class="tab-btn py-2.5 px-3 rounded text-xs font-cairo font-bold bg-navy-card text-gray-300 hover:bg-navy-light transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="smartphone" class="w-4 h-4"></i> ريلز / ستوري
+                    </button>
+                    <button onclick="switchTab('thumbnail')" id="tab-btn-thumbnail" class="tab-btn py-2.5 px-3 rounded text-xs font-cairo font-bold bg-navy-card text-gray-300 hover:bg-navy-light transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="image" class="w-4 h-4"></i> مصغرة يوتيوب
+                    </button>
+                    <button onclick="switchTab('yt-assets')" id="tab-btn-yt-assets" class="tab-btn py-2.5 px-3 rounded text-xs font-cairo font-bold bg-navy-card text-gray-300 hover:bg-navy-light transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="youtube" class="w-4 h-4"></i> غلاف وصورة القناة
+                    </button>
+                </div>
+            </div>
+
+            <!-- Carousel Investigation Switcher & Slide Selector -->
+            <div id="controls-carousel" class="control-panel flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">اختر موضوع التحقيق:</label>
+                    <select id="topic-select" onchange="changeTopic(this.value)" class="w-full bg-navy-card border border-navy-light rounded p-2.5 text-xs text-white focus:outline-none focus:border-brandRed font-cairo font-bold">
+                        <option value="customScript">السكريبت المخصص (المدخل حديثاً)</option>
+                        <option value="lastBullet">الرصاصة الأخيرة (10 سلايدات استقصائية)</option>
+                        <option value="pavement">شهادة على الرصيف (6 سلايدات مع الخاتمة)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">الانتقال للترقيم / السلايد:</label>
+                    <div id="slide-number-buttons" class="flex flex-wrap gap-1.5">
+                        <!-- Slide number buttons dynamically generated -->
+                    </div>
+                </div>
+
+                <!-- Batch Export Button -->
+                <button onclick="exportAllSlides()" class="w-full py-2.5 bg-brandRed/20 hover:bg-brandRed text-brandRed hover:text-white border border-brandRed/50 rounded font-cairo font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-md">
+                    <i data-lucide="archive" class="w-4 h-4"></i> تصدير جميع السلايدات بملف مضغوط (ZIP)
+                </button>
+
+                <!-- Dynamic Input Fields -->
+                <div class="border-t border-navy-light pt-3">
+                    <h3 class="font-cairo font-bold text-xs text-brandRed mb-3 flex items-center gap-1.5">
+                        <i data-lucide="edit-3" class="w-4 h-4"></i> تعديل محتوى السلايد الحالي:
+                    </h3>
+                    <div id="slide-inputs" class="flex flex-col gap-3">
+                        <!-- Dynamic inputs populated via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TikTok / Story Controls -->
+            <div id="controls-tiktok" class="control-panel hidden flex flex-col gap-4">
+                <h3 class="font-cairo font-bold text-sm text-white flex items-center gap-2">
+                    <i data-lucide="smartphone" class="w-4 h-4 text-brandRed"></i> إعدادات الريلز / تيك توك / الستوري (9:16)
+                </h3>
+                
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">اختر موضوع التحقيق للريلز:</label>
+                    <select id="tiktok-topic-select" onchange="changeTikTokTopic(this.value)" class="w-full bg-navy-card border border-navy-light rounded p-2.5 text-xs text-white focus:outline-none focus:border-brandRed font-cairo font-bold mb-3">
+                        <option value="customScript">السكريبت المخصص (المدخل حديثاً)</option>
+                        <option value="lastBullet">الرصاصة الأخيرة (10 سلايدات عمودية)</option>
+                        <option value="pavement">شهادة على الرصيف (6 سلايدات عمودية)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">الانتقال للشريحة العمودية:</label>
+                    <div id="tiktok-slide-buttons" class="flex flex-wrap gap-1.5">
+                        <!-- TikTok slide buttons generated dynamically -->
+                    </div>
+                </div>
+
+                <!-- TikTok Batch ZIP Export Button -->
+                <button onclick="exportAllTikTokSlides()" class="w-full py-2.5 bg-brandRed/20 hover:bg-brandRed text-brandRed hover:text-white border border-brandRed/50 rounded font-cairo font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-md">
+                    <i data-lucide="archive" class="w-4 h-4"></i> تصدير حزمة الريلز والستوري الكاملة بملف (ZIP)
+                </button>
+
+                <div class="border-t border-navy-light pt-3">
+                    <h4 class="font-cairo font-bold text-xs text-brandRed mb-3">تعديل الشريحة الحالية:</h4>
+                    <div id="tiktok-inputs" class="flex flex-col gap-3">
+                        <!-- Dynamic inputs generated via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- YouTube Thumbnail Controls -->
+            <div id="controls-thumbnail" class="control-panel hidden flex flex-col gap-4">
+                <h3 class="font-cairo font-bold text-sm text-white flex items-center gap-2">
+                    <i data-lucide="image" class="w-4 h-4 text-brandRed"></i> إعدادات أنماط المصغرات (16:9)
+                </h3>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">اختر نمط المصغرة للتحقيق:</label>
+                    <div id="thumb-preset-buttons" class="grid grid-cols-3 gap-1.5">
+                        <button onclick="selectThumbPreset(0)" id="yt-preset-btn-0" class="yt-preset-btn py-2 rounded text-[11px] font-cairo font-bold bg-brandRed text-white">1. العنوان الصادم</button>
+                        <button onclick="selectThumbPreset(1)" id="yt-preset-btn-1" class="yt-preset-btn py-2 rounded text-[11px] font-cairo font-bold bg-navy-card text-gray-400 hover:bg-navy-light">2. الوثيقة السرية</button>
+                        <button onclick="selectThumbPreset(2)" id="yt-preset-btn-2" class="yt-preset-btn py-2 rounded text-[11px] font-cairo font-bold bg-navy-card text-gray-400 hover:bg-navy-light">3. كشف الحقائق</button>
+                    </div>
+                </div>
+
+                <!-- Thumbnail Batch ZIP Export Button -->
+                <button onclick="exportAllThumbnails()" class="w-full py-2.5 bg-brandRed/20 hover:bg-brandRed text-brandRed hover:text-white border border-brandRed/50 rounded font-cairo font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-md">
+                    <i data-lucide="archive" class="w-4 h-4"></i> تصدير كافة أنماط المصغرات بملف (ZIP)
+                </button>
+
+                <div class="border-t border-navy-light pt-3">
+                    <h4 class="font-cairo font-bold text-xs text-brandRed mb-3">تعديل نمط المصغرة المحدد:</h4>
+                    <div id="thumbnail-inputs" class="flex flex-col gap-3">
+                        <!-- Dynamic inputs generated via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- YouTube Channel Assets Controls -->
+            <div id="controls-yt-assets" class="control-panel hidden flex flex-col gap-4">
+                <h3 class="font-cairo font-bold text-sm text-white flex items-center gap-2">
+                    <i data-lucide="youtube" class="w-4 h-4 text-brandRed"></i> أصول القناة الرسمية
+                </h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="selectYTAsset('avatar')" id="asset-btn-avatar" class="asset-btn py-2.5 rounded bg-brandRed text-white text-xs font-cairo font-bold shadow">صورة القناة (Avatar)</button>
+                    <button onclick="selectYTAsset('banner')" id="asset-btn-banner" class="asset-btn py-2.5 rounded bg-navy-card text-gray-400 hover:bg-navy-light text-xs font-cairo font-bold">غلاف القناة (Banner)</button>
+                </div>
+                
+                <button onclick="exportAllYTAssets()" class="w-full py-2.5 bg-brandRed/20 hover:bg-brandRed text-brandRed hover:text-white border border-brandRed/50 rounded font-cairo font-bold text-xs flex items-center justify-center gap-2 transition duration-200 mt-2">
+                    <i data-lucide="archive" class="w-4 h-4"></i> تصدير جميع أصول يوتيوب (غلاف + صورة) بملف ZIP
+                </button>
+            </div>
+
+            <!-- Single Export Button -->
+            <div class="mt-auto border-t border-navy-light pt-4">
+                <button onclick="exportSingleDesign()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-brandRed/20 transition duration-200">
+                    <i data-lucide="download" class="w-4 h-4"></i> تصدير التصميم الحالي (PNG)
+                </button>
+            </div>
+
+        </aside>
+
+        <!-- Right / Canvas Display Area -->
+        <section class="flex-1 bg-gray-950 p-6 flex flex-col items-center justify-center overflow-auto min-h-[600px] relative">
+            
+            <div class="mb-4 text-xs font-cairo font-semibold text-gray-400 flex items-center gap-2 bg-navy/80 border border-navy-light px-4 py-1.5 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>المعاينة المباشرة دقيقة 100% ومطابقة للتصدير النهائية</span>
+            </div>
+
+            <!-- Dynamic Target Container -->
+            <div id="preview-wrapper" class="flex items-center justify-center shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300">
+                <!-- HTML Content populated dynamically by renderCanvas() -->
+                <div id="export-target" class="bg-navy text-white relative flex flex-col justify-between box-border overflow-hidden select-none">
+                    <!-- Dynamic Graphic Canvas -->
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <script>
+
+        // ==================== Gemini AI Production Assistant ====================
+        let aiRecognition = null;
+        let aiListening = false;
+
+        function getCurrentStudioContent() {
+            return {
+                activeTab,
+                activeTopic,
+                activeTikTokTopic,
+                currentSlideIndex,
+                activeTikTokSlide,
+                topic: topics[activeTopic] || null,
+                tiktokTopic: topics[activeTikTokTopic] || null,
+                thumbnail: thumbPresets[activeThumbPreset] || null
+            };
+        }
+
+        function setAIStatus(message, state = 'info') {
+            const el = document.getElementById('ai-status');
+            const dot = document.getElementById('ai-status-dot');
+            if (!el || !dot) return;
+            el.textContent = message;
+            el.classList.remove('hidden');
+            dot.textContent = state === 'busy' ? 'يعمل الآن…' : state === 'error' ? 'خطأ' : 'جاهز';
+            dot.className = `text-[10px] font-tajawal ${state === 'busy' ? 'text-yellow-300' : state === 'error' ? 'text-red-400' : 'text-emerald-400'}`;
+        }
+
+        function normalizeAISlides(slides, title, subtitle) {
+            let out = Array.isArray(slides) ? slides.filter(Boolean).map((slide, i) => ({
+                id: i + 1,
+                type: slide.type || (i === 0 ? 'cover' : 'content'),
+                badge: slide.badge || 'تحقيق استقصائي',
+                title: slide.title || title || '',
+                subtitle: slide.subtitle || subtitle || '',
+                header: slide.header || '',
+                points: Array.isArray(slide.points) ? slide.points.slice(0, 7) : [],
+                q1: slide.q1 || '', speaker1: slide.speaker1 || '', q2: slide.q2 || '', speaker2: slide.speaker2 || '',
+                stat1: slide.stat1 || '', desc1: slide.desc1 || '', stat2: slide.stat2 || '', desc2: slide.desc2 || '', stat3: slide.stat3 || '', desc3: slide.desc3 || '',
+                steps: Array.isArray(slide.steps) ? slide.steps.slice(0, 5) : [],
+                cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia'
+            })) : [];
+            if (!out.length) out = [{ id: 1, type: 'cover', badge: 'تحقيق استقصائي', title: title || 'تحقيق جديد', subtitle: subtitle || '' }];
+            if (out[0].type !== 'cover') out[0].type = 'cover';
+            const last = out[out.length - 1];
+            if (last.type !== 'outro') out.push({ id: out.length + 1, type: 'outro', header: 'النقطة Media', tagline: 'نحقق . نكشف . نوصل', cta: 'اشترك الآن وتابع تحقيقاتنا الحصرية', handle: '@alnuqtamedia' });
+            return out.map((x, i) => ({ ...x, id: i + 1 }));
+        }
+
+        function applyGeminiResult(result) {
+            const slides = normalizeAISlides(result.slides, result.title, result.subtitle);
+            topics.customScript = {
+                title: result.title || 'تحقيق مخصص',
+                subtitle: result.subtitle || 'تم إنتاجه بواسطة Gemini داخل الاستوديو',
+                slides
+            };
+            if (result.title) {
+                thumbPresets[0].title = result.title;
+                thumbPresets[0].subtitle = result.subtitle || thumbPresets[0].subtitle;
+            }
+            activeTopic = 'customScript';
+            activeTikTokTopic = 'customScript';
+            currentSlideIndex = 0;
+            activeTikTokSlide = 0;
+            const topicSelect = document.getElementById('topic-select');
+            const tiktokTopicSelect = document.getElementById('tiktok-topic-select');
+            if (topicSelect) topicSelect.value = 'customScript';
+            if (tiktokTopicSelect) tiktokTopicSelect.value = 'customScript';
+            initSlideButtons();
+            initTikTokSlideButtons();
+            updateThumbInputs();
+
+            const output = String(result.output || 'carousel');
+            if (output === 'story' || output === 'reel' || output === 'video' || output === 'tiktok') switchTab('tiktok');
+            else if (output === 'youtube_thumbnail') switchTab('thumbnail');
+            else switchTab('carousel');
+            renderCanvas();
+        }
+
+        async function runGeminiStudioCommand() {
+            const input = document.getElementById('ai-command-input');
+            const btn = document.getElementById('ai-run-btn');
+            const command = input?.value.trim();
+            if (!command) return setAIStatus('اكتب الأمر أولاً، مثلاً: حوّل هذا إلى Carousel من 7 سلايدات.', 'error');
+            if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); }
+            setAIStatus('Gemini يحلل الأمر والمحتوى الحالي ويجهز التصميم…', 'busy');
+            try {
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command, currentContent: getCurrentStudioContent() })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'فشل الاتصال بخدمة Gemini');
+                applyGeminiResult(result);
+                setAIStatus(`تم التنفيذ: ${result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
+            } catch (error) {
+                console.error(error);
+                setAIStatus(error.message || 'تعذر تنفيذ الأمر.', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.classList.remove('opacity-60', 'cursor-wait'); }
+            }
+        }
+
+        function toggleAIListening() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return setAIStatus('الإدخال الصوتي غير مدعوم في هذا المتصفح. جرّب Chrome.', 'error');
+            if (aiListening && aiRecognition) { aiRecognition.stop(); return; }
+            aiRecognition = new SpeechRecognition();
+            aiRecognition.lang = 'ar-IQ';
+            aiRecognition.interimResults = true;
+            aiRecognition.continuous = false;
+            aiListening = true;
+            const voiceBtn = document.getElementById('ai-voice-btn');
+            voiceBtn?.classList.add('border-brandRed', 'text-brandRed');
+            setAIStatus('أستمع… احچي الأمر الآن.', 'busy');
+            aiRecognition.onresult = (event) => {
+                const text = Array.from(event.results).map(r => r[0].transcript).join('');
+                const input = document.getElementById('ai-command-input');
+                if (input) input.value = text;
+            };
+            aiRecognition.onerror = () => { aiListening = false; setAIStatus('تعذر التقاط الصوت.', 'error'); };
+            aiRecognition.onend = () => {
+                aiListening = false;
+                voiceBtn?.classList.remove('border-brandRed', 'text-brandRed');
+                if (document.getElementById('ai-command-input')?.value.trim()) setAIStatus('تم التقاط الأمر. اضغط تنفيذ الأمر.');
+            };
+            aiRecognition.start();
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                const input = document.getElementById('ai-command-input');
+                if (document.activeElement === input) runGeminiStudioCommand();
+            }
+        });
+
+        // Data Store for Investigations
+        const topics = {
+            customScript: {
+                title: "تحقيق مخصص",
+                subtitle: "تم التجميع آلياً من السكريبت",
+                slides: [
+                    {
+                        id: 1,
+                        type: 'cover',
+                        badge: 'تحقيق خاص',
+                        title: 'الرمز السريع للتحقيق',
+                        subtitle: 'أدخل سكريبت المحتوى في الحقل الجانبي لتوزيعه هنا آلياً.',
+                        footer: 'صحافة استقصائية محايدة'
+                    }
+                ]
+            },
+            lastBullet: {
+                title: "الرصاصة الأخيرة",
+                subtitle: "حين يُصبح \"الانتحار\" غطاءً للتصفية في تاريخ العراق",
+                slides: [
+                    {
+                        id: 1,
+                        type: 'cover',
+                        badge: 'تحقيق تاريخي',
+                        title: 'الرصاصة الأخيرة',
+                        subtitle: 'حين يُصبح "الانتحار" غطاءً للتصفية في تاريخ العراق',
+                        footer: 'صحافة استقصائية محايدة'
+                    },
+                    {
+                        id: 2,
+                        type: 'content',
+                        header: 'فرضية قاسية ومجتمع محافظ',
+                        points: [
+                            'الخصوصية العقائدية: ينتمي المجتمع العراقي لبنية دينية واجتماعية صارمة ترفض فكرة الانتحار وتعتبرها محرمة أخلاقياً وعقائدياً.',
+                            'سقوط الفرضية: الإقدام على إنهاء الحياة من قبل شخصيات ذات خلفية عسكرية، دينية، أو أكاديمية رفيعة يُعد سلوكاً نادر الوقوع دون وجود أسباب قاهرة.',
+                            'علامات الاستفهام: الحوادث الأخيرة — كوفاة آمر فوج القوات الخاصة في التاجي داخل مقره — فتحت باب التشكيك الشعبي حول الروايات الرسمية السريعة.'
+                        ]
+                    },
+                    {
+                        id: 3,
+                        type: 'content',
+                        header: 'لماذا يرفض الشارع رواية "الانتحار"؟',
+                        points: [
+                            '1. الحسم الإعلامي السريع: إعلان سبب الوفاة كـ "انتحار" خلال ساعات قليلة وقبل اكتمال تقرير الطب العدلي.',
+                            '2. تغييب الأدلة الفنية: عدم الكشف عن مسار الرصاصة، تحليل البصمات على السلاح، أو وجود آثار مقاومة على الجثة.',
+                            '3. إهمال البروفايل الشخصي: تجاهل الاستقرار الوظيفي والاجتماعي للمتوفى وتقديم شماعة "الأزمة النفسية المفاجئة" كسبب مجرد.'
+                        ]
+                    },
+                    {
+                        id: 4,
+                        type: 'content',
+                        header: 'رحيل السعدون: أول لغز في تاريخ الدولة',
+                        points: [
+                            'الحادثة: وفاة رئيس الوزراء العراقي عبد المحسن السعدون عام 1929 بطلق ناري داخل بيته.',
+                            'الرواية الرسمية: انتحار بسبب الضغوط السياسية البريطانية والشعبية، مع وجود رسالة وداع شهيرة.',
+                            'علامات التصفية: ظلت الشكوك التاريخية قائمة حول دفع الرجل للإقدام على الخطوة أو وجود أيدٍ خفية استفادت من إنهاء حياته لحسم صراع النفوذ مع الاحتلال البريطاني.'
+                        ]
+                    },
+                    {
+                        id: 5,
+                        type: 'content',
+                        header: 'مسرح العهد السابق: الموت خلف الكواليس',
+                        points: [
+                            'تصفية القيادات الأمنية: إبان أحداث ناظم كزار ومحاولات الانقلاب، عُثر على ضباط كبار ميتين في ظروف غامضة سُجل بعضها كـ "سكتات قلبية" أو "انتحار".',
+                            'إخفاء الأدلة: استخدام الإشاعات والوصمة الشخصية لتغطية الإعدامات الميدانية والتصفية السياسية داخل المعتقلات الرسمية.',
+                            'الهدف: امتصاص الغضب الشعبي والعشائري عبر تحويل الاغتيال السياسي إلى قضية شخصية أو مرضية.'
+                        ]
+                    },
+                    {
+                        id: 6,
+                        type: 'content',
+                        header: 'اغتيالات منظمة تحت ستار الجريمة الغامضة',
+                        points: [
+                            'استهداف العقول والضباط: بين عامي 2003 و2006، تعرض المئات من علماء التصنيع العسكري وضباط الطيران العراقي للقتل والاندثار.',
+                            'نمط التغطية: سُجلت عشرات القضايا في بدايتها ضد "مجهول" أو "انتحار بظروف غامضة"، قبل أن يتكشف أنها تصفيات أدارتها شبكات خارجية وميليشيات محلية.',
+                            'الغاية: تفريغ المؤسسات العسكرية والعلمية من كوادرها دون ترك خيط إدانة للفاعل.'
+                        ]
+                    },
+                    {
+                        id: 7,
+                        type: 'content',
+                        header: 'حادثة ميناء الفاو: حين يقتل المال الاستراتيجية',
+                        points: [
+                            'الجريمة: العثور على المدير التنفيذي لشركة "دايو" الكورية المنفذة لميناء الفاو الكبير مقتولاً شنقاً داخل مقر عمله بالبصرة.',
+                            'الرواية الرسمية: انتحار جراء ضغوط العمل والأزمات النفسية.',
+                            'الشكوك الاستقصائية: رفض برلماني وشعبي واسع للرواية، وإشارات متقاطعة إلى تعرضه لابتزاز وتصفية من شبكات نفوذ لإعاقة مشروع الميناء الاستراتيجي.'
+                        ]
+                    },
+                    {
+                        id: 8,
+                        type: 'diagram',
+                        header: 'كيف تُحول المافيا "الجريمة" إلى "انتحار"؟',
+                        steps: ['مسرح جريمة مُعد', 'إطلاق شائعة المرض النفسي', 'إغلاق الملف قضائياً'],
+                        points: [
+                            'استغلال الوصمة: استغلال عدم فهم الشارع للمرض النفسي لإقفال القضية أخلاقياً واجتماعياً.',
+                            'تضييع معالم الجريمة: استخدام نفوذ السلطة للسيطرة على مسرح الجريمة قبل وصول المحققين المستقلين.',
+                            'دفن أسرار الفساد: تصفية الشهود أو المسؤولين الذين يمتلكون وثائق تدين شبكات النفوذ والسلاح.'
+                        ]
+                    },
+                    {
+                        id: 9,
+                        type: 'content',
+                        header: 'تبعات إغلاق القضايا ضد "مجهول"',
+                        points: [
+                            'انهيار الأمان الوظيفي: شعور الضباط والمسؤولين النزهاء بأنهم بلا حماية أمام مافيات السلاح والفساد.',
+                            'فقدان الثقة بالقضاء والأجهزة الأمنية: تعزيز انطباع الشارع بأن القانون يُطبق فقط على الضعفاء، بينما يُحمى الجناة النافذون.',
+                            'ضياع الحقيقة التاريخية: تحول الجرائم الكبرى إلى مجرد أسرار تُدفن مع أصحابها تحت الأرض.'
+                        ]
+                    },
+                    {
+                        id: 10,
+                        type: 'verdict',
+                        header: 'الحقيقة لا تُدفن بالتقارير المقتضبة',
+                        points: [
+                            'النتيجة الاستقصائية: الانتحار في تاريخ العراق السياسي والأمني لم يكن دوماً خياراً للضحية، بل كان في كثير من الأحيان "الطلقة الأخيرة" التي يطلقها الجاني لإخفاء معالم الجريمة.',
+                            'المطلب: إيجاد لجان تحقيق مستقلة وإعادة فتح ملفات الوفيات الغامضة للضباط والمسؤولين لحماية ما تبقى من هيبة الدولة وحرمة الدم.'
+                        ]
+                    }
+                ]
+            },
+            pavement: {
+                title: "شهادة على الرصيف",
+                subtitle: "كيف يرفع العجز الحكومي والانفجار الأكاديمي كلفة البطالة؟",
+                slides: [
+                    {
+                        id: 1,
+                        type: 'cover',
+                        badge: 'تحقيق استقصائي',
+                        title: 'شهادة على الرصيف',
+                        subtitle: 'كيف يرفع العجز الحكومي والانفجار الأكاديمي كلفة البطالة؟',
+                        footer: 'صحافة استقصائية محايدة'
+                    },
+                    {
+                        id: 2,
+                        type: 'quotes',
+                        header: 'صراع المواقف: الشارع ضد الأكاديميا',
+                        q1: '"صار لي 13 سنة متخرج.. لا شغل ولا تعيين، والقطاع الخاص ميت وشهادتي محد يعترف بيها.. يعني أحرق نفسي؟"',
+                        speaker1: 'صوت الخريج',
+                        q2: '"مهنتنا ندرّس وننطي العلم ونخرّج.. أما يشتغلون أو ما يشتغلون، هاي مو مسؤوليتنا.. هاي مسؤولية الدولة."',
+                        speaker2: 'صوت رئيس الجامعة'
+                    },
+                    {
+                        id: 3,
+                        type: 'stats',
+                        header: 'الأزمة بالأرقام: واقع سوق العمل العراقي',
+                        stat1: '+150,000',
+                        desc1: 'خريج جديد يدفق سنوياً من الجامعات الحكومية والأهلية.',
+                        stat2: '13 سنة',
+                        desc2: 'متوسط فترة انتظار التعيين لبعض التخصصات المعطلة.',
+                        stat3: 'أقل من 10%',
+                        desc3: 'نسبة خريجي الكليات المشمولين بحماية وضمان القطاع الخاص.'
+                    },
+                    {
+                        id: 4,
+                        type: 'content',
+                        header: 'لماذا انسد الأفق أمام الخريجين؟',
+                        points: [
+                            '1. تجارة التعليم والتوسع العشوائي: فتح أقسام وكليات أهلية وحكومية بكثرة دون دراسة جدوى لسوق العمل.',
+                            '2. انغلاق القطاع العام: تضخم الموازنة التشغيلية وعجز الوزارات عن استيعاب الدفعات.',
+                            '3. موت القطاع الخاص: غياب الأمان الوظيفي وعدم تفعيل قانون الضمان الاجتماعي للعمال.'
+                        ]
+                    },
+                    {
+                        id: 5,
+                        type: 'content',
+                        header: 'كيف تُعالج الأزمة الهيكلية؟',
+                        points: [
+                            'ربط القبول الجامعي: إيقاف التوسع بالأقسام غير المطلوبة وربط الخطة بوزارة التخطيط.',
+                            'تفعيل الضمان الإجباري: فرض قانون التقاعد والضمان على مؤسسات القطاع الخاص لحماية الشاب.',
+                            'دعم المشاريع الناشئة: تحويل الدعم المالي نحو تمويل مشاريع الخريجين بدلاً من التعيين الوهمي.'
+                        ]
+                    },
+                    {
+                        id: 6,
+                        type: 'outro',
+                        header: 'النقطة Media',
+                        tagline: 'نحقق . نكشف . نوصل',
+                        cta: 'اشترك الآن وتابع تحقيقاتنا الحصرية',
+                        handle: '@alnuqtamedia'
+                    }
+                ]
+            }
+        };
+
+        let activeTab = 'carousel';
+        let activeTopic = 'lastBullet';
+        let currentSlideIndex = 0;
+        let activeYTAsset = 'avatar';
+
+        // Data Store for TikTok / Reels Slides
+        let activeTikTokTopic = 'lastBullet';
+        let activeTikTokSlide = 0;
+
+        // Data Store for YouTube Thumbnail Presets
+        let activeThumbPreset = 0;
+        const thumbPresets = [
+            {
+                badge: 'تحقيق خاص',
+                title: 'سر الرصاصة الأخيرة!',
+                subtitle: 'كيف تُحول مافيات النفوذ التصفيات إلى ملفات انتحار؟',
+                style: 'impact'
+            },
+            {
+                badge: 'وثائق حصرية',
+                title: 'مستندات كشفت المستور!',
+                subtitle: 'أدلة رسمية تُفند الروايات السريعة وتكشف خفايا الملفات المغلقة',
+                style: 'doc'
+            },
+            {
+                badge: 'ملف استقصائي',
+                title: 'من القاتل الحقيقي؟',
+                subtitle: 'تسلسل التصفيات الغامضة من السعدون إلى مدير شركة دايو',
+                style: 'investigation'
+            }
+        ];
+
+        // Process and automatically distribute raw script
+        function processAndDistributeScript() {
+            const rawText = document.getElementById('raw-script-input').value.trim();
+            if (!rawText) {
+                alert('يرجى كتابة أو لصق السكريبت في المربع المخصص أولاً!');
+                return;
+            }
+
+            // Split script by '---' or multiple empty lines
+            let rawBlocks = rawText.split(/(?:\r?\n){2,}|---/).map(b => b.trim()).filter(b => b.length > 0);
+
+            if (rawBlocks.length === 0) return;
+
+            const newSlides = [];
+
+            // 1. First block forms the Cover Slide
+            const firstLines = rawBlocks[0].split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            newSlides.push({
+                id: 1,
+                type: 'cover',
+                badge: 'تحقيق مخصص',
+                title: firstLines[0] || 'عنوان التحقيق',
+                subtitle: firstLines.slice(1).join(' ') || 'تفاصيل وملخص سكريبت التحقيق الاستقصائي',
+                footer: 'صحافة استقصائية محايدة'
+            });
+
+            // Update Thumbnails preset title automatically based on first block
+            if (thumbPresets[0]) {
+                thumbPresets[0].title = firstLines[0] || thumbPresets[0].title;
+                thumbPresets[0].subtitle = firstLines.slice(1).join(' ') || thumbPresets[0].subtitle;
+            }
+
+            // 2. Remaining blocks form content slides
+            for (let i = 1; i < rawBlocks.length; i++) {
+                const lines = rawBlocks[i].split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length === 0) continue;
+
+                let header = lines[0];
+                let points = lines.slice(1);
+
+                // If only 1 line in block, use it as point with generic header
+                if (points.length === 0) {
+                    points = [header];
+                    header = `محور التحقيق (${i})`;
+                }
+
+                newSlides.push({
+                    id: i + 1,
+                    type: 'content',
+                    header: header,
+                    points: points
+                });
+            }
+
+            // Add Outro slide at end
+            newSlides.push({
+                id: newSlides.length + 1,
+                type: 'outro',
+                header: 'النقطة Media',
+                tagline: 'نحقق . نكشف . نوصل',
+                cta: 'اشترك الآن وتابع تحقيقاتنا الحصرية',
+                handle: '@alnuqtamedia'
+            });
+
+            topics.customScript.slides = newSlides;
+            topics.customScript.title = firstLines[0] || "تحقيق مخصص";
+
+            // Select Custom Topic
+            activeTopic = 'customScript';
+            activeTikTokTopic = 'customScript';
+            currentSlideIndex = 0;
+            activeTikTokSlide = 0;
+
+            const topicSelect = document.getElementById('topic-select');
+            const tiktokTopicSelect = document.getElementById('tiktok-topic-select');
+            if (topicSelect) topicSelect.value = 'customScript';
+            if (tiktokTopicSelect) tiktokTopicSelect.value = 'customScript';
+
+            initSlideButtons();
+            initTikTokSlideButtons();
+            renderCanvas();
+
+            alert(`تم تحليل السكريبت وتوزيعه بنجاح على (${newSlides.length}) سلايدات!`);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function createInputField(label, value, onChange) {
+            const div = document.createElement('div');
+            div.className = 'flex flex-col gap-1';
+            const lbl = document.createElement('label');
+            lbl.className = 'text-[11px] font-cairo font-bold text-gray-400';
+            lbl.innerText = label;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = value || '';
+            input.className = 'w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white focus:outline-none focus:border-brandRed font-tajawal';
+            input.oninput = (e) => onChange(e.target.value);
+            div.appendChild(lbl);
+            div.appendChild(input);
+            return div;
+        }
+
+        function createTextareaField(label, value, onChange) {
+            const div = document.createElement('div');
+            div.className = 'flex flex-col gap-1';
+            const lbl = document.createElement('label');
+            lbl.className = 'text-[11px] font-cairo font-bold text-gray-400';
+            lbl.innerText = label;
+            const textarea = document.createElement('textarea');
+            textarea.rows = 2;
+            textarea.value = value || '';
+            textarea.className = 'w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white focus:outline-none focus:border-brandRed font-tajawal resize-none';
+            textarea.oninput = (e) => onChange(e.target.value);
+            div.appendChild(lbl);
+            div.appendChild(textarea);
+            return div;
+        }
+
+        function changeTopic(topicKey) {
+            activeTopic = topicKey;
+            currentSlideIndex = 0;
+            initSlideButtons();
+            renderCanvas();
+        }
+
+        function initSlideButtons() {
+            const container = document.getElementById('slide-number-buttons');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const slides = topics[activeTopic].slides;
+            slides.forEach((slide, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `px-2.5 py-1 rounded text-xs font-cairo font-bold ${idx === currentSlideIndex ? 'bg-brandRed text-white' : 'bg-navy-card text-gray-400 hover:bg-navy-light'}`;
+                btn.innerText = idx + 1;
+                btn.onclick = () => {
+                    currentSlideIndex = idx;
+                    initSlideButtons();
+                    renderCanvas();
+                };
+                container.appendChild(btn);
+            });
+            updateSlideInputs();
+        }
+
+        function updateSlideInputs() {
+            const container = document.getElementById('slide-inputs');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const slide = topics[activeTopic].slides[currentSlideIndex];
+            if (!slide) return;
+
+            if (slide.badge !== undefined) container.appendChild(createInputField('شارة السلايد', slide.badge, v => { slide.badge = v; renderCanvas(); }));
+            if (slide.title !== undefined) container.appendChild(createInputField('العنوان الرئيسي', slide.title, v => { slide.title = v; renderCanvas(); }));
+            if (slide.subtitle !== undefined) container.appendChild(createTextareaField('الوصف / التفاصيل', slide.subtitle, v => { slide.subtitle = v; renderCanvas(); }));
+            if (slide.header !== undefined) container.appendChild(createInputField('عنوان الفقرة', slide.header, v => { slide.header = v; renderCanvas(); }));
+            if (slide.q1 !== undefined) container.appendChild(createTextareaField('الاقتباس الأول', slide.q1, v => { slide.q1 = v; renderCanvas(); }));
+            if (slide.speaker1 !== undefined) container.appendChild(createInputField('صاحب الاقتباس الأول', slide.speaker1, v => { slide.speaker1 = v; renderCanvas(); }));
+            if (slide.q2 !== undefined) container.appendChild(createTextareaField('الاقتباس الثاني', slide.q2, v => { slide.q2 = v; renderCanvas(); }));
+            if (slide.speaker2 !== undefined) container.appendChild(createInputField('صاحب الاقتباس الثاني', slide.speaker2, v => { slide.speaker2 = v; renderCanvas(); }));
+            if (slide.stat1 !== undefined) container.appendChild(createInputField('الإحصائية 1', slide.stat1, v => { slide.stat1 = v; renderCanvas(); }));
+            if (slide.desc1 !== undefined) container.appendChild(createInputField('وصف الإحصائية 1', slide.desc1, v => { slide.desc1 = v; renderCanvas(); }));
+            if (slide.stat2 !== undefined) container.appendChild(createInputField('الإحصائية 2', slide.stat2, v => { slide.stat2 = v; renderCanvas(); }));
+            if (slide.desc2 !== undefined) container.appendChild(createInputField('وصف الإحصائية 2', slide.desc2, v => { slide.desc2 = v; renderCanvas(); }));
+            if (slide.stat3 !== undefined) container.appendChild(createInputField('الإحصائية 3', slide.stat3, v => { slide.stat3 = v; renderCanvas(); }));
+            if (slide.desc3 !== undefined) container.appendChild(createInputField('وصف الإحصائية 3', slide.desc3, v => { slide.desc3 = v; renderCanvas(); }));
+            if (slide.tagline !== undefined) container.appendChild(createInputField('الشعار اللفظي', slide.tagline, v => { slide.tagline = v; renderCanvas(); }));
+            if (slide.cta !== undefined) container.appendChild(createInputField('دعوة للتفاعل', slide.cta, v => { slide.cta = v; renderCanvas(); }));
+
+            if (slide.points) {
+                slide.points.forEach((pt, idx) => {
+                    container.appendChild(createTextareaField(`النقطة ${idx + 1}`, pt, v => { slide.points[idx] = v; renderCanvas(); }));
+                });
+            }
+        }
+
+        function selectThumbPreset(index) {
+            activeThumbPreset = index;
+            document.querySelectorAll('.yt-preset-btn').forEach((btn, idx) => {
+                if (idx === index) {
+                    btn.className = 'yt-preset-btn py-2 rounded text-[11px] font-cairo font-bold bg-brandRed text-white';
+                } else {
+                    btn.className = 'yt-preset-btn py-2 rounded text-[11px] font-cairo font-bold bg-navy-card text-gray-400 hover:bg-navy-light';
+                }
+            });
+            updateThumbInputs();
+            renderCanvas();
+        }
+
+        function updateThumbInputs() {
+            const container = document.getElementById('thumbnail-inputs');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const preset = thumbPresets[activeThumbPreset];
+            if (!preset) return;
+
+            container.appendChild(createInputField('شارة المصغرة', preset.badge, v => { preset.badge = v; renderCanvas(); }));
+            container.appendChild(createInputField('العنوان الرئيسي', preset.title, v => { preset.title = v; renderCanvas(); }));
+            container.appendChild(createTextareaField('الوصف الفرعي', preset.subtitle, v => { preset.subtitle = v; renderCanvas(); }));
+        }
+
+        function selectYTAsset(assetType) {
+            activeYTAsset = assetType;
+            const avatarBtn = document.getElementById('asset-btn-avatar');
+            const bannerBtn = document.getElementById('asset-btn-banner');
+
+            if (assetType === 'avatar') {
+                if (avatarBtn) avatarBtn.className = 'asset-btn py-2.5 rounded bg-brandRed text-white text-xs font-cairo font-bold shadow';
+                if (bannerBtn) bannerBtn.className = 'asset-btn py-2.5 rounded bg-navy-card text-gray-400 hover:bg-navy-light text-xs font-cairo font-bold';
+            } else {
+                if (avatarBtn) avatarBtn.className = 'asset-btn py-2.5 rounded bg-navy-card text-gray-400 hover:bg-navy-light text-xs font-cairo font-bold';
+                if (bannerBtn) bannerBtn.className = 'asset-btn py-2.5 rounded bg-brandRed text-white text-xs font-cairo font-bold shadow';
+            }
+            renderCanvas();
+        }
+
+        window.onload = function() {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+            initSlideButtons();
+            initTikTokSlideButtons();
+            updateThumbInputs();
+            renderCanvas();
+        };
+
+        function switchTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-brandRed', 'text-white');
+                btn.classList.add('bg-navy-card', 'text-gray-300');
+            });
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-navy-card', 'text-gray-300');
+                activeBtn.classList.add('bg-brandRed', 'text-white');
+            }
+
+            document.querySelectorAll('.control-panel').forEach(p => p.classList.add('hidden'));
+            const ctrl = document.getElementById(`controls-${tab}`);
+            if (ctrl) ctrl.classList.remove('hidden');
+
+            renderCanvas();
+        }
+
+        function changeTikTokTopic(topicKey) {
+            activeTikTokTopic = topicKey;
+            activeTikTokSlide = 0;
+            initTikTokSlideButtons();
+            renderCanvas();
+        }
+
+        function initTikTokSlideButtons() {
+            const container = document.getElementById('tiktok-slide-buttons');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const slides = topics[activeTikTokTopic].slides;
+            slides.forEach((slide, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `px-2.5 py-1 rounded text-xs font-cairo font-bold ${idx === activeTikTokSlide ? 'bg-brandRed text-white' : 'bg-navy-card text-gray-400 hover:bg-navy-light'}`;
+                btn.innerText = idx + 1;
+                btn.onclick = () => {
+                    activeTikTokSlide = idx;
+                    initTikTokSlideButtons();
+                    updateTikTokInputs();
+                    renderCanvas();
+                };
+                container.appendChild(btn);
+            });
+            updateTikTokInputs();
+        }
+
+        function updateTikTokInputs() {
+            const container = document.getElementById('tiktok-inputs');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const slide = topics[activeTikTokTopic].slides[activeTikTokSlide];
+            if (!slide) return;
+
+            if (slide.badge !== undefined) container.appendChild(createInputField('شارة السلايد', slide.badge, v => { slide.badge = v; renderCanvas(); }));
+            if (slide.title !== undefined) container.appendChild(createInputField('العنوان الرئيسي', slide.title, v => { slide.title = v; renderCanvas(); }));
+            if (slide.subtitle !== undefined) container.appendChild(createTextareaField('الوصف / التفاصيل', slide.subtitle, v => { slide.subtitle = v; renderCanvas(); }));
+            if (slide.header !== undefined) container.appendChild(createInputField('عنوان الفقرة', slide.header, v => { slide.header = v; renderCanvas(); }));
+            if (slide.q1 !== undefined) container.appendChild(createTextareaField('الاقتباس الأول', slide.q1, v => { slide.q1 = v; renderCanvas(); }));
+            if (slide.speaker1 !== undefined) container.appendChild(createInputField('صاحب الاقتباس الأول', slide.speaker1, v => { slide.speaker1 = v; renderCanvas(); }));
+            if (slide.q2 !== undefined) container.appendChild(createTextareaField('الاقتباس الثاني', slide.q2, v => { slide.q2 = v; renderCanvas(); }));
+            if (slide.speaker2 !== undefined) container.appendChild(createInputField('صاحب الاقتباس الثاني', slide.speaker2, v => { slide.speaker2 = v; renderCanvas(); }));
+            if (slide.tagline !== undefined) container.appendChild(createInputField('الشعار اللفظي', slide.tagline, v => { slide.tagline = v; renderCanvas(); }));
+            if (slide.cta !== undefined) container.appendChild(createInputField('دعوة للتفاعل', slide.cta, v => { slide.cta = v; renderCanvas(); }));
+
+            if (slide.points) {
+                slide.points.forEach((pt, idx) => {
+                    container.appendChild(createTextareaField(`النقطة ${idx + 1}`, pt, v => { slide.points[idx] = v; renderCanvas(); }));
+                });
+            }
+        }
+
+        function renderCanvas() {
+            const target = document.getElementById('export-target');
+            const wrapper = document.getElementById('preview-wrapper');
+            if (!target || !wrapper) return;
+
+            if (activeTab === 'carousel') {
+                wrapper.className = 'preview-carousel shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
+                target.style.width = '360px';
+                target.style.height = '640px';
+                target.style.padding = '24px';
+                
+                const slides = topics[activeTopic].slides;
+                const slide = slides[currentSlideIndex];
+                const totalSlides = slides.length;
+
+                target.innerHTML = buildSlideHTML(slide, currentSlideIndex + 1, totalSlides);
+            } 
+            else if (activeTab === 'tiktok') {
+                wrapper.className = 'preview-carousel shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
+                target.style.width = '360px';
+                target.style.height = '640px';
+                target.style.padding = '24px';
+
+                const slides = topics[activeTikTokTopic].slides;
+                const slide = slides[activeTikTokSlide];
+                const totalSlides = slides.length;
+
+                target.innerHTML = buildSlideHTML(slide, activeTikTokSlide + 1, totalSlides);
+            } 
+            else if (activeTab === 'thumbnail') {
+                wrapper.className = 'preview-yt-thumb shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
+                target.style.width = '560px';
+                target.style.height = '315px';
+                target.style.padding = '24px';
+
+                const preset = thumbPresets[activeThumbPreset];
+
+                if (preset.style === 'impact') {
+                    target.innerHTML = `
+                        <div class="h-full flex flex-col justify-between relative bg-gradient-to-br from-navy via-navy-card to-navy p-2">
+                            <div class="flex items-center justify-between w-full">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-sm leading-none">.</div>
+                                    <span class="font-cairo font-black text-sm tracking-wide text-white">النقطة <span class="text-brandRed">Media</span></span>
+                                </div>
+                                <span class="bg-brandRed text-white text-[10px] font-cairo font-extrabold px-2.5 py-1 rounded shadow">${escapeHtml(preset.badge)}</span>
+                            </div>
+
+                            <div class="my-auto flex flex-col items-start gap-2">
+                                <div class="bg-brandRed text-white px-3 py-1.5 rounded-lg font-cairo font-black text-2xl shadow-lg leading-snug max-w-full">
+                                    ${escapeHtml(preset.title)}
+                                </div>
+                                <p class="font-tajawal font-bold text-sm text-gray-200 max-w-md leading-relaxed drop-shadow mt-1">
+                                    ${escapeHtml(preset.subtitle)}
+                                </p>
+                            </div>
+
+                            <div class="flex items-center justify-between text-[10px] text-gray-400 font-cairo border-t border-navy-light/60 pt-2 w-full">
+                                <span class="bidi-ltr font-mono text-gray-300">@ALNUQTAMEDIA</span>
+                                <span class="inline-flex items-center gap-1.5 text-brandRed font-bold">
+                                    <span>نحقق</span><span>•</span><span>نكشف</span><span>•</span><span>نوصل</span>
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                } else if (preset.style === 'doc') {
+                    target.innerHTML = `
+                        <div class="h-full flex flex-col justify-between relative bg-navy p-2 border-2 border-brandRed/40 rounded-lg">
+                            <div class="flex items-center justify-between w-full">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-sm leading-none">.</div>
+                                    <span class="font-cairo font-black text-sm tracking-wide text-white">النقطة <span class="text-brandRed">Media</span></span>
+                                </div>
+                                <span class="bg-navy-light text-brandRed border border-brandRed/60 text-[10px] font-cairo font-black px-2 py-0.5 rounded">${escapeHtml(preset.badge)}</span>
+                            </div>
+
+                            <div class="my-auto bg-navy-card/90 border-r-4 border-brandRed p-4 rounded-l w-full">
+                                <h2 class="font-cairo font-black text-xl text-white mb-1 leading-snug">${escapeHtml(preset.title)}</h2>
+                                <p class="font-tajawal text-xs text-gray-300 leading-relaxed">${escapeHtml(preset.subtitle)}</p>
+                            </div>
+
+                            <div class="flex items-center justify-between text-[10px] text-gray-400 font-cairo border-t border-navy-light/60 pt-2 w-full">
+                                <span class="bidi-ltr font-mono text-gray-300">@ALNUQTAMEDIA</span>
+                                <span class="text-brandRed font-bold">وثائق استقصائية حصرية</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (preset.style === 'investigation') {
+                    target.innerHTML = `
+                        <div class="h-full flex flex-col justify-between relative bg-gradient-to-l from-navy-card via-navy to-black p-2">
+                            <div class="flex items-center justify-between w-full">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-sm leading-none">.</div>
+                                    <span class="font-cairo font-black text-sm tracking-wide text-white">النقطة <span class="text-brandRed">Media</span></span>
+                                </div>
+                                <span class="bg-brandRed/20 text-brandRed border border-brandRed/40 text-[10px] font-cairo font-extrabold px-2.5 py-0.5 rounded-full">${escapeHtml(preset.badge)}</span>
+                            </div>
+
+                            <div class="my-auto flex flex-col items-start">
+                                <span class="text-brandRed font-cairo font-black text-xs uppercase tracking-widest mb-1 block">[تحقيق استقصائي ممتد]</span>
+                                <h1 class="font-cairo font-black text-2xl text-white mb-2 leading-tight">${escapeHtml(preset.title)}</h1>
+                                <p class="font-tajawal text-xs text-gray-300 max-w-sm leading-relaxed">${escapeHtml(preset.subtitle)}</p>
+                            </div>
+
+                            <div class="flex items-center justify-between text-[10px] text-gray-400 font-cairo border-t border-navy-light/60 pt-2 w-full">
+                                <span class="bidi-ltr font-mono text-gray-300">@ALNUQTAMEDIA</span>
+                                <span class="inline-flex items-center gap-1.5 text-gray-300">
+                                    <span>نحقق</span><span>•</span><span>نكشف</span><span>•</span><span>نوصل</span>
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }
+            } 
+            else if (activeTab === 'yt-assets') {
+                if (activeYTAsset === 'avatar') {
+                    wrapper.className = 'preview-yt-avatar shadow-2xl rounded-full overflow-hidden border-2 border-brandRed transition-all duration-300';
+                    target.style.width = '320px';
+                    target.style.height = '320px';
+                    target.style.padding = '0px';
+
+                    target.innerHTML = `
+                        <div class="w-full h-full bg-navy flex flex-col items-center justify-center p-6 text-center relative">
+                            <div class="w-24 h-24 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-6xl shadow-2xl shadow-brandRed/50 mb-3 border-2 border-white/20 leading-none">
+                                .
+                            </div>
+                            <h1 class="font-cairo font-black text-2xl text-white tracking-wide">النقطة</h1>
+                            <p class="font-cairo font-extrabold text-xs text-brandRed tracking-widest mt-0.5 bidi-ltr">MEDIA</p>
+                        </div>
+                    `;
+                } else {
+                    wrapper.className = 'preview-yt-banner shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
+                    target.style.width = '640px';
+                    target.style.height = '144px';
+                    target.style.padding = '16px';
+
+                    target.innerHTML = `
+                        <div class="w-full h-full flex items-center justify-between bg-gradient-to-r from-navy via-navy-card to-navy px-6 border border-navy-light/40 rounded-lg">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-2xl shadow-lg shadow-brandRed/30 leading-none">
+                                    .
+                                </div>
+                                <div>
+                                    <h1 class="font-cairo font-black text-xl text-white">النقطة <span class="text-brandRed">Media</span></h1>
+                                    <p class="font-tajawal text-xs text-gray-300">منصة التحقيقات والتغطيات الإخبارية الميدانية</p>
+                                </div>
+                            </div>
+
+                            <div class="text-left flex flex-col items-end gap-1">
+                                <div class="bg-brandRed/20 border border-brandRed/50 text-brandRed font-cairo font-bold text-xs px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+                                    <span>نحقق</span><span>•</span><span>نكشف</span><span>•</span><span>نوصل</span>
+                                </div>
+                                <span class="text-[10px] text-gray-400 font-mono bidi-ltr">@ALNUQTAMEDIA</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function buildSlideHTML(slide, slideNum, totalSlides) {
+            const headerHTML = `
+                <div class="flex items-center justify-between border-b border-navy-light/50 pb-3 w-full">
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-6 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-xs leading-none">.</div>
+                        <span class="font-cairo font-black text-xs">النقطة <span class="text-brandRed">Media</span></span>
+                    </div>
+                    <span class="text-[10px] text-gray-400 font-mono tracking-wider bidi-ltr">@ALNUQTAMEDIA</span>
+                </div>
+            `;
+
+            const footerHTML = `
+                <div class="border-t border-navy-light/50 pt-3 flex items-center justify-between text-[10px] text-gray-400 font-cairo w-full">
+                    <span>صحافة استقصائية محايدة</span>
+                    <span class="font-mono bidi-ltr text-gray-300 font-bold">${slideNum} / ${totalSlides}</span>
+                </div>
+            `;
+
+            if (slide.type === 'cover') {
+                return `
+                    ${headerHTML}
+                    <div class="my-auto flex flex-col items-center text-center gap-4 w-full">
+                        <div class="inline-block bg-brandRed text-white text-[10px] font-cairo font-black px-3 py-1 rounded shadow">
+                            ${escapeHtml(slide.badge)}
+                        </div>
+                        <h1 class="font-cairo font-black text-2xl leading-tight text-white px-2">
+                            ${escapeHtml(slide.title)}
+                        </h1>
+                        <div class="w-12 h-1 bg-brandRed rounded-full"></div>
+                        <p class="font-tajawal text-xs text-gray-300 leading-relaxed px-4">
+                            ${escapeHtml(slide.subtitle)}
+                        </p>
+                    </div>
+                    ${footerHTML}
+                `;
+            } else if (slide.type === 'content' || slide.type === 'verdict') {
+                const pointsHTML = (slide.points || []).map(p => `
+                    <div class="bg-navy-card/80 border border-navy-light/60 p-2.5 rounded-lg flex items-start gap-2 text-right">
+                        <span class="w-1.5 h-1.5 rounded-full bg-brandRed mt-1.5 flex-shrink-0"></span>
+                        <p class="font-tajawal text-xs text-gray-200 leading-relaxed">${escapeHtml(p)}</p>
+                    </div>
+                `).join('');
+
+                return `
+                    ${headerHTML}
+                    <div class="my-auto flex flex-col gap-3 w-full">
+                        <div class="inline-block bg-brandRed text-white text-[10px] font-cairo font-black px-2.5 py-1 rounded w-max">
+                            ${slide.type === 'verdict' ? 'النتيجة والاستنتاج' : 'محور التحقيق'}
+                        </div>
+                        <h2 class="font-cairo font-bold text-sm text-white text-right">${escapeHtml(slide.header)}</h2>
+                        <div class="flex flex-col gap-2 mt-1 w-full">
+                            ${pointsHTML}
+                        </div>
+                    </div>
+                    ${footerHTML}
+                `;
+            } else if (slide.type === 'quotes') {
+                return `
+                    ${headerHTML}
+                    <div class="my-auto flex flex-col gap-3 w-full">
+                        <h2 class="font-cairo font-bold text-sm text-white border-r-2 border-brandRed pr-2 text-right">${escapeHtml(slide.header)}</h2>
+                        <div class="bg-navy-card/90 border border-navy-light/60 p-3 rounded-lg flex flex-col gap-1 text-right">
+                            <span class="text-[10px] text-brandRed font-cairo font-bold">${escapeHtml(slide.speaker1)}</span>
+                            <p class="font-tajawal text-xs text-gray-200 italic leading-relaxed">${escapeHtml(slide.q1)}</p>
+                        </div>
+                        <div class="bg-navy-card/90 border border-navy-light/60 p-3 rounded-lg flex flex-col gap-1 text-right">
+                            <span class="text-[10px] text-brandRed font-cairo font-bold">${escapeHtml(slide.speaker2)}</span>
+                            <p class="font-tajawal text-xs text-gray-200 italic leading-relaxed">${escapeHtml(slide.q2)}</p>
+                        </div>
+                    </div>
+                    ${footerHTML}
+                `;
+            } else if (slide.type === 'stats') {
+                return `
+                    ${headerHTML}
+                    <div class="my-auto flex flex-col gap-3 w-full">
+                        <h2 class="font-cairo font-bold text-sm text-white text-right">${escapeHtml(slide.header)}</h2>
+                        <div class="grid grid-cols-1 gap-2 mt-1 w-full">
+                            <div class="bg-navy-card/80 border border-navy-light/60 p-2.5 rounded-lg flex items-center justify-between">
+                                <span class="font-cairo font-black text-lg text-brandRed">${escapeHtml(slide.stat1)}</span>
+                                <span class="font-tajawal text-[11px] text-gray-300 text-left">${escapeHtml(slide.desc1)}</span>
+                            </div>
+                            <div class="bg-navy-card/80 border border-navy-light/60 p-2.5 rounded-lg flex items-center justify-between">
+                                <span class="font-cairo font-black text-lg text-brandRed">${escapeHtml(slide.stat2)}</span>
+                                <span class="font-tajawal text-[11px] text-gray-300 text-left">${escapeHtml(slide.desc2)}</span>
+                            </div>
+                            <div class="bg-navy-card/80 border border-navy-light/60 p-2.5 rounded-lg flex items-center justify-between">
+                                <span class="font-cairo font-black text-lg text-brandRed">${escapeHtml(slide.stat3)}</span>
+                                <span class="font-tajawal text-[11px] text-gray-300 text-left">${escapeHtml(slide.desc3)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${footerHTML}
+                `;
+            } else if (slide.type === 'diagram') {
+                const stepsHTML = (slide.steps || []).map((step, idx) => `
+                    <div class="bg-navy-card border border-brandRed/40 p-2 rounded text-center font-cairo font-bold text-xs text-brandRed">
+                        ${idx + 1}. ${escapeHtml(step)}
+                    </div>
+                `).join('<div class="text-center text-gray-500 text-xs my-0.5">↓</div>');
+
+                const pointsHTML = (slide.points || []).map(p => `
+                    <p class="font-tajawal text-[11px] text-gray-300 border-r-2 border-brandRed pr-2 leading-relaxed text-right">${escapeHtml(p)}</p>
+                `).join('');
+
+                return `
+                    ${headerHTML}
+                    <div class="my-auto flex flex-col gap-3 w-full">
+                        <h2 class="font-cairo font-bold text-sm text-white text-right">${escapeHtml(slide.header)}</h2>
+                        <div class="flex flex-col my-1 w-full">${stepsHTML}</div>
+                        <div class="flex flex-col gap-1.5 mt-1 w-full">${pointsHTML}</div>
+                    </div>
+                    ${footerHTML}
+                `;
+            } else if (slide.type === 'outro') {
+                return `
+                    ${headerHTML}
+                    <div class="my-auto flex flex-col items-center text-center gap-4 w-full">
+                        <div class="w-16 h-16 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black text-white text-3xl shadow-xl shadow-brandRed/40 leading-none">.</div>
+                        <div>
+                            <h2 class="font-cairo font-black text-xl text-white">${escapeHtml(slide.header)}</h2>
+                            <div class="inline-flex items-center gap-2 text-brandRed font-cairo font-bold text-xs mt-1">
+                                <span>نحقق</span><span>•</span><span>نكشف</span><span>•</span><span>نوصل</span>
+                            </div>
+                        </div>
+                        <div class="bg-navy-card border border-navy-light px-4 py-2 rounded-full mt-2">
+                            <p class="font-tajawal text-xs text-gray-200 font-bold">${escapeHtml(slide.cta)}</p>
+                        </div>
+                    </div>
+                    <div class="border-t border-navy-light/50 pt-3 flex items-center justify-center text-xs font-mono text-gray-400 bidi-ltr w-full">
+                        ${escapeHtml(slide.handle)}
+                    </div>
+                `;
+            }
+            return '';
+        }
+
+        async function exportAllTikTokSlides() {
+            const status = document.getElementById('export-status');
+            const statusText = document.getElementById('export-status-text');
+
+            if (status) {
+                statusText.innerText = "جاري حزم كافة شرائح الريلز والستوري بملف ZIP...";
+                status.classList.remove('hidden');
+            }
+
+            if (document.fonts) {
+                await document.fonts.ready;
+            }
+
+            try {
+                const zip = new JSZip();
+                const folder = zip.folder(`alnuqta-reels-${activeTikTokTopic}-package`);
+                const slides = topics[activeTikTokTopic].slides;
+                const originalSlide = activeTikTokSlide;
+
+                for (let i = 0; i < slides.length; i++) {
+                    activeTikTokSlide = i;
+                    renderCanvas();
+                    await new Promise(r => setTimeout(r, 150));
+
+                    const target = document.getElementById('export-target');
+                    if (target) {
+                        const canvas = await html2canvas(target, {
+                            scale: 3,
+                            backgroundColor: '#0A1A2F',
+                            useCORS: true,
+                            letterRendering: false
+                        });
+                        const imgData = canvas.toDataURL('image/png').split(',')[1];
+                        folder.file(`reels-slide-${i + 1}.png`, imgData, { base64: true });
+                    }
+                }
+
+                activeTikTokSlide = originalSlide;
+                renderCanvas();
+
+                statusText.innerText = "جاري الضغط وتحميل حزمة الريلز...";
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `alnuqta-reels-${activeTikTokTopic}-pack.zip`;
+                link.click();
+
+            } catch (err) {
+                console.error("TikTok ZIP Export Error: ", err);
+            } finally {
+                if (status) status.classList.add('hidden');
+            }
+        }
+
+        async function exportAllThumbnails() {
+            const status = document.getElementById('export-status');
+            const statusText = document.getElementById('export-status-text');
+
+            if (status) {
+                statusText.innerText = "جاري تجميع أنماط مصغرات يوتيوب بملف ZIP...";
+                status.classList.remove('hidden');
+            }
+
+            if (document.fonts) {
+                await document.fonts.ready;
+            }
+
+            try {
+                const zip = new JSZip();
+                const folder = zip.folder("alnuqta-youtube-thumbnails-package");
+                const originalPreset = activeThumbPreset;
+
+                for (let i = 0; i < thumbPresets.length; i++) {
+                    activeThumbPreset = i;
+                    renderCanvas();
+                    await new Promise(r => setTimeout(r, 150));
+
+                    const target = document.getElementById('export-target');
+                    if (target) {
+                        const canvas = await html2canvas(target, {
+                            scale: 3,
+                            backgroundColor: '#0A1A2F',
+                            useCORS: true,
+                            letterRendering: false
+                        });
+                        const imgData = canvas.toDataURL('image/png').split(',')[1];
+                        folder.file(`youtube-thumbnail-style-${i + 1}-${thumbPresets[i].style}.png`, imgData, { base64: true });
+                    }
+                }
+
+                activeThumbPreset = originalPreset;
+                renderCanvas();
+
+                statusText.innerText = "جاري تجهيز التحميل...";
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `alnuqta-youtube-thumbnails-pack.zip`;
+                link.click();
+
+            } catch (err) {
+                console.error("Thumbnails ZIP Export Error: ", err);
+            } finally {
+                if (status) status.classList.add('hidden');
+            }
+        }
+
+        async function exportSingleDesign() {
+            const target = document.getElementById('export-target');
+            const status = document.getElementById('export-status');
+            const statusText = document.getElementById('export-status-text');
+            
+            if (!target) return;
+            if (status) {
+                statusText.innerText = "جاري التقاط ومعالجة تصميم الصورة...";
+                status.classList.remove('hidden');
+            }
+
+            if (document.fonts) {
+                await document.fonts.ready;
+            }
+
+            try {
+                const canvas = await html2canvas(target, {
+                    scale: 3,
+                    backgroundColor: '#0A1A2F',
+                    useCORS: true,
+                    allowTaint: true,
+                    letterRendering: false,
+                    onclone: (clonedDoc) => {
+                        const el = clonedDoc.getElementById('export-target');
+                        if (el) el.style.direction = 'rtl';
+                    }
+                });
+
+                const link = document.createElement('a');
+                link.download = `alnuqta-${activeTab}-${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (err) {
+                console.error("Single Export Error: ", err);
+            } finally {
+                if (status) status.classList.add('hidden');
+            }
+        }
+
+        async function exportAllSlides() {
+            const status = document.getElementById('export-status');
+            const statusText = document.getElementById('export-status-text');
+
+            if (status) {
+                statusText.innerText = "جاري إنشاء وتجميع كافة السلايدات بملف ZIP...";
+                status.classList.remove('hidden');
+            }
+
+            if (document.fonts) {
+                await document.fonts.ready;
+            }
+
+            try {
+                const zip = new JSZip();
+                const folder = zip.folder(`alnuqta-${activeTopic}-slides`);
+                const slides = topics[activeTopic].slides;
+                const originalSlideIndex = currentSlideIndex;
+
+                for (let i = 0; i < slides.length; i++) {
+                    currentSlideIndex = i;
+                    renderCanvas();
+                    await new Promise(r => setTimeout(r, 150));
+
+                    const target = document.getElementById('export-target');
+                    if (target) {
+                        const canvas = await html2canvas(target, {
+                            scale: 3,
+                            backgroundColor: '#0A1A2F',
+                            useCORS: true,
+                            letterRendering: false
+                        });
+                        const imgData = canvas.toDataURL('image/png').split(',')[1];
+                        folder.file(`slide-${i + 1}.png`, imgData, { base64: true });
+                    }
+                }
+
+                currentSlideIndex = originalSlideIndex;
+                renderCanvas();
+
+                statusText.innerText = "جاري الضغط وحفظ الملف النهائي...";
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `alnuqta-${activeTopic}-slides-package.zip`;
+                link.click();
+
+            } catch (err) {
+                console.error("Batch Export Error: ", err);
+            } finally {
+                if (status) status.classList.add('hidden');
+            }
+        }
+
+        async function exportAllYTAssets() {
+            const status = document.getElementById('export-status');
+            const statusText = document.getElementById('export-status-text');
+
+            if (status) {
+                statusText.innerText = "جاري تجهيز وتصدير كافة أصول اليوتيوب بملف ZIP...";
+                status.classList.remove('hidden');
+            }
+
+            if (document.fonts) {
+                await document.fonts.ready;
+            }
+
+            try {
+                const zip = new JSZip();
+                const folder = zip.folder("alnuqta-youtube-brand-kit");
+                const target = document.getElementById('export-target');
+
+                // 1. Capture Avatar
+                switchTab('yt-assets');
+                selectYTAsset('avatar');
+                await new Promise(r => setTimeout(r, 200));
+                let canvas = await html2canvas(target, { scale: 3, backgroundColor: '#0A1A2F', useCORS: true, letterRendering: false });
+                folder.file("youtube-avatar-profile.png", canvas.toDataURL('image/png').split(',')[1], { base64: true });
+
+                // 2. Capture Banner
+                selectYTAsset('banner');
+                await new Promise(r => setTimeout(r, 200));
+                canvas = await html2canvas(target, { scale: 3, backgroundColor: '#0A1A2F', useCORS: true, letterRendering: false });
+                folder.file("youtube-channel-banner.png", canvas.toDataURL('image/png').split(',')[1], { base64: true });
+
+                // 3. Capture Thumbnail
+                switchTab('thumbnail');
+                await new Promise(r => setTimeout(r, 200));
+                canvas = await html2canvas(target, { scale: 3, backgroundColor: '#0A1A2F', useCORS: true, letterRendering: false });
+                folder.file("youtube-thumbnail-cover.png", canvas.toDataURL('image/png').split(',')[1], { base64: true });
+
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `alnuqta-youtube-brand-kit.zip`;
+                link.click();
+
+            } catch (err) {
+                console.error("YT Package Export Error: ", err);
+            } finally {
+                if (status) status.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
