@@ -1,8 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 const MODELS = [
-  process.env.GEMINI_MODEL || "gemini-2.5-flash",
-  "gemini-2.5-flash-lite"
+  process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
 ];
 
 const responseSchema = {
