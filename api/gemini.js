@@ -1,4 +1,3 @@
-```javascript
 import { GoogleGenAI } from "@google/genai";
 
 const MODELS = [
@@ -22,20 +21,11 @@ const responseSchema = {
           header: { type: "string" },
           title: { type: "string" },
           subtitle: { type: "string" },
-          points: {
-            type: "array",
-            items: { type: "string" }
-          },
+          points: { type: "array", items: { type: "string" } },
           q1: { type: "string" },
           q2: { type: "string" },
-          stats: {
-            type: "array",
-            items: { type: "string" }
-          },
-          steps: {
-            type: "array",
-            items: { type: "string" }
-          },
+          stats: { type: "array", items: { type: "string" } },
+          steps: { type: "array", items: { type: "string" } },
           cta: { type: "string" },
           handle: { type: "string" }
         },
@@ -119,9 +109,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== "POST") {
-    return send(res, 405, {
-      error: "Method not allowed"
-    });
+    return send(res, 405, { error: "Method not allowed" });
   }
 
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -129,9 +117,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return send(res, 500, {
-      error: "GEMINI_API_KEY is not configured."
-    });
+    return send(res, 500, { error: "GEMINI_API_KEY is not configured." });
   }
 
   try {
@@ -144,14 +130,10 @@ export default async function handler(req, res) {
     const currentContent = body.currentContent || {};
 
     if (!command) {
-      return send(res, 400, {
-        error: "command is required"
-      });
+      return send(res, 400, { error: "command is required" });
     }
 
-    const ai = new GoogleGenAI({
-      apiKey
-    });
+    const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
 ${SYSTEM}
@@ -178,7 +160,6 @@ ${command}
           });
 
           const text = response?.text || "{}";
-
           let result;
 
           try {
@@ -202,9 +183,7 @@ ${command}
           }
 
           const delay = 800 * Math.pow(2, attempt);
-          await new Promise((resolve) =>
-            setTimeout(resolve, delay)
-          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     }
@@ -223,4 +202,3 @@ ${command}
     });
   }
 }
-```
