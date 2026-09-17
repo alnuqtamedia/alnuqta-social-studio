@@ -396,7 +396,7 @@
             initTikTokSlideButtons();
             updateThumbInputs();
 
-            const output = String(result.output || 'carousel');
+            const output = String(result.outputType || result.output || 'carousel');
             if (output === 'story' || output === 'reel' || output === 'video' || output === 'tiktok') switchTab('tiktok');
             else if (output === 'youtube_thumbnail') switchTab('thumbnail');
             else switchTab('carousel');
@@ -411,7 +411,7 @@
             if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); }
             setAIStatus('Gemini يحلل الأمر والمحتوى الحالي ويجهز التصميم…', 'busy');
             try {
-                const response = await fetch('/.netlify/functions/gemini', {
+                const response = await fetch('/api/gemini', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ command, currentContent: getCurrentStudioContent() })
                 });
