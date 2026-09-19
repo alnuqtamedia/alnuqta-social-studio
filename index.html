@@ -120,6 +120,13 @@
             <span id="export-status-text">جاري معالجة وتصدير الصور...</span>
         </div>
     </header>
+    <!-- Newsroom import status -->
+    <div id="newsroom-import-banner" class="hidden bg-emerald-500/10 border-b border-emerald-500/30 px-6 py-3 text-sm text-emerald-300 font-tajawal">
+        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <span id="newsroom-import-text">تم استيراد مادة من غرفة أخبار النقطة.</span>
+            <a id="newsroom-source-link" href="#" target="_blank" rel="noopener" class="underline hover:text-white">فتح المادة الأصلية</a>
+        </div>
+    </div>
 
     <!-- Main Workspace -->
     <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -676,8 +683,36 @@
             }
         ];
 
+        // Newsroom handoff: imports only the URL payload and never modifies the source article.
+        function importFromNewsroom() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('source') !== 'alnuqta-newsroom') return;
+            const title = (params.get('title') || '').trim();
+            const excerpt = (params.get('excerpt') || '').trim();
+            const articleUrl = (params.get('url') || '').trim();
+            const articleId = (params.get('article_id') || '').trim();
+            if (!title && !excerpt && !articleId) return;
+
+            const raw = document.getElementById('raw-script-input');
+            if (raw) raw.value = [title, excerpt].filter(Boolean).join('\n\n');
+            const command = document.getElementById('ai-command-input');
+            if (command && !command.value.trim()) command.value = 'حوّل هذه المادة إلى Carousel صحفي مختصر وجاهز للنشر';
+
+            const banner = document.getElementById('newsroom-import-banner');
+            const text = document.getElementById('newsroom-import-text');
+            const link = document.getElementById('newsroom-source-link');
+            if (text) text.textContent = title ? 'تم استيراد مادة من غرفة أخبار النقطة: ' + title : 'تم استيراد مادة من غرفة أخبار النقطة.';
+            if (link) {
+                if (articleUrl && /^https:\/\/alnuqtamedia\.github\.io\/alnuqta-media\//.test(articleUrl)) link.href = articleUrl;
+                else link.classList.add('hidden');
+            }
+            banner?.classList.remove('hidden');
+
+            if (raw?.value.trim()) processAndDistributeScript(true);
+        }
+
         // Process and automatically distribute raw script
-        function processAndDistributeScript() {
+        function processAndDistributeScript(silent = false) {
             const rawText = document.getElementById('raw-script-input').value.trim();
             if (!rawText) {
                 alert('يرجى كتابة أو لصق السكريبت في المربع المخصص أولاً!');
@@ -758,7 +793,7 @@
             initTikTokSlideButtons();
             renderCanvas();
 
-            alert(`تم تحليل السكريبت وتوزيعه بنجاح على (${newSlides.length}) سلايدات!`);
+            if (!silent) alert(`تم تحليل السكريبت وتوزيعه بنجاح على (${newSlides.length}) سلايدات!`);
         }
 
         function escapeHtml(str) {
@@ -911,6 +946,7 @@
             initTikTokSlideButtons();
             updateThumbInputs();
             renderCanvas();
+            importFromNewsroom();
         };
 
         function switchTab(tab) {
