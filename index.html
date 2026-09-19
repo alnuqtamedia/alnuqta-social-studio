@@ -1379,9 +1379,9 @@
                         const t=frame/Math.max(1,frames-1); const fade=Math.min(1,t*6,(1-t)*6); ctx.fillStyle='#071220';ctx.fillRect(0,0,W,H);ctx.globalAlpha=Math.max(.08,fade);ctx.drawImage(shot,0,0,W,H);ctx.globalAlpha=1;
                         await new Promise(r=>setTimeout(r,1000/fps));
                     }
-                    if(statusText)statusText.innerText=\`إنشاء الفيديو: مشهد \${i+1} من \${slides.length}\`;
+                    if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length}`;
                 }
-                recorder.stop(); await done; const ext=mimeType.startsWith('video/mp4')?'mp4':'webm'; const blob=new Blob(chunks,{type:mimeType}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=\`alnuqta-video-\${Date.now()}.\${ext}\`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+                recorder.stop(); await done; const ext=mimeType.startsWith('video/mp4')?'mp4':'webm'; const blob=new Blob(chunks,{type:mimeType}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
                 setAIStatus(ext==='mp4'?'تم تصدير فيديو MP4 فعلي.':'تم تصدير فيديو WebM فعلي لأن متصفحك لا يدعم تسجيل MP4 مباشرة.','success');
             } catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{} setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error');}
             finally {activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
