@@ -254,6 +254,16 @@
                     </label>
                 </div>
                 <label class="text-[10px] text-gray-400 font-cairo">مدة الفيديو المطلوبة (ثانية)<input id="video-total-duration" type="number" min="5" max="180" value="30" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"></label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="text-[10px] text-gray-400 font-cairo">صوت AI
+                        <select id="ai-tts-voice" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option value="Charon">صحفي واضح</option><option value="Rasalgethi">إخباري</option><option value="Gacrux">ناضج</option><option value="Kore">حازم</option><option value="Sulafat">دافئ</option><option value="Aoede">خفيف</option></select>
+                    </label>
+                    <label class="text-[10px] text-gray-400 font-cairo">أسلوب القراءة
+                        <select id="ai-tts-style" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option value="صحفي وثائقي هادئ وواضح، بالعربية الفصحى الطبيعية، سرعة متوسطة، بلا مبالغة درامية">وثائقي</option><option value="مذيع أخبار عربي واضح ورصين، سرعة متوسطة">إخباري</option><option value="سرد استقصائي جاد، هادئ، مع وقفات طبيعية">استقصائي</option></select>
+                    </label>
+                </div>
+                <button id="ai-tts-btn" onclick="generateAIVoiceover()" class="w-full py-2.5 bg-navy border border-brandRed/60 hover:bg-brandRed text-white rounded font-cairo font-bold text-xs">توليد التعليق الصوتي بالذكاء الاصطناعي</button>
+                <audio id="ai-tts-preview" controls class="hidden w-full"></audio>
                 <label class="text-[10px] text-gray-400 font-cairo">مسار صوتي / تعليق مسجل (اختياري)<input id="video-audio-file" type="file" accept="audio/*" class="mt-1 w-full text-[10px] text-gray-300"></label>
                 <button id="export-video-btn" onclick="exportVerticalVideo()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-xs flex items-center justify-center gap-2 transition shadow-lg">
                     <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو فعلي
@@ -1364,6 +1374,24 @@
             return '';
         }
 
+
+        function pcm16ToWavBlob(base64, sampleRate=24000) {
+            const bin=atob(base64), pcm=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)pcm[i]=bin.charCodeAt(i);
+            const buffer=new ArrayBuffer(44+pcm.length), v=new DataView(buffer); const s=(o,x)=>{for(let i=0;i<x.length;i++)v.setUint8(o+i,x.charCodeAt(i))};
+            s(0,'RIFF');v.setUint32(4,36+pcm.length,true);s(8,'WAVE');s(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sampleRate,true);v.setUint32(28,sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);s(36,'data');v.setUint32(40,pcm.length,true);new Uint8Array(buffer,44).set(pcm);return new Blob([buffer],{type:'audio/wav'});
+        }
+        async function generateAIVoiceover(){
+            const btn=document.getElementById('ai-tts-btn'); const slides=topics[activeTikTokTopic]?.slides||[];
+            const text=slides.map(s=>String(s.voiceover||'').trim()).filter(Boolean).join('\n\n');
+            if(!text)return setAIStatus('لا يوجد نص تعليق صوتي. ولّد فيديو عبر Gemini أولاً أو اكتب نص التعليق داخل المشاهد.','error');
+            if(btn)btn.disabled=true; setAIStatus('جاري توليد التعليق الصوتي العربي بالذكاء الاصطناعي…','busy');
+            try{const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:document.getElementById('ai-tts-style')?.value||''})});const data=await r.json();if(!r.ok)throw new Error(data.error||'فشل توليد الصوت');
+                const blob=(data.mimeType||'').toLowerCase().includes('l16')?pcm16ToWavBlob(data.audio,24000):new Blob([Uint8Array.from(atob(data.audio),x=>x.charCodeAt(0))],{type:data.mimeType||'audio/wav'});
+                if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);window.aiVoiceoverUrl=URL.createObjectURL(blob);window.aiVoiceoverBlob=blob;
+                const audio=document.getElementById('ai-tts-preview');audio.src=window.aiVoiceoverUrl;audio.classList.remove('hidden');setAIStatus('تم توليد التعليق الصوتي. استمع للمعاينة، وسيُستخدم تلقائياً عند تصدير الفيديو.','success');
+            }catch(e){console.error(e);setAIStatus('تعذر توليد التعليق الصوتي: '+(e?.message||e),'error')}finally{if(btn)btn.disabled=false}
+        }
+
         async function exportVerticalVideo() {
             const btn = document.getElementById('export-video-btn');
             const status = document.getElementById('export-status');
@@ -1380,7 +1408,7 @@
             const ctx=canvas.getContext('2d'); const stream=canvas.captureStream(fps);
             let audioEl=null, audioUrl=null;
             const audioFile=document.getElementById('video-audio-file')?.files?.[0];
-            if(audioFile){audioUrl=URL.createObjectURL(audioFile);audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(r=>{audioEl.oncanplaythrough=r;audioEl.onerror=r;audioEl.load()});try{const audioStream=audioEl.captureStream?audioEl.captureStream():audioEl.mozCaptureStream?.();audioStream?.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Audio capture unavailable',e);}}
+            if(audioFile || window.aiVoiceoverBlob){audioUrl=audioFile?URL.createObjectURL(audioFile):window.aiVoiceoverUrl;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(r=>{audioEl.oncanplaythrough=r;audioEl.onerror=r;audioEl.load()});try{const audioStream=audioEl.captureStream?audioEl.captureStream():audioEl.mozCaptureStream?.();audioStream?.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Audio capture unavailable',e);}}
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond: quality===720?5000000:9000000}); const chunks=[];
             recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
             const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
@@ -1407,7 +1435,7 @@
                 recorder.stop(); await done; const ext=mimeType.startsWith('video/mp4')?'mp4':'webm'; const blob=new Blob(chunks,{type:mimeType}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
                 setAIStatus(ext==='mp4'?'تم تصدير فيديو MP4 فعلي.':'تم تصدير فيديو WebM فعلي لأن متصفحك لا يدعم تسجيل MP4 مباشرة.','success');
             } catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{} setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error');}
-            finally {if(audioEl){audioEl.pause();}if(audioUrl)URL.revokeObjectURL(audioUrl);activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
+            finally {if(audioEl){audioEl.pause();}if(audioUrl && audioFile)URL.revokeObjectURL(audioUrl);activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
         }
 
         async function exportAllTikTokSlides() {
