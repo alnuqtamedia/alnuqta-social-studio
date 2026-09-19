@@ -381,7 +381,20 @@
         }
 
         function applyGeminiResult(result) {
-            const slides = normalizeAISlides(result.slides, result.title, result.subtitle);
+            const output = String(result.outputType || result.output || 'carousel').toLowerCase();
+            const videoMode = ['story','reel','video','tiktok'].includes(output);
+            const sourceSlides = Array.isArray(result.slides) ? result.slides : [];
+            const videoSlides = videoMode ? sourceSlides.map((s, i) => ({
+                ...s,
+                type: i === 0 ? 'cover' : (i === sourceSlides.length - 1 ? 'outro' : 'content'),
+                badge: s.badge || (output === 'story' ? 'STORY' : output === 'tiktok' ? 'TIKTOK' : 'فيديو صحفي'),
+                title: s.title || s.header || (i === 0 ? result.title : ''),
+                subtitle: s.subtitle || '',
+                header: s.header || s.title || '',
+                points: Array.isArray(s.points) && s.points.length ? s.points : [s.subtitle || s.cta || ''].filter(Boolean),
+                duration: Number(s.duration || 4)
+            })) : sourceSlides;
+            const slides = normalizeAISlides(videoSlides, result.title, result.subtitle);
             topics.customScript = {
                 title: result.title || 'تحقيق مخصص',
                 subtitle: result.subtitle || 'تم إنتاجه بواسطة Gemini داخل الاستوديو',
@@ -403,8 +416,7 @@
             initTikTokSlideButtons();
             updateThumbInputs();
 
-            const output = String(result.outputType || result.output || 'carousel');
-            if (output === 'story' || output === 'reel' || output === 'video' || output === 'tiktok') switchTab('tiktok');
+            if (videoMode) switchTab('tiktok');
             else if (output === 'youtube_thumbnail') switchTab('thumbnail');
             else switchTab('carousel');
             renderCanvas();
@@ -431,7 +443,7 @@
                 catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
                 if (!response.ok) throw new Error(result.error || 'فشل الاتصال بخدمة Gemini');
                 applyGeminiResult(result);
-                setAIStatus(`تم التنفيذ: ${result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
+                setAIStatus(['video','reel','story','tiktok'].includes(String(result.outputType || result.output || '').toLowerCase()) ? `تم تجهيز سيناريو ${result.outputType || result.output}: ${topics.customScript.slides.length} مشاهد عمودية. ملاحظة: التصدير الحالي للمشاهد كصور؛ تصدير MP4 الفعلي قيد الإضافة.` : `تم التنفيذ: ${result.outputType || result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
             } catch (error) {
                 console.error(error);
                 setAIStatus(error.message || 'تعذر تنفيذ الأمر.', 'error');
