@@ -456,7 +456,7 @@
                 catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
                 if (!response.ok) throw new Error(result.error || 'فشل الاتصال بخدمة Gemini');
                 applyGeminiResult(result);
-                setAIStatus(['video','reel','story','tiktok'].includes(String(result.outputType || result.output || '').toLowerCase()) ? `تم تجهيز سيناريو ${result.outputType || result.output}: ${topics.customScript.slides.length} مشاهد عمودية. ملاحظة: التصدير الحالي للمشاهد كصور؛ تصدير MP4 الفعلي قيد الإضافة.` : `تم التنفيذ: ${result.outputType || result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
+                setAIStatus(['video','reel','story','tiktok'].includes(String(result.outputType || result.output || '').toLowerCase()) ? `تم تجهيز ${topics.customScript.slides.length} مشاهد عمودية. استخدم زر «تصدير فيديو فعلي» في إعدادات الريلز/تيك توك/الستوري. سيُصدّر MP4 إذا كان المتصفح يدعمه، وإلا WebM.` : `تم التنفيذ: ${result.outputType || result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
             } catch (error) {
                 console.error(error);
                 setAIStatus(error.message || 'تعذر تنفيذ الأمر.', 'error');
