@@ -15,3 +15,11 @@ The browser calls `/.netlify/functions/gemini`; the Gemini API key stays server-
 
 ## Local
 Install dependencies, set `GEMINI_API_KEY`, then use a Netlify-compatible local dev command such as `netlify dev`.
+
+## Supabase Edge Function security
+
+The live `gemini-studio`, `gemini-image`, `pexels-search`, and `gemini-tts`
+functions are protected by an exact Origin allowlist and a shared server-side rate
+limit. Their versioned source and database migrations live in the
+[`alnuqta-media` repository](https://github.com/alnuqtamedia/alnuqta-media/tree/main/supabase).
+See [the security status](docs/security-status.md).
