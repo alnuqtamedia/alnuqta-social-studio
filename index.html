@@ -399,7 +399,7 @@
                 steps: Array.isArray(slide.steps) ? slide.steps.slice(0, 5) : [],
                 cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia',
                 duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || '',
-                visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade'
+                visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || ''
             })) : [];
             if (!out.length) out = [{ id: 1, type: 'cover', badge: 'تحقيق استقصائي', title: title || 'تحقيق جديد', subtitle: subtitle || '' }];
             if (out[0].type !== 'cover') out[0].type = 'cover';
@@ -1453,16 +1453,18 @@
                     activeTikTokSlide=i; renderCanvas(); await new Promise(r=>setTimeout(r,120));
                     const target=document.getElementById('export-target');
                     const shot=await html2canvas(target,{scale:3,backgroundColor:'#0A1A2F',useCORS:true,letterRendering:false});
+                    let brollVideo=null,brollReady=false;
+                    if(slides[i].mediaVideoUrl){try{brollVideo=document.createElement('video');brollVideo.src=slides[i].mediaVideoUrl;brollVideo.crossOrigin='anonymous';brollVideo.muted=true;brollVideo.playsInline=true;brollVideo.preload='auto';await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('B-roll timeout')),8000);brollVideo.onloadeddata=()=>{clearTimeout(timer);resolve()};brollVideo.onerror=()=>{clearTimeout(timer);reject(new Error('B-roll load failed'))};brollVideo.load()});brollVideo.currentTime=0;await brollVideo.play();brollReady=true}catch(e){console.warn('B-roll video fallback to preview image',e);brollReady=false}}
                     const duration=durations[i] || fallbackDuration; const frames=Math.round(duration*fps);
                     for(let frame=0;frame<frames;frame++){
                         const t=frame/Math.max(1,frames-1); const transition=slides[i].transition||'fade'; const fade=transition==='cut'?1:Math.min(1,t*7,(1-t)*7); const motion=slides[i].motion||'zoom-in';
                         let zoom=1,ox=0,oy=0;if(motion==='zoom-in')zoom=1+(0.045*t);else if(motion==='zoom-out')zoom=1.045-(0.045*t);else if(motion==='pan-left'){zoom=1.04;ox=-W*.035*t}else if(motion==='pan-right'){zoom=1.04;ox=W*.035*t}
-                        const dw=W*zoom,dh=H*zoom;ctx.fillStyle='#071220';ctx.fillRect(0,0,W,H);ctx.globalAlpha=Math.max(.08,fade);let tx=0;if(transition==='slide'&&t<.14)tx=W*(1-t/.14);ctx.drawImage(shot,(W-dw)/2+ox+tx,(H-dh)/2+oy,dw,dh);ctx.globalAlpha=1;
+                        const dw=W*zoom,dh=H*zoom;ctx.fillStyle='#071220';ctx.fillRect(0,0,W,H);ctx.globalAlpha=Math.max(.08,fade);let tx=0;if(transition==='slide'&&t<.14)tx=W*(1-t/.14);if(brollReady&&brollVideo?.readyState>=2){const vw=brollVideo.videoWidth||W,vh=brollVideo.videoHeight||H,vr=vw/vh,tr=W/H;let sx=0,sy=0,sw=vw,sh=vh;if(vr>tr){sw=vh*tr;sx=(vw-sw)/2}else{sh=vw/tr;sy=(vh-sh)/2}ctx.drawImage(brollVideo,sx,sy,sw,sh,(W-dw)/2+ox+tx,(H-dh)/2+oy,dw,dh);ctx.fillStyle='rgba(3,10,20,.24)';ctx.fillRect(0,0,W,H);}else{ctx.drawImage(shot,(W-dw)/2+ox+tx,(H-dh)/2+oy,dw,dh);}ctx.globalAlpha=1;
                         const caption=slides[i].type==='outro'?'':String(slides[i].voiceover||'').trim();if(caption){const words=caption.split(/\\s+/);const phraseSize=7,phraseCount=Math.max(1,Math.ceil(words.length/phraseSize)),phraseIndex=Math.min(phraseCount-1,Math.floor(t*phraseCount));const visible=words.slice(phraseIndex*phraseSize,(phraseIndex+1)*phraseSize).join(' ');ctx.direction='rtl';ctx.textAlign='center';ctx.font=`700 ${Math.round(H*.024)}px Tajawal, Arial`;const maxW=W*.76,lineH=H*.034;const ws=visible.split(' ');let lines=[],line='';for(const w of ws){const test=line?line+' '+w:w;if(ctx.measureText(test).width>maxW&&line){lines.push(line);line=w}else line=test}if(line)lines.push(line);lines=lines.slice(0,2);const boxH=lines.length*lineH+H*.024,boxY=H*.845-boxH/2;ctx.fillStyle='rgba(3,10,20,.82)';ctx.fillRect(W*.10,boxY,W*.80,boxH);ctx.fillStyle='#fff';lines.forEach((ln,k)=>ctx.fillText(ln,W/2,boxY+H*.017+(k+1)*lineH-H*.006,maxW));}
                         const barW=W*0.78, barH=Math.max(6,H*0.004), x=(W-barW)/2, y=H*0.92; ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y,barW,barH);ctx.fillStyle='#E31217';ctx.fillRect(x,y,barW*t,barH);
                         await new Promise(r=>setTimeout(r,1000/fps));
                     }
-                    if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length}`;
+                    if(brollVideo){brollVideo.pause();brollVideo.removeAttribute('src');brollVideo.load();}if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length}`;
                 }
                 recorder.stop(); await done; const ext=mimeType.startsWith('video/mp4')?'mp4':'webm'; const blob=new Blob(chunks,{type:mimeType}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
                 setAIStatus(ext==='mp4'?'تم تصدير فيديو MP4 فعلي.':'تم تصدير فيديو WebM فعلي لأن متصفحك لا يدعم تسجيل MP4 مباشرة.','success');
