@@ -253,6 +253,7 @@
                         <select id="video-quality" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option value="1080">1080×1920</option><option value="720">720×1280</option></select>
                     </label>
                 </div>
+                <label class="text-[10px] text-gray-400 font-cairo">مدة الفيديو المطلوبة (ثانية)<input id="video-total-duration" type="number" min="5" max="180" value="30" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"></label>
                 <button id="export-video-btn" onclick="exportVerticalVideo()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-xs flex items-center justify-center gap-2 transition shadow-lg">
                     <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو فعلي
                 </button>
@@ -1361,12 +1362,16 @@
             const quality = Number(document.getElementById('video-quality')?.value || 1080);
             const W = quality === 720 ? 720 : 1080, H = quality === 720 ? 1280 : 1920;
             const fallbackDuration = Math.max(1, Math.min(15, Number(document.getElementById('video-scene-duration')?.value || 4)));
+            const requestedTotal = Math.max(5, Math.min(180, Number(document.getElementById('video-total-duration')?.value || 30)));
             const fps = 30, canvas = document.createElement('canvas'); canvas.width=W; canvas.height=H;
             const ctx=canvas.getContext('2d'); const stream=canvas.captureStream(fps);
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond: quality===720?5000000:9000000}); const chunks=[];
             recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
             const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
             const slides=topics[activeTikTokTopic]?.slides||[]; if(!slides.length)return setAIStatus('لا توجد مشاهد لتصديرها.', 'error');
+            const explicitDurations=slides.map(s=>Number(s.duration)).filter(n=>Number.isFinite(n)&&n>0);
+            const rawTotal=explicitDurations.length===slides.length?explicitDurations.reduce((a,b)=>a+b,0):0;
+            const durations=slides.map(s=>rawTotal?Math.max(1,requestedTotal*(Number(s.duration)/rawTotal)):requestedTotal/slides.length);
             const original=activeTikTokSlide; if(btn)btn.disabled=true; if(status){status.classList.remove('hidden');statusText.innerText='جاري إنشاء الفيديو...';}
             try {
                 if(document.fonts) await document.fonts.ready; recorder.start(1000);
@@ -1374,9 +1379,10 @@
                     activeTikTokSlide=i; renderCanvas(); await new Promise(r=>setTimeout(r,120));
                     const target=document.getElementById('export-target');
                     const shot=await html2canvas(target,{scale:3,backgroundColor:'#0A1A2F',useCORS:true,letterRendering:false});
-                    const duration=Math.max(1,Math.min(15,Number(slides[i].duration||fallbackDuration))); const frames=Math.round(duration*fps);
+                    const duration=durations[i] || fallbackDuration; const frames=Math.round(duration*fps);
                     for(let frame=0;frame<frames;frame++){
-                        const t=frame/Math.max(1,frames-1); const fade=Math.min(1,t*6,(1-t)*6); ctx.fillStyle='#071220';ctx.fillRect(0,0,W,H);ctx.globalAlpha=Math.max(.08,fade);ctx.drawImage(shot,0,0,W,H);ctx.globalAlpha=1;
+                        const t=frame/Math.max(1,frames-1); const fade=Math.min(1,t*7,(1-t)*7); const zoom=1+(0.035*t); const dw=W*zoom,dh=H*zoom;
+                        ctx.fillStyle='#071220';ctx.fillRect(0,0,W,H);ctx.globalAlpha=Math.max(.08,fade);ctx.drawImage(shot,(W-dw)/2,(H-dh)/2,dw,dh);ctx.globalAlpha=1;
                         await new Promise(r=>setTimeout(r,1000/fps));
                     }
                     if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length}`;
