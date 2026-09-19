@@ -1429,6 +1429,37 @@
         }
 
         async function generateAIVoiceover(){
+            const btn=document.getElementById('ai-tts-btn'),slides=topics[activeTikTokTopic]?.slides||[];
+            const texts=slides.map(s=>String(s.voiceover||'').trim()),text=texts.filter(Boolean).join('\n\n');
+            if(!text)return setAIStatus('لا يوجد نص تعليق صوتي. ولّد فيديو عبر Gemini أولاً أو اكتب نص التعليق داخل المشاهد.','error');
+            if(btn)btn.disabled=true;setAIStatus('جاري توليد تعليق صوتي واحد متصل لكل التقرير…','busy');
+            try{
+                let data;
+                for(let attempt=0;attempt<5;attempt++){
+                    const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:document.getElementById('ai-tts-style')?.value||''})});
+                    data=await r.json();if(r.ok)break;
+                    const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),limited=r.status===429||/quota|rate.?limit|high demand/i.test(message);
+                    if(!limited||attempt===4)throw new Error(message);
+                    const waitSeconds=Math.max(10,Math.ceil(Number(retryMatch?.[1]||60))+2);
+                    for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة الصوت ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
+                }
+                const blob=(data.mimeType||'').toLowerCase().includes('l16')?pcm16ToWavBlob(data.audio,24000):new Blob([Uint8Array.from(atob(data.audio),x=>x.charCodeAt(0))],{type:data.mimeType||'audio/wav'});
+                if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);(window.aiSceneVoiceovers||[]).forEach(x=>{if(x?.url)URL.revokeObjectURL(x.url)});
+                window.aiSceneVoiceovers=[];window.aiVoiceoverBlob=blob;window.aiVoiceoverUrl=URL.createObjectURL(blob);
+                const audio=document.getElementById('ai-tts-preview');audio.src=window.aiVoiceoverUrl;audio.classList.remove('hidden');
+                await new Promise(resolve=>{audio.onloadedmetadata=resolve;audio.onerror=resolve;audio.load()});
+                if(Number.isFinite(audio.duration)&&audio.duration>0){
+                    window.aiVoiceoverDuration=audio.duration;
+                    const weights=texts.map((value,i)=>{const words=value.split(/\s+/).filter(Boolean).length;return words||((slides[i]?.type==='outro')?3:1)}),totalWeight=weights.reduce((a,b)=>a+b,0)||1;
+                    window.aiSceneDurations=weights.map(weight=>audio.duration*weight/totalWeight);
+                    const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=audio.duration.toFixed(1);
+                }
+                setAIStatus(`تم توليد تعليق صوتي واحد متصل (${window.aiVoiceoverDuration?.toFixed(1)||0} ثانية). المشاهد ستُنظّم حول صوت الراوي بدون تقطيع صوته.`,'success');
+            }catch(e){console.error(e);setAIStatus('تعذر توليد التعليق الصوتي: '+(e?.message||e),'error')}
+            finally{if(btn)btn.disabled=false}
+        }
+
+        async function generateAIVoiceoverPerScene(){
             const btn=document.getElementById('ai-tts-btn'), slides=topics[activeTikTokTopic]?.slides||[];
             const texts=slides.map(s=>String(s.voiceover||'').trim());
             if(!texts.some(Boolean))return setAIStatus('لا يوجد نص تعليق صوتي. ولّد فيديو عبر Gemini أولاً أو اكتب نص التعليق داخل المشاهد.','error');
