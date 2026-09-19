@@ -1,25 +1,57 @@
-# Alnuqta Media — Social Design Studio + Gemini
+# Alnuqta Social Studio
 
-Independent social-media design studio. It does not modify or depend on the main Alnuqta Media site.
+استوديو مستقل بالواجهة والكود لإنتاج تصاميم ومحتوى السوشيال ميديا لمنصة النقطة.
 
-## Netlify deployment
-1. Create/import a repository containing this folder.
-2. In Netlify, Add new project → Import an existing project → GitHub.
-3. Build command: leave empty.
-4. Publish directory: `.`
-5. Functions directory: `netlify/functions` (also defined in `netlify.toml`).
-6. Add environment variable `GEMINI_API_KEY` with your Google AI Studio key. Optional: `GEMINI_MODEL=gemini-3.8-flash`.
-7. Deploy.
+## البنية الفعلية
 
-The browser calls `/.netlify/functions/gemini`; the Gemini API key stays server-side in Netlify Functions.
+المستودع يحتوي واجهة ثابتة واحدة منشورة عبر GitHub Pages. الواجهة تتصل بأربع
+Supabase Edge Functions موجودة في مشروع Supabase نفسه المستخدم من موقع
+`alnuqta-media`:
 
-## Local
-Install dependencies, set `GEMINI_API_KEY`, then use a Netlify-compatible local dev command such as `netlify dev`.
+- `gemini-studio`: معالجة أوامر المحتوى.
+- `gemini-image`: توليد الصور التوضيحية.
+- `pexels-search`: البحث عن صور وفيديو.
+- `gemini-tts`: توليد التعليق الصوتي.
 
-## Supabase Edge Function security
+الاستوديو مستقل عن الموقع الرئيسي على مستوى الواجهة والمستودع، لكنه يشارك معه
+البنية الخلفية في Supabase.
 
-The live `gemini-studio`, `gemini-image`, `pexels-search`, and `gemini-tts`
-functions are protected by an exact Origin allowlist and a shared server-side rate
-limit. Their versioned source and database migrations live in the
-[`alnuqta-media` repository](https://github.com/alnuqtamedia/alnuqta-media/tree/main/supabase).
-See [the security status](docs/security-status.md).
+## الأمان
+
+مفاتيح Gemini وPexels محفوظة في Supabase Secrets ولا تظهر في المتصفح. الدوال
+الأربع تطبق:
+
+- قائمة Origin مسموح بها للاستوديو.
+- CORS يعيد الـOrigin المسموح فقط.
+- rate limiting بمقدار 20 طلباً لكل دالة وبصمة شبكة في الساعة.
+- SHA-256 لبصمة الشبكة من دون تخزين IP خام.
+
+كود الدوال وmigrations موجودان في:
+[alnuqta-media/supabase](https://github.com/alnuqtamedia/alnuqta-media/tree/main/supabase).
+
+## النشر
+
+النشر يتم تلقائياً إلى GitHub Pages بواسطة
+`.github/workflows/pages-deploy.yml` عند رفع أي تغيير إلى فرع `main`.
+
+الرابط:
+https://alnuqtamedia.github.io/alnuqta-social-studio/
+
+## التشغيل المحلي
+
+لا يحتاج المشروع إلى Node.js أو build step. شغّله عبر خادم ملفات محلي، لأن فتح
+`index.html` مباشرة بصيغة `file://` لا يرسل Origin مقبولاً إلى Supabase.
+
+مثال:
+
+```bash
+python3 -m http.server 8000
+```
+
+إذا كان التطوير المحلي مطلوباً، أضف `http://localhost:8000` مؤقتاً إلى
+`STUDIO_ALLOWED_ORIGINS` في Supabase ثم احذفه بعد انتهاء الاختبار.
+
+## ملاحظات
+
+لا توجد مسارات Vercel أو Netlify أو Cloudflare Workers في البنية الحالية.
+`index.html` يتصل مباشرة بدوال Supabase المحمية.
