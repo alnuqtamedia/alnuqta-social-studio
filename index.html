@@ -387,7 +387,8 @@
                 stat1: slide.stat1 || '', desc1: slide.desc1 || '', stat2: slide.stat2 || '', desc2: slide.desc2 || '', stat3: slide.stat3 || '', desc3: slide.desc3 || '',
                 steps: Array.isArray(slide.steps) ? slide.steps.slice(0, 5) : [],
                 cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia',
-                duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || ''
+                duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || '',
+                visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade'
             })) : [];
             if (!out.length) out = [{ id: 1, type: 'cover', badge: 'تحقيق استقصائي', title: title || 'تحقيق جديد', subtitle: subtitle || '' }];
             if (out[0].type !== 'cover') out[0].type = 'cover';
@@ -408,7 +409,7 @@
                 subtitle: s.subtitle || '',
                 header: s.header || s.title || '',
                 points: Array.isArray(s.points) && s.points.length ? s.points : [s.subtitle || s.cta || ''].filter(Boolean),
-                duration: Number(s.duration || 4)
+                duration: Number(s.duration || 4), voiceover: s.voiceover || s.narration || '', visualType: s.visualType || '', visualQuery: s.visualQuery || '', motion: s.motion || 'zoom-in', transition: s.transition || 'fade'
             })) : sourceSlides;
             const slides = normalizeAISlides(videoSlides, result.title, result.subtitle);
             topics.customScript = {
