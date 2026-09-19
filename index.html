@@ -469,18 +469,25 @@
             if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); }
             setAIStatus('Gemini يحلل الأمر والمحتوى الحالي ويجهز التصميم…', 'busy');
             try {
-                const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command, currentContent: getCurrentStudioContent() })
-                });
-                const contentType = response.headers.get('content-type') || '';
-                if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
-                const raw = await response.text();
-                if (!raw.trim()) throw new Error('خدمة Gemini لم تُرجع بيانات. أعد المحاولة.');
                 let result;
-                try { result = JSON.parse(raw); }
-                catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
-                if (!response.ok) throw new Error(result.error || 'فشل الاتصال بخدمة Gemini');
+                for(let attempt=0;attempt<5;attempt++){
+                    const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command, currentContent: getCurrentStudioContent() })
+                    });
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
+                    const raw = await response.text();
+                    if (!raw.trim()) throw new Error('خدمة Gemini لم تُرجع بيانات. أعد المحاولة.');
+                    try { result = JSON.parse(raw); }
+                    catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
+                    if(response.ok)break;
+                    const message=String(result.error||'فشل الاتصال بخدمة Gemini'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),isRateLimit=response.status===429||/quota|rate.?limit|high demand/i.test(message);
+                    if(!isRateLimit||attempt===4)throw new Error(message);
+                    const waitSeconds=Math.max(3,Math.ceil(Number(retryMatch?.[1]||60))+2);
+                    for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`Gemini مشغول أو الحصة ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
+                    setAIStatus(`إعادة المحاولة تلقائياً (${attempt+2} من 5)…`,'busy');
+                }
                 applyGeminiResult(result);
                 setAIStatus(['video','reel','story','tiktok'].includes(String(result.outputType || result.output || '').toLowerCase()) ? `تم تجهيز ${topics.customScript.slides.length} مشاهد عمودية. استخدم زر «تصدير فيديو فعلي» في إعدادات الريلز/تيك توك/الستوري. سيُصدّر MP4 إذا كان المتصفح يدعمه، وإلا WebM.` : `تم التنفيذ: ${result.outputType || result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
             } catch (error) {
