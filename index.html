@@ -1431,14 +1431,25 @@
                 (window.aiSceneVoiceovers||[]).forEach(x=>{if(x?.url)URL.revokeObjectURL(x.url)});
                 const voice=document.getElementById('ai-tts-voice')?.value||'Charon', style=document.getElementById('ai-tts-style')?.value||'';
                 const sceneAudio=[], decoded=[], sceneDurations=[];
+                const requestSceneTts=async(text,sceneNumber)=>{
+                    for(let attempt=0;attempt<5;attempt++){
+                        const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice,style})});
+                        const data=await r.json();
+                        if(r.ok)return data;
+                        const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),isQuota=r.status===429||/quota|rate.?limit/i.test(message);
+                        if(!isQuota||attempt===4)throw new Error(`المشهد ${sceneNumber}: ${message}`);
+                        const waitSeconds=Math.max(10,Math.ceil(Number(retryMatch?.[1]||60))+2);
+                        for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة Gemini ممتلئة مؤقتاً. إعادة محاولة المشهد ${sceneNumber} تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
+                    }
+                };
                 for(let i=0;i<texts.length;i++){
                     if(!texts[i]){sceneAudio[i]=null;decoded[i]=null;sceneDurations[i]=slides[i].type==='outro'?1.4:.8;continue;}
                     setAIStatus(`جاري توليد صوت المشهد ${i+1} من ${texts.length}…`,'busy');
-                    const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:texts[i],voice,style})});
-                    const data=await r.json();if(!r.ok)throw new Error(`المشهد ${i+1}: ${data.error||'فشل توليد الصوت'}`);
+                    const data=await requestSceneTts(texts[i],i+1);
                     const blob=(data.mimeType||'').toLowerCase().includes('l16')?pcm16ToWavBlob(data.audio,24000):new Blob([Uint8Array.from(atob(data.audio),x=>x.charCodeAt(0))],{type:data.mimeType||'audio/wav'});
                     const buffer=await decodeCtx.decodeAudioData(await blob.arrayBuffer());
                     sceneAudio[i]={blob,url:URL.createObjectURL(blob),duration:buffer.duration};decoded[i]=buffer;sceneDurations[i]=buffer.duration;
+                    if(texts.slice(i+1).some(Boolean)){setAIStatus(`اكتمل صوت المشهد ${i+1}. تهيئة الطلب التالي ضمن حدود Gemini…`,'busy');await new Promise(resolve=>setTimeout(resolve,6500));}
                 }
                 const sampleRate=decoded.find(Boolean)?.sampleRate||24000, channels=Math.max(1,...decoded.filter(Boolean).map(x=>x.numberOfChannels));
                 const frameCounts=sceneDurations.map(d=>Math.max(1,Math.round(d*sampleRate))), totalFrames=frameCounts.reduce((a,b)=>a+b,0);
