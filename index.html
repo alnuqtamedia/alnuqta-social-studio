@@ -418,10 +418,12 @@
             if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); }
             setAIStatus('Gemini يحلل الأمر والمحتوى الحالي ويجهز التصميم…', 'busy');
             try {
-                const response = await fetch('/api/gemini', {
+                const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ command, currentContent: getCurrentStudioContent() })
                 });
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'فشل الاتصال بخدمة Gemini');
                 applyGeminiResult(result);
