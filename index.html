@@ -270,6 +270,7 @@
                 </button>
                 <p class="text-[10px] text-gray-500 font-tajawal">يُصدّر الفيديو مباشرة من المتصفح. WebM مدعوم على Chrome/Edge؛ MP4 يظهر تلقائياً إذا كان المتصفح يدعم تسجيل H.264/MP4.</p>
 
+                <div class="border border-brandRed/30 rounded-lg p-3 bg-navy-card/50"><h4 class="font-cairo font-black text-xs text-white mb-2">المساعد البصري للمادة</h4><p class="text-[10px] text-gray-400 font-tajawal mb-2">يحلل المشاهد ويحدد احتياج الصورة وB-roll لكل مشهد.</p><button onclick="prepareVisualPlan()" class="w-full py-2 bg-navy border border-brandRed/60 hover:bg-brandRed rounded text-xs font-cairo font-bold">جهّز المادة بصرياً</button><div id="visual-plan-status" class="text-[10px] text-gray-400 mt-2"></div></div>
                 <!-- TikTok Batch ZIP Export Button -->
                 <button onclick="exportAllTikTokSlides()" class="w-full py-2.5 bg-brandRed/20 hover:bg-brandRed text-brandRed hover:text-white border border-brandRed/50 rounded font-cairo font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-md">
                     <i data-lucide="archive" class="w-4 h-4"></i> تصدير حزمة الريلز والستوري الكاملة بملف (ZIP)
@@ -1052,6 +1053,8 @@
             updateTikTokInputs();
         }
 
+        function prepareVisualPlan(){const slides=topics[activeTikTokTopic]?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتحليلها.','error');let needs=0;slides.forEach((s,i)=>{if(!s.visualType)s.visualType=(i===slides.length-1?'text-only':'broll');if(!s.visualQuery)s.visualQuery=[s.title,s.subtitle,(s.points||[])[0]].filter(Boolean).join(' — ').slice(0,180);s.mediaStatus=s.mediaUrl?'ready':'needed';if(!s.mediaUrl)needs++;});const st=document.getElementById('visual-plan-status');if(st)st.innerText='الخطة جاهزة: '+needs+' مشاهد تحتاج مادة بصرية.';updateTikTokInputs();renderCanvas();setAIStatus('تم تجهيز الخطة البصرية للمادة.','success');}
+
         function updateTikTokInputs() {
             const container = document.getElementById('tiktok-inputs');
             if (!container) return;
@@ -1075,9 +1078,9 @@
             durationWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مدة هذا المشهد (ثانية)</label>';
             const durationInput=document.createElement('input'); durationInput.type='number'; durationInput.min='1'; durationInput.max='30'; durationInput.value=slide.duration||4; durationInput.className='w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white'; durationInput.oninput=e=>{slide.duration=Math.max(1,Number(e.target.value)||4)}; durationWrap.appendChild(durationInput); container.appendChild(durationWrap);
             container.appendChild(createTextareaField('نص التعليق الصوتي للمشهد', slide.voiceover || '', v => { slide.voiceover=v; }));
-            const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-1'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">صورة / B-roll للمشهد</label>';
-            const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*'; mediaInput.className='w-full text-[10px] text-gray-300';
-            if(slide.visualQuery){const hint=document.createElement('div');hint.className='text-[10px] text-gray-500 font-tajawal';hint.innerText='اقتراح B-roll من Gemini: '+slide.visualQuery;mediaWrap.appendChild(hint);} mediaInput.onchange=e=>{const file=e.target.files?.[0];if(!file)return;if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl=URL.createObjectURL(file);renderCanvas();}; mediaWrap.appendChild(mediaInput);
+            const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-2'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">الصورة / B-roll للمشهد</label>';const mediaActions=document.createElement('div');mediaActions.className='grid grid-cols-3 gap-1';const makeMediaBtn=(label,disabled,title)=>{const b=document.createElement('button');b.type='button';b.className='py-1.5 rounded border border-navy-light text-[9px] font-cairo '+(disabled?'opacity-45 cursor-not-allowed':'hover:border-brandRed');b.innerText=label;if(title)b.title=title;return b};const aiBtn=makeMediaBtn('توليد صورة AI',true,'قريباً: توليد آمن مع وسم صورة مولدة');const searchBtn=makeMediaBtn('بحث B-roll',true,'قريباً: بحث بمصادر مرخصة وحفظ المصدر');const uploadBtn=makeMediaBtn('رفع صورة',false);mediaActions.append(aiBtn,searchBtn,uploadBtn);mediaWrap.appendChild(mediaActions);
+            const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*'; mediaInput.className='hidden';uploadBtn.onclick=()=>mediaInput.click();
+            if(slide.visualType){const type=document.createElement('div');type.className='text-[9px] text-brandRed font-cairo font-bold';type.innerText='نوع المادة المقترح: '+slide.visualType;mediaWrap.appendChild(type);}if(slide.visualQuery){const hint=document.createElement('div');hint.className='text-[10px] text-gray-500 font-tajawal';hint.innerText='اقتراح B-roll من Gemini: '+slide.visualQuery;mediaWrap.appendChild(hint);} mediaInput.onchange=e=>{const file=e.target.files?.[0];if(!file)return;if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl=URL.createObjectURL(file);renderCanvas();}; mediaWrap.appendChild(mediaInput);
             if(slide.mediaUrl){const clear=document.createElement('button');clear.type='button';clear.className='text-[10px] text-brandRed text-right';clear.innerText='إزالة الصورة من المشهد';clear.onclick=()=>{if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl='';updateTikTokInputs();renderCanvas();};mediaWrap.appendChild(clear);} container.appendChild(mediaWrap);
 
             if (slide.points) {
