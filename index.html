@@ -254,6 +254,7 @@
                     </label>
                 </div>
                 <label class="text-[10px] text-gray-400 font-cairo">مدة الفيديو المطلوبة (ثانية)<input id="video-total-duration" type="number" min="5" max="180" value="30" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"></label>
+                <label class="text-[10px] text-gray-400 font-cairo">مسار صوتي / تعليق مسجل (اختياري)<input id="video-audio-file" type="file" accept="audio/*" class="mt-1 w-full text-[10px] text-gray-300"></label>
                 <button id="export-video-btn" onclick="exportVerticalVideo()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-xs flex items-center justify-center gap-2 transition shadow-lg">
                     <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو فعلي
                 </button>
@@ -1376,6 +1377,9 @@
             const requestedTotal = Math.max(5, Math.min(180, Number(document.getElementById('video-total-duration')?.value || 30)));
             const fps = 30, canvas = document.createElement('canvas'); canvas.width=W; canvas.height=H;
             const ctx=canvas.getContext('2d'); const stream=canvas.captureStream(fps);
+            let audioEl=null, audioUrl=null;
+            const audioFile=document.getElementById('video-audio-file')?.files?.[0];
+            if(audioFile){audioUrl=URL.createObjectURL(audioFile);audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(r=>{audioEl.oncanplaythrough=r;audioEl.onerror=r;audioEl.load()});try{const audioStream=audioEl.captureStream?audioEl.captureStream():audioEl.mozCaptureStream?.();audioStream?.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Audio capture unavailable',e);}}
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond: quality===720?5000000:9000000}); const chunks=[];
             recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
             const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
@@ -1385,7 +1389,7 @@
             const durations=slides.map(s=>rawTotal?Math.max(1,requestedTotal*(Number(s.duration)/rawTotal)):requestedTotal/slides.length);
             const original=activeTikTokSlide; if(btn)btn.disabled=true; if(status){status.classList.remove('hidden');statusText.innerText='جاري إنشاء الفيديو...';}
             try {
-                if(document.fonts) await document.fonts.ready; recorder.start(1000);
+                if(document.fonts) await document.fonts.ready; recorder.start(1000); if(audioEl){audioEl.currentTime=0;await audioEl.play();}
                 for(let i=0;i<slides.length;i++){
                     activeTikTokSlide=i; renderCanvas(); await new Promise(r=>setTimeout(r,120));
                     const target=document.getElementById('export-target');
@@ -1394,6 +1398,7 @@
                     for(let frame=0;frame<frames;frame++){
                         const t=frame/Math.max(1,frames-1); const fade=Math.min(1,t*7,(1-t)*7); const zoom=1+(0.035*t); const dw=W*zoom,dh=H*zoom;
                         ctx.fillStyle='#071220';ctx.fillRect(0,0,W,H);ctx.globalAlpha=Math.max(.08,fade);ctx.drawImage(shot,(W-dw)/2,(H-dh)/2,dw,dh);ctx.globalAlpha=1;
+                        const barW=W*0.78, barH=Math.max(6,H*0.004), x=(W-barW)/2, y=H*0.92; ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y,barW,barH);ctx.fillStyle='#E31217';ctx.fillRect(x,y,barW*t,barH);
                         await new Promise(r=>setTimeout(r,1000/fps));
                     }
                     if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length}`;
@@ -1401,7 +1406,7 @@
                 recorder.stop(); await done; const ext=mimeType.startsWith('video/mp4')?'mp4':'webm'; const blob=new Blob(chunks,{type:mimeType}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
                 setAIStatus(ext==='mp4'?'تم تصدير فيديو MP4 فعلي.':'تم تصدير فيديو WebM فعلي لأن متصفحك لا يدعم تسجيل MP4 مباشرة.','success');
             } catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{} setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error');}
-            finally {activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
+            finally {if(audioEl){audioEl.pause();}if(audioUrl)URL.revokeObjectURL(audioUrl);activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
         }
 
         async function exportAllTikTokSlides() {
