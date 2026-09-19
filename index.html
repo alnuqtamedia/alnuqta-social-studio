@@ -424,7 +424,11 @@
                 });
                 const contentType = response.headers.get('content-type') || '';
                 if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
-                const result = await response.json();
+                const raw = await response.text();
+                if (!raw.trim()) throw new Error('خدمة Gemini لم تُرجع بيانات. أعد المحاولة.');
+                let result;
+                try { result = JSON.parse(raw); }
+                catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
                 if (!response.ok) throw new Error(result.error || 'فشل الاتصال بخدمة Gemini');
                 applyGeminiResult(result);
                 setAIStatus(`تم التنفيذ: ${result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
