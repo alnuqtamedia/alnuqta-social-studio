@@ -1065,7 +1065,8 @@
             const durationInput=document.createElement('input'); durationInput.type='number'; durationInput.min='1'; durationInput.max='30'; durationInput.value=slide.duration||4; durationInput.className='w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white'; durationInput.oninput=e=>{slide.duration=Math.max(1,Number(e.target.value)||4)}; durationWrap.appendChild(durationInput); container.appendChild(durationWrap);
             container.appendChild(createTextareaField('نص التعليق الصوتي للمشهد', slide.voiceover || '', v => { slide.voiceover=v; }));
             const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-1'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">صورة / B-roll للمشهد</label>';
-            const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*'; mediaInput.className='w-full text-[10px] text-gray-300'; mediaInput.onchange=e=>{const file=e.target.files?.[0];if(!file)return;if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl=URL.createObjectURL(file);renderCanvas();}; mediaWrap.appendChild(mediaInput);
+            const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*'; mediaInput.className='w-full text-[10px] text-gray-300';
+            if(slide.visualQuery){const hint=document.createElement('div');hint.className='text-[10px] text-gray-500 font-tajawal';hint.innerText='اقتراح B-roll من Gemini: '+slide.visualQuery;mediaWrap.appendChild(hint);} mediaInput.onchange=e=>{const file=e.target.files?.[0];if(!file)return;if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl=URL.createObjectURL(file);renderCanvas();}; mediaWrap.appendChild(mediaInput);
             if(slide.mediaUrl){const clear=document.createElement('button');clear.type='button';clear.className='text-[10px] text-brandRed text-right';clear.innerText='إزالة الصورة من المشهد';clear.onclick=()=>{if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl='';updateTikTokInputs();renderCanvas();};mediaWrap.appendChild(clear);} container.appendChild(mediaWrap);
 
             if (slide.points) {
@@ -1073,6 +1074,17 @@
                     container.appendChild(createTextareaField(`النقطة ${idx + 1}`, pt, v => { slide.points[idx] = v; renderCanvas(); }));
                 });
             }
+        }
+
+
+        function buildVideoSceneHTML(slide, slideNum, totalSlides) {
+            const vt=String(slide.visualType||'broll').toLowerCase(), title=escapeHtml(slide.title||slide.header||''), sub=escapeHtml(slide.subtitle||'');
+            const brand='<div class="absolute top-5 right-5 z-20 flex items-center gap-2"><span class="w-7 h-7 rounded-full bg-brandRed flex items-center justify-center font-cairo font-black">.</span><span class="font-cairo font-black text-xs">النقطة <span class="text-brandRed">Media</span></span></div>';
+            if(slide.type==='outro') return '<div class="relative h-full w-full flex flex-col items-center justify-center text-center bg-gradient-to-b from-navy to-black overflow-hidden">'+brand+'<div class="w-20 h-20 rounded-full bg-brandRed flex items-center justify-center text-5xl font-black mb-6 shadow-2xl">.</div><h2 class="font-cairo font-black text-3xl">النقطة <span class="text-brandRed">Media</span></h2><p class="font-cairo text-lg mt-3">نحقق • نكشف • نوصل</p><p class="font-tajawal text-sm text-gray-300 mt-7">'+escapeHtml(slide.cta||'تابع تحقيقاتنا')+'</p></div>';
+            if(slide.type==='cover') return '<div class="relative h-full w-full overflow-hidden">'+brand+'<div class="absolute inset-x-0 bottom-0 p-7 pb-14 bg-gradient-to-t from-black via-black/80 to-transparent"><span class="inline-block bg-brandRed px-3 py-1 rounded text-[11px] font-cairo font-black mb-3">تحقيق النقطة</span><h1 class="font-cairo font-black text-3xl leading-tight drop-shadow-2xl">'+title+'</h1><p class="font-tajawal text-sm text-gray-200 mt-3 leading-relaxed">'+sub+'</p></div></div>';
+            if(vt==='document') return '<div class="relative h-full w-full overflow-hidden">'+brand+'<div class="absolute inset-0 flex items-center justify-center p-8"><div class="bg-white text-gray-900 w-full min-h-[58%] rotate-[-2deg] shadow-2xl p-6 border-t-8 border-brandRed"><div class="text-[10px] text-gray-500 font-mono mb-5">DOCUMENT / ALNUQTA</div><h2 class="font-cairo font-black text-2xl leading-tight">'+title+'</h2><p class="font-tajawal text-sm mt-5 leading-loose">'+escapeHtml((slide.points||[]).slice(0,2).join(' — ')||slide.subtitle||'')+'</p></div></div></div>';
+            if(vt==='data'||vt==='map') return '<div class="relative h-full w-full overflow-hidden">'+brand+'<div class="absolute inset-x-6 top-[28%] border-r-4 border-brandRed pr-4"><div class="text-brandRed font-cairo font-black text-xs mb-2">'+(vt==='map'?'خريطة / موقع':'بيانات التحقيق')+'</div><h2 class="font-cairo font-black text-3xl leading-tight">'+title+'</h2><p class="font-tajawal text-sm text-gray-200 mt-4">'+escapeHtml((slide.points||[])[0]||slide.subtitle||'')+'</p></div></div>';
+            return '<div class="relative h-full w-full overflow-hidden">'+brand+'<div class="absolute inset-x-0 bottom-0 p-7 pb-14 bg-gradient-to-t from-black via-black/80 to-transparent"><span class="text-brandRed font-cairo font-black text-xs">'+escapeHtml(slide.badge||'محور التحقيق')+'</span><h2 class="font-cairo font-black text-2xl leading-tight mt-2">'+title+'</h2><p class="font-tajawal text-sm text-gray-200 mt-3 leading-relaxed">'+escapeHtml((slide.points||[])[0]||slide.subtitle||'')+'</p></div></div>';
         }
 
         function renderCanvas() {
@@ -1101,10 +1113,10 @@
                 const slides = topics[activeTikTokTopic].slides;
                 const slide = slides[activeTikTokSlide];
                 const totalSlides = slides.length;
-                target.style.backgroundImage = slide?.mediaUrl ? `linear-gradient(rgba(7,18,32,.58),rgba(7,18,32,.78)), url("${slide.mediaUrl}")` : '';
+                target.style.padding = '0';
+                target.style.backgroundImage = slide?.mediaUrl ? `linear-gradient(rgba(7,18,32,.18),rgba(7,18,32,.35)), url("${slide.mediaUrl}")` : 'linear-gradient(145deg,#071220,#102a46 58%,#050a10)';
                 target.style.backgroundSize = 'cover'; target.style.backgroundPosition = 'center';
-
-                target.innerHTML = buildSlideHTML(slide, activeTikTokSlide + 1, totalSlides);
+                target.innerHTML = buildVideoSceneHTML(slide, activeTikTokSlide + 1, totalSlides);
             } 
             else if (activeTab === 'thumbnail') {
                 wrapper.className = 'preview-yt-thumb shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
