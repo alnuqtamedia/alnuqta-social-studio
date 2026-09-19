@@ -385,7 +385,8 @@
                 q1: slide.q1 || '', speaker1: slide.speaker1 || '', q2: slide.q2 || '', speaker2: slide.speaker2 || '',
                 stat1: slide.stat1 || '', desc1: slide.desc1 || '', stat2: slide.stat2 || '', desc2: slide.desc2 || '', stat3: slide.stat3 || '', desc3: slide.desc3 || '',
                 steps: Array.isArray(slide.steps) ? slide.steps.slice(0, 5) : [],
-                cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia'
+                cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia',
+                duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || ''
             })) : [];
             if (!out.length) out = [{ id: 1, type: 'cover', badge: 'تحقيق استقصائي', title: title || 'تحقيق جديد', subtitle: subtitle || '' }];
             if (out[0].type !== 'cover') out[0].type = 'cover';
@@ -1047,6 +1048,14 @@
             if (slide.tagline !== undefined) container.appendChild(createInputField('الشعار اللفظي', slide.tagline, v => { slide.tagline = v; renderCanvas(); }));
             if (slide.cta !== undefined) container.appendChild(createInputField('دعوة للتفاعل', slide.cta, v => { slide.cta = v; renderCanvas(); }));
 
+            const durationWrap=document.createElement('div'); durationWrap.className='flex flex-col gap-1';
+            durationWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مدة هذا المشهد (ثانية)</label>';
+            const durationInput=document.createElement('input'); durationInput.type='number'; durationInput.min='1'; durationInput.max='30'; durationInput.value=slide.duration||4; durationInput.className='w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white'; durationInput.oninput=e=>{slide.duration=Math.max(1,Number(e.target.value)||4)}; durationWrap.appendChild(durationInput); container.appendChild(durationWrap);
+            container.appendChild(createTextareaField('نص التعليق الصوتي للمشهد', slide.voiceover || '', v => { slide.voiceover=v; }));
+            const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-1'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">صورة / B-roll للمشهد</label>';
+            const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*'; mediaInput.className='w-full text-[10px] text-gray-300'; mediaInput.onchange=e=>{const file=e.target.files?.[0];if(!file)return;if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl=URL.createObjectURL(file);renderCanvas();}; mediaWrap.appendChild(mediaInput);
+            if(slide.mediaUrl){const clear=document.createElement('button');clear.type='button';clear.className='text-[10px] text-brandRed text-right';clear.innerText='إزالة الصورة من المشهد';clear.onclick=()=>{if(slide.mediaUrl?.startsWith('blob:'))URL.revokeObjectURL(slide.mediaUrl);slide.mediaUrl='';updateTikTokInputs();renderCanvas();};mediaWrap.appendChild(clear);} container.appendChild(mediaWrap);
+
             if (slide.points) {
                 slide.points.forEach((pt, idx) => {
                     container.appendChild(createTextareaField(`النقطة ${idx + 1}`, pt, v => { slide.points[idx] = v; renderCanvas(); }));
@@ -1080,6 +1089,8 @@
                 const slides = topics[activeTikTokTopic].slides;
                 const slide = slides[activeTikTokSlide];
                 const totalSlides = slides.length;
+                target.style.backgroundImage = slide?.mediaUrl ? `linear-gradient(rgba(7,18,32,.58),rgba(7,18,32,.78)), url("${slide.mediaUrl}")` : '';
+                target.style.backgroundSize = 'cover'; target.style.backgroundPosition = 'center';
 
                 target.innerHTML = buildSlideHTML(slide, activeTikTokSlide + 1, totalSlides);
             } 
