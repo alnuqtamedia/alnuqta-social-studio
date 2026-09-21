@@ -254,6 +254,8 @@
                     </label>
                 </div>
                 <label class="text-[10px] text-gray-400 font-cairo">مدة الفيديو المطلوبة (ثانية)<input id="video-total-duration" type="number" min="5" max="180" value="30" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"></label>
+                <button type="button" onclick="organizeVideoScenes()" class="w-full py-2.5 bg-navy border border-emerald-500/60 hover:bg-emerald-700 text-white rounded font-cairo font-bold text-xs">تنظيم المشاهد تلقائياً</button>
+                <p class="text-[10px] text-gray-500 font-tajawal">يقسّم السرد الطويل إلى لقطات أقصر، ويضبط المدة والحركة والانتقال قبل توليد الصوت.</p>
                 <div class="grid grid-cols-2 gap-2">
                     <label class="text-[10px] text-gray-400 font-cairo">صوت AI
                         <select id="ai-tts-voice" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option value="Charon">صحفي واضح</option><option value="Rasalgethi">إخباري</option><option value="Gacrux">ناضج</option><option value="Kore">حازم</option><option value="Sulafat">دافئ</option><option value="Aoede">خفيف</option></select>
@@ -1066,6 +1068,36 @@
 
         function prepareVisualPlan(){const slides=topics[activeTikTokTopic]?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتحليلها.','error');let needs=0;slides.forEach((s,i)=>{if(!s.visualType)s.visualType=(i===slides.length-1?'text-only':'broll');if(!s.visualQuery)s.visualQuery=[s.title,s.subtitle,(s.points||[])[0]].filter(Boolean).join(' — ').slice(0,180);s.mediaStatus=s.mediaUrl?'ready':'needed';if(!s.mediaUrl)needs++;});const st=document.getElementById('visual-plan-status');if(st)st.innerText='الخطة جاهزة: '+needs+' مشاهد تحتاج مادة بصرية.';updateTikTokInputs();renderCanvas();setAIStatus('تم تجهيز الخطة البصرية للمادة.','success');}
 
+        function invalidateGeneratedVoiceover(){
+            if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);
+            (window.aiSceneVoiceovers||[]).forEach(item=>{if(item?.url)URL.revokeObjectURL(item.url)});
+            window.aiVoiceoverBlob=null;window.aiVoiceoverUrl='';window.aiVoiceoverDuration=0;window.aiSceneVoiceovers=[];window.aiSceneDurations=[];
+            const preview=document.getElementById('ai-tts-preview');if(preview){preview.pause();preview.removeAttribute('src');preview.classList.add('hidden')}
+        }
+
+        function splitNarration(text,maxWords=18){
+            const sentences=String(text||'').trim().split(/(?<=[.!؟،؛:])\s+/).filter(Boolean),chunks=[];let current=[];
+            const flush=()=>{if(current.length){chunks.push(current.join(' '));current=[]}};
+            sentences.forEach(sentence=>{const words=sentence.split(/\s+/).filter(Boolean);for(const word of words){if(current.length>=maxWords)flush();current.push(word)}if(current.length>=Math.round(maxWords*.65))flush()});flush();
+            return chunks.length?chunks:[''];
+        }
+
+        function organizeVideoScenes(){
+            const topic=topics[activeTikTokTopic],slides=topic?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتنظيمها.','error');
+            const motions=['zoom-in','pan-left','zoom-out','pan-right'],transitions=['crossfade','crossfade','slide','dip-black'];let organized=[];
+            slides.forEach((slide,index)=>{
+                if(slide.type==='cover'||slide.type==='outro'){organized.push({...slide});return}
+                const parts=splitNarration(slide.voiceover,18);
+                parts.forEach((voiceover,partIndex)=>organized.push({...slide,voiceover,duration:Math.max(3,Math.min(7.5,voiceover.split(/\s+/).filter(Boolean).length/2.35+.8)),motion:motions[(organized.length-1)%motions.length],transition:transitions[(organized.length-1)%transitions.length],subtitle:partIndex?voiceover:(slide.subtitle||voiceover)}));
+            });
+            organized=organized.map((slide,index)=>({...slide,id:index+1,type:index===0?'cover':(index===organized.length-1?'outro':slide.type||'content')}));
+            if(organized[0]){organized[0].duration=Math.max(3,Math.min(5,Number(organized[0].duration)||3.5));organized[0].transition='crossfade'}
+            if(organized.length>1){const last=organized[organized.length-1];last.duration=Math.max(2.5,Math.min(4,Number(last.duration)||3));last.transition='cut'}
+            topic.slides=organized;activeTikTokSlide=0;invalidateGeneratedVoiceover();initTikTokSlideButtons();renderCanvas();
+            const total=organized.reduce((sum,slide)=>sum+(Number(slide.duration)||0),0),totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=total.toFixed(1);
+            setAIStatus(`تم تنظيم الفيديو إلى ${organized.length} مشاهد قصيرة (${total.toFixed(1)} ثانية تقديرية). ولّد التعليق الصوتي الآن لتثبيت المدة الدقيقة.`,'success');
+        }
+
         function updateTikTokInputs() {
             const container = document.getElementById('tiktok-inputs');
             if (!container) return;
@@ -1084,6 +1116,18 @@
             if (slide.speaker2 !== undefined) container.appendChild(createInputField('صاحب الاقتباس الثاني', slide.speaker2, v => { slide.speaker2 = v; renderCanvas(); }));
             if (slide.tagline !== undefined) container.appendChild(createInputField('الشعار اللفظي', slide.tagline, v => { slide.tagline = v; renderCanvas(); }));
             if (slide.cta !== undefined) container.appendChild(createInputField('دعوة للتفاعل', slide.cta, v => { slide.cta = v; renderCanvas(); }));
+
+            const orderWrap=document.createElement('div');orderWrap.className='grid grid-cols-3 gap-1';
+            const orderButton=(label,disabled,handler)=>{const button=document.createElement('button');button.type='button';button.className='py-2 rounded border border-navy-light text-[10px] font-cairo disabled:opacity-40';button.innerText=label;button.disabled=disabled;button.onclick=handler;return button};
+            const slides=topics[activeTikTokTopic].slides,index=activeTikTokSlide,fixedScene=slide.type==='cover'||slide.type==='outro';
+            orderWrap.append(orderButton('السابق',fixedScene||index<=1,()=>{[slides[index-1],slides[index]]=[slides[index],slides[index-1]];activeTikTokSlide=index-1;slides.forEach((item,i)=>item.id=i+1);invalidateGeneratedVoiceover();initTikTokSlideButtons();renderCanvas()}));
+            orderWrap.append(orderButton('التالي',fixedScene||index>=slides.length-2,()=>{[slides[index+1],slides[index]]=[slides[index],slides[index+1]];activeTikTokSlide=index+1;slides.forEach((item,i)=>item.id=i+1);invalidateGeneratedVoiceover();initTikTokSlideButtons();renderCanvas()}));
+            orderWrap.append(orderButton('حذف المشهد',slide.type==='cover'||slide.type==='outro'||slides.length<=2,()=>{slides.splice(index,1);slides.forEach((item,i)=>item.id=i+1);activeTikTokSlide=Math.min(index,slides.length-1);invalidateGeneratedVoiceover();initTikTokSlideButtons();renderCanvas()}));container.appendChild(orderWrap);
+
+            const motionWrap=document.createElement('div');motionWrap.className='grid grid-cols-2 gap-2';
+            const selectField=(label,value,options,onchange)=>{const wrap=document.createElement('label');wrap.className='text-[10px] text-gray-400 font-cairo';wrap.innerText=label;const select=document.createElement('select');select.className='mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white';options.forEach(([key,text])=>{const option=document.createElement('option');option.value=key;option.innerText=text;option.selected=key===value;select.appendChild(option)});select.onchange=event=>onchange(event.target.value);wrap.appendChild(select);return wrap};
+            motionWrap.append(selectField('حركة الصورة',slide.motion||'zoom-in',[['zoom-in','تقريب'],['zoom-out','إبعاد'],['pan-left','حركة لليسار'],['pan-right','حركة لليمين']],value=>{slide.motion=value}));
+            motionWrap.append(selectField('الانتقال',slide.transition||'crossfade',[['cut','قطع مباشر'],['crossfade','تلاشي ناعم'],['slide','انزلاق'],['dip-black','سواد قصير']],value=>{slide.transition=value}));container.appendChild(motionWrap);
 
             const durationWrap=document.createElement('div'); durationWrap.className='flex flex-col gap-1';
             durationWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مدة هذا المشهد (ثانية)</label>';
