@@ -1472,6 +1472,47 @@
             return new Blob([buffer],{type:'audio/wav'});
         }
 
+        async function detectNarrationSceneDurations(blob,texts,totalDuration) {
+            const fallback=()=>{
+                const weights=texts.map(value=>Math.max(1,String(value||'').trim().split(/\s+/).filter(Boolean).length));
+                const totalWeight=weights.reduce((a,b)=>a+b,0)||1;
+                return weights.map(weight=>totalDuration*weight/totalWeight);
+            };
+            if(!blob||texts.length<2||!Number.isFinite(totalDuration)||totalDuration<=0)return fallback();
+            const context=new (window.AudioContext||window.webkitAudioContext)();
+            try{
+                const buffer=await context.decodeAudioData(await blob.arrayBuffer());
+                const sampleRate=buffer.sampleRate,channels=Array.from({length:buffer.numberOfChannels},(_,i)=>buffer.getChannelData(i));
+                const windowSamples=Math.max(1,Math.round(sampleRate*.025)),energy=[];
+                for(let start=0;start<buffer.length;start+=windowSamples){
+                    let sum=0,count=0;
+                    const end=Math.min(buffer.length,start+windowSamples);
+                    for(let p=start;p<end;p+=3){let sample=0;for(const channel of channels)sample+=Math.abs(channel[p]||0);sum+=sample/channels.length;count++}
+                    energy.push(sum/Math.max(1,count));
+                }
+                const words=texts.map(value=>Math.max(1,String(value||'').trim().split(/\s+/).filter(Boolean).length)),wordTotal=words.reduce((a,b)=>a+b,0)||1;
+                const boundaries=[0];let cumulativeWords=0;
+                for(let scene=0;scene<texts.length-1;scene++){
+                    cumulativeWords+=words[scene];
+                    const expected=totalDuration*cumulativeWords/wordTotal;
+                    const remainingScenes=texts.length-scene-1,minTime=boundaries[boundaries.length-1]+.65,maxTime=totalDuration-remainingScenes*.65;
+                    const radius=Math.min(4,Math.max(1.4,totalDuration*.065)),from=Math.max(minTime,expected-radius),to=Math.min(maxTime,expected+radius);
+                    let bestTime=Math.max(minTime,Math.min(maxTime,expected)),bestScore=Infinity;
+                    for(let t=from;t<=to;t+=.025){
+                        const index=Math.max(0,Math.min(energy.length-1,Math.round(t/.025)));
+                        let local=0,samples=0;
+                        for(let offset=-3;offset<=3;offset++){if(energy[index+offset]!==undefined){local+=energy[index+offset];samples++}}
+                        const quietness=local/Math.max(1,samples),distance=Math.abs(t-expected)/Math.max(.1,radius),score=quietness+distance*.0035;
+                        if(score<bestScore){bestScore=score;bestTime=t}
+                    }
+                    boundaries.push(bestTime);
+                }
+                boundaries.push(totalDuration);
+                return boundaries.slice(1).map((end,i)=>Math.max(.4,end-boundaries[i]));
+            }catch(error){console.warn('Narration pause detection fallback',error);return fallback()}
+            finally{try{await context.close()}catch{}}
+        }
+
         async function generateAIVoiceover(){
             const btn=document.getElementById('ai-tts-btn'),slides=topics[activeTikTokTopic]?.slides||[];
             const texts=slides.map(s=>String(s.voiceover||'').trim()),text=texts.filter(Boolean).join('\n\n');
@@ -1494,11 +1535,13 @@
                 await new Promise(resolve=>{audio.onloadedmetadata=resolve;audio.onerror=resolve;audio.load()});
                 if(Number.isFinite(audio.duration)&&audio.duration>0){
                     window.aiVoiceoverDuration=audio.duration;
-                    const weights=texts.map((value,i)=>{const words=value.split(/\s+/).filter(Boolean).length;return words||((slides[i]?.type==='outro')?3:1)}),totalWeight=weights.reduce((a,b)=>a+b,0)||1;
-                    window.aiSceneDurations=weights.map(weight=>audio.duration*weight/totalWeight);
+                    setAIStatus('تم توليد الصوت. جاري مطابقة الوقفات مع انتقالات المشاهد…','busy');
+                    window.aiSceneDurations=await detectNarrationSceneDurations(blob,texts,audio.duration);
+                    window.aiSceneDurations.forEach((duration,index)=>{if(slides[index])slides[index].duration=Number(duration.toFixed(2))});
                     const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=audio.duration.toFixed(1);
                 }
-                setAIStatus(`تم توليد تعليق صوتي واحد متصل (${window.aiVoiceoverDuration?.toFixed(1)||0} ثانية). المشاهد ستُنظّم حول صوت الراوي بدون تقطيع صوته.`,'success');
+                updateTikTokInputs();
+                setAIStatus(`تم توليد تعليق صوتي واحد متصل (${window.aiVoiceoverDuration?.toFixed(1)||0} ثانية) ومزامنة انتقالات الصور مع الوقفات الفعلية في السرد.`,'success');
             }catch(e){console.error(e);setAIStatus('تعذر توليد التعليق الصوتي: '+(e?.message||e),'error')}
             finally{if(btn)btn.disabled=false}
         }
