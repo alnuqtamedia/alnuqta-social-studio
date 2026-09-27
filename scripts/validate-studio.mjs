@@ -1,6 +1,9 @@
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const required = [
   'organizeVideoScenes()',
   'generateAIVoiceover()',
@@ -9,6 +12,13 @@ const required = [
   'gemini-image',
   'gemini-tts',
   'pexels-search',
+  'STUDIO_OUTPUT_SCHEMA',
+  'validateGeminiResult',
+  'generateScenePollinationsImage',
+  'exportAllSlides()',
+  'exportAllTikTokSlides()',
+  "target.style.height = presentationMode?'360px':'450px'",
+  "H=quality===720?1280:1920",
 ];
 
 for (const marker of required) {
@@ -19,5 +29,23 @@ for (const match of html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>
   Function(match[1]);
 }
 
-if (/service_role/i.test(html)) throw new Error('service_role must never appear in the browser application.');
-console.log('Studio validation passed.');
+const forbiddenBrowserPatterns = [
+  [/service_role/i, 'service_role'],
+  [/GEMINI_API_KEY/i, 'Gemini secret name'],
+  [/AIza[0-9A-Za-z_-]{20,}/, 'Google API key'],
+  [/sk-[0-9A-Za-z_-]{20,}/, 'generic secret key'],
+  [/getUserMedia|SpeechRecognition|webkitSpeechRecognition|ai-voice-btn|video-audio-file|accept=["']audio\/\*/i, 'human microphone/audio input'],
+];
+for (const [pattern, label] of forbiddenBrowserPatterns) if (pattern.test(html)) throw new Error(`${label} must not appear in the browser application.`);
+
+for (const obsolete of ['wrangler.json', 'netlify.toml', 'vercel.json', 'netlify', 'api', 'src/cloudflare-worker.js']) {
+  if (fs.existsSync(path.join(root, obsolete))) throw new Error(`Obsolete deployment path still exists: ${obsolete}`);
+}
+
+const trackedTextFiles = ['index.html', 'README.md', 'docs/security-status.md', 'package.json', 'package-lock.json'];
+for (const file of trackedTextFiles) {
+  const body = fs.readFileSync(path.join(root, file), 'utf8');
+  if (/AIza[0-9A-Za-z_-]{20,}|sk-[0-9A-Za-z_-]{20,}/.test(body)) throw new Error(`Possible secret found in ${file}`);
+}
+
+console.log('Studio validation passed: schema, browser security, deployment paths, and format exporters.');
