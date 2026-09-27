@@ -73,6 +73,14 @@
             width: 360px;
             height: 640px;
         }
+        .preview-social-post {
+            width: 360px;
+            height: 450px;
+        }
+        .preview-presentation {
+            width: 640px;
+            height: 360px;
+        }
         .preview-yt-thumb {
             width: 560px;
             height: 315px;
@@ -142,15 +150,12 @@
                     </label>
                     <span id="ai-status-dot" class="text-[10px] text-emerald-400 font-tajawal">جاهز</span>
                 </div>
-                <p class="text-[10px] text-gray-400 font-tajawal leading-relaxed">اكتب أو احچي الأمر. المساعد ينفّذه على المحتوى الحالي ويضع النتيجة داخل القالب المناسب.</p>
+                <p class="text-[10px] text-gray-400 font-tajawal leading-relaxed">اكتب الأمر. المساعد ينفّذه على المحتوى الحالي ويضع النتيجة داخل القالب المناسب.</p>
                 <textarea id="ai-command-input" rows="3" dir="rtl" class="w-full bg-navy border border-navy-light rounded p-2 text-xs text-white focus:outline-none focus:border-brandRed font-tajawal resize-none" placeholder="مثال: حوّل هذا التحقيق إلى Carousel من 7 سلايدات
 أو: سوّي منه فيديو تيك توك 45 ثانية"></textarea>
-                <div class="grid grid-cols-[1fr_auto] gap-2">
-                    <button id="ai-run-btn" onclick="runGeminiStudioCommand()" class="py-2 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-bold text-xs flex items-center justify-center gap-1.5 transition shadow">
+                <div>
+                    <button id="ai-run-btn" onclick="runGeminiStudioCommand()" class="w-full py-2 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-bold text-xs flex items-center justify-center gap-1.5 transition shadow">
                         <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> تنفيذ الأمر
-                    </button>
-                    <button id="ai-voice-btn" onclick="toggleAIListening()" title="إدخال صوتي" class="px-3 py-2 bg-navy border border-navy-light hover:border-brandRed text-gray-200 rounded font-cairo text-xs transition">
-                        <i data-lucide="mic" class="w-4 h-4"></i>
                     </button>
                 </div>
                 <div id="ai-status" class="hidden text-[10px] rounded border border-navy-light bg-navy p-2 text-gray-300 font-tajawal"></div>
@@ -272,7 +277,6 @@
                 </div>
                 <button id="ai-tts-btn" onclick="generateAIVoiceover()" class="w-full py-2.5 bg-navy border border-brandRed/60 hover:bg-brandRed text-white rounded font-cairo font-bold text-xs">مطابقة المدة وتوليد التعليق الصوتي</button>
                 <audio id="ai-tts-preview" controls class="hidden w-full"></audio>
-                <label class="text-[10px] text-gray-400 font-cairo">مسار صوتي / تعليق مسجل (اختياري)<input id="video-audio-file" type="file" accept="audio/*" class="mt-1 w-full text-[10px] text-gray-300"></label>
                 <button id="export-video-btn" onclick="exportVerticalVideo()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-xs flex items-center justify-center gap-2 transition shadow-lg">
                     <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو فعلي
                 </button>
@@ -367,9 +371,6 @@
     <script>
 
         // ==================== Gemini AI Production Assistant ====================
-        let aiRecognition = null;
-        let aiListening = false;
-
         function getCurrentStudioContent() {
             return {
                 activeTab,
@@ -381,6 +382,100 @@
                 tiktokTopic: topics[activeTikTokTopic] || null,
                 thumbnail: thumbPresets[activeThumbPreset] || null
             };
+        }
+
+        const STUDIO_SCHEMA_VERSION = '1.0';
+        const STUDIO_OUTPUT_SCHEMA = {
+            type: 'object',
+            additionalProperties: false,
+            required: ['outputType', 'title', 'subtitle', 'slides'],
+            properties: {
+                outputType: { enum: ['post', 'carousel', 'slides', 'story', 'reel', 'video', 'tiktok', 'youtube_thumbnail'] },
+                title: { type: 'string' },
+                subtitle: { type: 'string' },
+                slides: {
+                    type: 'array', minItems: 1, maxItems: 20,
+                    items: {
+                        type: 'object', additionalProperties: true,
+                        required: ['id', 'title', 'voiceover', 'caption', 'visualAsset', 'source', 'visualType', 'duration', 'motion', 'transition', 'editorNotes'],
+                        properties: {
+                            id: { type: 'string' },
+                            title: { type: 'string', minLength: 1 },
+                            voiceover: { type: 'string' },
+                            caption: { type: 'string' },
+                            visualAsset: {
+                                type: 'object', additionalProperties: false,
+                                required: ['id', 'url'],
+                                properties: { id: { type: 'string' }, url: { type: 'string' } }
+                            },
+                            source: { type: 'string' },
+                            visualType: { enum: ['real', 'archive', 'illustrative', 'generated', 'broll', 'document', 'data', 'map', 'portrait', 'text-only'] },
+                            duration: { type: 'number', minimum: 1, maximum: 30 },
+                            motion: { enum: ['zoom-in', 'zoom-out', 'pan-left', 'pan-right', 'static'] },
+                            transition: { enum: ['fade', 'crossfade', 'cut', 'slide', 'dip-black'] },
+                            editorNotes: { type: 'string' }
+                        }
+                    }
+                }
+            }
+        };
+
+        function canonicalizeGeminiResult(raw) {
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('رد Gemini ليس كائناً صالحاً.');
+            const requestedType = String(raw.outputType || raw.output || '').toLowerCase();
+            const outputType = ({ report: 'post', presentation: 'slides', slide: 'slides', instagram_story: 'story', shorts: 'video' })[requestedType] || requestedType;
+            const sourceSlides = Array.isArray(raw.slides) ? raw.slides : [];
+            const slides = sourceSlides.map((scene, index) => {
+                const item = scene && typeof scene === 'object' ? scene : {};
+                const asset = item.visualAsset && typeof item.visualAsset === 'object' ? item.visualAsset : {};
+                const title = String(item.title || item.header || raw.title || '').trim();
+                const caption = String(item.caption || item.subtitle || (Array.isArray(item.points) ? item.points[0] : '') || '').trim();
+                const voiceover = String(item.voiceover || item.narration || caption || title).trim();
+                const inferredVisualType = String(item.visualType || (item.mediaGenerated ? 'generated' : item.mediaUrl || item.mediaVideoUrl ? 'real' : 'illustrative')).toLowerCase();
+                return {
+                    ...item,
+                    id: String(item.id || `scene-${index + 1}`),
+                    title,
+                    voiceover,
+                    caption,
+                    visualAsset: { id: String(asset.id || item.mediaId || ''), url: String(asset.url || item.mediaVideoUrl || item.mediaUrl || '') },
+                    source: String(item.source || item.mediaCredit || item.mediaSourceUrl || ''),
+                    visualType: inferredVisualType,
+                    duration: Number(item.duration || 4),
+                    motion: String(item.motion || 'zoom-in'),
+                    transition: String(item.transition || 'fade'),
+                    editorNotes: String(item.editorNotes || '')
+                };
+            });
+            return { ...raw, outputType, title: String(raw.title || '').trim(), subtitle: String(raw.subtitle || '').trim(), slides };
+        }
+
+        function validateGeminiResult(result) {
+            const errors = [];
+            const outputTypes = STUDIO_OUTPUT_SCHEMA.properties.outputType.enum;
+            if (!outputTypes.includes(result.outputType)) errors.push('نوع الناتج غير معروف');
+            if (!result.title) errors.push('العنوان الرئيسي مفقود');
+            if (!Array.isArray(result.slides) || result.slides.length < 1 || result.slides.length > 20) errors.push('عدد المشاهد يجب أن يكون بين 1 و20');
+            const visualTypes = STUDIO_OUTPUT_SCHEMA.properties.slides.items.properties.visualType.enum;
+            const motions = STUDIO_OUTPUT_SCHEMA.properties.slides.items.properties.motion.enum;
+            const transitions = STUDIO_OUTPUT_SCHEMA.properties.slides.items.properties.transition.enum;
+            (result.slides || []).forEach((scene, index) => {
+                const at = `المشهد ${index + 1}`;
+                const words = String(scene.title || '').split(/\s+/).filter(Boolean).length;
+                if (!scene.id) errors.push(`${at}: المعرّف مفقود`);
+                if (words < 3 || words > 7) errors.push(`${at}: العنوان يجب أن يكون من 3 إلى 7 كلمات`);
+                if (typeof scene.voiceover !== 'string') errors.push(`${at}: نص التعليق غير صالح`);
+                if (typeof scene.caption !== 'string') errors.push(`${at}: الترجمة غير صالحة`);
+                if (!scene.visualAsset || typeof scene.visualAsset.id !== 'string' || typeof scene.visualAsset.url !== 'string') errors.push(`${at}: الأصل البصري غير صالح`);
+                if (typeof scene.source !== 'string') errors.push(`${at}: المصدر غير صالح`);
+                if (!visualTypes.includes(scene.visualType)) errors.push(`${at}: نوع الأصل البصري غير مسموح`);
+                if (!Number.isFinite(scene.duration) || scene.duration < 1 || scene.duration > 30) errors.push(`${at}: المدة خارج النطاق`);
+                if (!motions.includes(scene.motion)) errors.push(`${at}: الحركة غير مسموحة`);
+                if (!transitions.includes(scene.transition)) errors.push(`${at}: الانتقال غير مسموح`);
+                if (typeof scene.editorNotes !== 'string') errors.push(`${at}: ملاحظات المحرر غير صالحة`);
+            });
+            if (errors.length) throw new Error(`رفض الاستوديو رد Gemini لأنه لا يطابق مخطط المحتوى: ${errors.slice(0, 4).join('، ')}`);
+            return result;
         }
 
         function setAIStatus(message, state = 'info') {
@@ -399,7 +494,7 @@
                 type: slide.type || (i === 0 ? 'cover' : 'content'),
                 badge: slide.badge || 'تحقيق استقصائي',
                 title: slide.title || title || '',
-                subtitle: slide.subtitle || subtitle || '',
+                subtitle: slide.caption || slide.subtitle || subtitle || '',
                 header: slide.header || '',
                 points: Array.isArray(slide.points) ? slide.points.slice(0, 7) : [],
                 q1: slide.q1 || '', speaker1: slide.speaker1 || '', q2: slide.q2 || '', speaker2: slide.speaker2 || '',
@@ -407,7 +502,8 @@
                 steps: Array.isArray(slide.steps) ? slide.steps.slice(0, 5) : [],
                 cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia',
                 duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || '',
-                visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || '',
+                caption: slide.caption || slide.subtitle || '', visualAsset: slide.visualAsset || { id: '', url: '' }, source: slide.source || slide.mediaCredit || '', editorNotes: slide.editorNotes || '',
+                visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || slide.visualAsset?.url || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || slide.source || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || '',
                 mediaItems: Array.isArray(slide.mediaItems) && slide.mediaItems.length ? slide.mediaItems : (slide.mediaUrl || slide.mediaVideoUrl ? [{ url: slide.mediaVideoUrl || slide.mediaUrl, preview: slide.mediaUrl || slide.mediaVideoUrl, kind: slide.mediaVideoUrl ? 'video' : 'image', credit: slide.mediaCredit || '', sourceUrl: slide.mediaSourceUrl || '', generated: Boolean(slide.mediaGenerated) }] : [])
             })) : [];
             if (!out.length) out = [{ id: 1, type: 'cover', badge: 'تحقيق استقصائي', title: title || 'تحقيق جديد', subtitle: subtitle || '' }];
@@ -418,7 +514,9 @@
         }
 
         function applyGeminiResult(result) {
+            result = validateGeminiResult(canonicalizeGeminiResult(result));
             const output = String(result.outputType || result.output || 'carousel').toLowerCase();
+            activeGeneratedOutputType = output;
             const videoMode = ['story','reel','video','tiktok'].includes(output);
             const sourceSlides = Array.isArray(result.slides) ? result.slides : [];
             const videoSlides = videoMode ? sourceSlides.map((s, i) => ({
@@ -482,7 +580,7 @@
                 for(let attempt=0;attempt<5;attempt++){
                     const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ command, currentContent: getCurrentStudioContent() })
+                        body: JSON.stringify({ command, currentContent: getCurrentStudioContent(), schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
                     });
                     const contentType = response.headers.get('content-type') || '';
                     if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
@@ -505,32 +603,6 @@
             } finally {
                 if (btn) { btn.disabled = false; btn.classList.remove('opacity-60', 'cursor-wait'); }
             }
-        }
-
-        function toggleAIListening() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return setAIStatus('الإدخال الصوتي غير مدعوم في هذا المتصفح. جرّب Chrome.', 'error');
-            if (aiListening && aiRecognition) { aiRecognition.stop(); return; }
-            aiRecognition = new SpeechRecognition();
-            aiRecognition.lang = 'ar-IQ';
-            aiRecognition.interimResults = true;
-            aiRecognition.continuous = false;
-            aiListening = true;
-            const voiceBtn = document.getElementById('ai-voice-btn');
-            voiceBtn?.classList.add('border-brandRed', 'text-brandRed');
-            setAIStatus('أستمع… احچي الأمر الآن.', 'busy');
-            aiRecognition.onresult = (event) => {
-                const text = Array.from(event.results).map(r => r[0].transcript).join('');
-                const input = document.getElementById('ai-command-input');
-                if (input) input.value = text;
-            };
-            aiRecognition.onerror = () => { aiListening = false; setAIStatus('تعذر التقاط الصوت.', 'error'); };
-            aiRecognition.onend = () => {
-                aiListening = false;
-                voiceBtn?.classList.remove('border-brandRed', 'text-brandRed');
-                if (document.getElementById('ai-command-input')?.value.trim()) setAIStatus('تم التقاط الأمر. اضغط تنفيذ الأمر.');
-            };
-            aiRecognition.start();
         }
 
         document.addEventListener('keydown', (event) => {
@@ -725,6 +797,7 @@
         };
 
         let activeTab = 'carousel';
+        let activeGeneratedOutputType = 'carousel';
         let activeTopic = 'lastBullet';
         let currentSlideIndex = 0;
         let activeYTAsset = 'avatar';
@@ -1088,6 +1161,19 @@
         }
 
         async function generateSceneAIImage(slide,btn){const prompt=String(slide.visualQuery||slide.title||slide.subtitle||'').trim();if(!prompt)return setAIStatus('لا يوجد وصف بصري لهذا المشهد.','error');const old=btn.innerText;btn.disabled=true;btn.innerText='جاري التوليد…';try{const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(!r.ok){const code=d.code?` [${d.code}]`:'';const detail=d.detail?` — ${d.detail}`:'';throw new Error((d.error||'فشل توليد الصورة')+code+detail);}const bytes=Uint8Array.from(atob(d.image),x=>x.charCodeAt(0));const blob=new Blob([bytes],{type:d.mimeType||'image/jpeg'}),url=URL.createObjectURL(blob);addSceneMedia(slide,{url,preview:url,kind:'image',credit:d.label||'صورة مولدة بالذكاء الاصطناعي',generated:true,local:true});setAIStatus('تم توليد صورة توضيحية AI وإضافتها إلى مواد المشهد.','success')}catch(e){console.error('Gemini image generation error',e);const msg=String(e?.message||e||'خطأ غير معروف');setAIStatus('تعذر توليد الصورة — '+msg+' | انسخ هذه الرسالة إذا استمرت المشكلة.','error')}finally{btn.disabled=false;btn.innerText=old}}
+        async function generateScenePollinationsImage(slide,btn){
+            const prompt=String(slide.visualQuery||slide.title||slide.subtitle||'').trim();if(!prompt)return setAIStatus('لا يوجد وصف بصري لهذا المشهد.','error');
+            const old=btn.innerText;btn.disabled=true;btn.innerText='جاري التوليد…';
+            try{
+                const safe=`Vertical 9:16 editorial illustration for Iraqi journalism, no text, no logo, no watermark, clearly illustrative, do not fabricate evidence. ${prompt}`;
+                const endpoint=`https://image.pollinations.ai/prompt/${encodeURIComponent(safe)}?width=1080&height=1920&nologo=true&seed=${Date.now()%1000000}`;
+                const response=await fetch(endpoint,{headers:{Accept:'image/*'}});if(!response.ok)throw new Error(`Pollinations HTTP ${response.status}`);
+                const blob=await response.blob();if(!blob.type.startsWith('image/'))throw new Error('الخدمة لم تُرجع صورة صالحة');
+                const url=URL.createObjectURL(blob);addSceneMedia(slide,{url,preview:url,kind:'image',credit:'Pollinations.ai — صورة مولدة توضيحية',sourceUrl:'https://pollinations.ai/',generated:true,local:true});
+                setAIStatus('تمت إضافة صورة Pollinations التوضيحية إلى المشهد.','success');
+            }catch(error){console.error('Pollinations image generation error',error);setAIStatus('تعذر توليد صورة Pollinations: '+String(error?.message||error),'error')}
+            finally{btn.disabled=false;btn.innerText=old}
+        }
         async function searchSceneBroll(slide){const q=String(slide.visualQuery||slide.title||'').trim();if(!q)return setAIStatus('لا يوجد وصف للبحث.','error');const type=String(slide.visualType||'').toLowerCase()==='broll'?'video':'photo';setAIStatus('جاري البحث في Pexels…','busy');try{const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/pexels-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,type})});const d=await r.json();if(!r.ok)throw new Error(d.error||'فشل بحث Pexels');showPexelsResults(slide,d.items||[],type);setAIStatus('اختر مادة من نتائج Pexels لإضافتها مباشرة للمشهد.','success')}catch(e){setAIStatus((e?.message||e)+(String(e?.message||'').includes('PEXELS_API_KEY')?' — أضف المفتاح في Supabase Secrets باسم PEXELS_API_KEY.':''),'error')}}
         function showPexelsResults(slide,items,type){let modal=document.getElementById('pexels-results-modal');if(!modal){modal=document.createElement('div');modal.id='pexels-results-modal';modal.className='fixed inset-0 z-[9999] bg-black/80 p-4 overflow-auto';document.body.appendChild(modal)}modal.innerHTML='<div class="max-w-4xl mx-auto bg-navy rounded-xl p-4 border border-navy-light"><div class="flex justify-between items-center mb-3"><div><h3 class="font-cairo font-black">نتائج Pexels — '+(type==='video'?'فيديو B-roll':'صور')+'</h3><a href="https://www.pexels.com/" target="_blank" rel="noopener" class="text-[10px] text-gray-400 underline">Photos & videos provided by Pexels</a></div><button id="pexels-close" class="text-white text-xl">×</button></div><div id="pexels-grid" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div></div>';modal.querySelector('#pexels-close').onclick=()=>modal.remove();const grid=modal.querySelector('#pexels-grid');items.slice(0,8).forEach(item=>{const card=document.createElement('button');card.type='button';card.className='text-right bg-black/30 rounded overflow-hidden border border-navy-light hover:border-brandRed';card.innerHTML='<img src="'+item.preview+'" class="w-full aspect-[9/16] object-cover"><div class="p-1 text-[9px] text-gray-300">By '+escapeHtml(item.creator||'Pexels')+(item.duration?' • '+item.duration+'s':'')+'</div>';card.onclick=()=>{addSceneMedia(slide,{url:type==='video'?item.mediaUrl:(item.preview||item.mediaUrl),preview:item.preview||item.mediaUrl,kind:type==='video'?'video':'image',credit:'Pexels — '+(item.creator||''),sourceUrl:item.pageUrl,generated:false});modal.remove();setAIStatus('تمت إضافة مادة Pexels إلى المشهد مع حفظ المصدر.','success')};grid.appendChild(card)});if(!items.length)grid.innerHTML='<p class="text-gray-400 text-xs col-span-4">لا توجد نتائج مناسبة.</p>'}
 
@@ -1158,8 +1244,8 @@
             durationWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مدة هذا المشهد (ثانية)</label>';
             const durationInput=document.createElement('input'); durationInput.type='number'; durationInput.min='1'; durationInput.max='30'; durationInput.value=slide.duration||4; durationInput.className='w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white'; durationInput.oninput=e=>{slide.duration=Math.max(1,Number(e.target.value)||4)}; durationWrap.appendChild(durationInput); container.appendChild(durationWrap);
             container.appendChild(createTextareaField('نص التعليق الصوتي للمشهد', slide.voiceover || '', v => { slide.voiceover=v; }));
-            const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-2'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مواد المشهد — صور أو فيديوهات متعددة</label>';const mediaActions=document.createElement('div');mediaActions.className='grid grid-cols-3 gap-1';const makeMediaBtn=(label,disabled,title)=>{const b=document.createElement('button');b.type='button';b.className='py-1.5 rounded border border-navy-light text-[9px] font-cairo '+(disabled?'opacity-45 cursor-not-allowed':'hover:border-brandRed');b.innerText=label;if(title)b.title=title;return b};const aiBtn=makeMediaBtn('توليد صورة AI',false,'إضافة صورة توضيحية للمشهد');const mediaStatus=document.createElement('div');mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-gray-400';mediaStatus.innerText='';const searchBtn=makeMediaBtn('بحث B-roll',false,'إضافة صور أو فيديوهات Pexels');const uploadBtn=makeMediaBtn('رفع مواد',false,'يمكن اختيار عدة صور وفيديوهات');mediaActions.append(aiBtn,searchBtn,uploadBtn);mediaWrap.appendChild(mediaActions);mediaWrap.appendChild(mediaStatus);
-            aiBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري الاتصال بـ Gemini وتوليد الصورة…';try{await generateSceneAIImage(slide,aiBtn);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-emerald-400';mediaStatus.innerText='تمت إضافة الصورة إلى مواد المشهد.'}catch(e){console.error(e);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-red-400';mediaStatus.innerText='فشل توليد الصورة: '+String(e?.message||e)}};searchBtn.onclick=()=>searchSceneBroll(slide);const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*,video/*';mediaInput.multiple=true; mediaInput.className='hidden';uploadBtn.onclick=()=>mediaInput.click();
+            const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-2'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مواد المشهد — صور أو فيديوهات متعددة</label>';const mediaActions=document.createElement('div');mediaActions.className='grid grid-cols-2 gap-1';const makeMediaBtn=(label,disabled,title)=>{const b=document.createElement('button');b.type='button';b.className='py-1.5 rounded border border-navy-light text-[9px] font-cairo '+(disabled?'opacity-45 cursor-not-allowed':'hover:border-brandRed');b.innerText=label;if(title)b.title=title;return b};const aiBtn=makeMediaBtn('Gemini Image',false,'إضافة صورة توضيحية من Gemini');const pollinationsBtn=makeMediaBtn('Pollinations',false,'مولد صور احتياطي مجاني بلا مفتاح داخل الاستوديو');const mediaStatus=document.createElement('div');mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-gray-400';mediaStatus.innerText='';const searchBtn=makeMediaBtn('بحث B-roll',false,'إضافة صور أو فيديوهات Pexels');const uploadBtn=makeMediaBtn('رفع مواد',false,'يمكن اختيار عدة صور وفيديوهات');mediaActions.append(aiBtn,pollinationsBtn,searchBtn,uploadBtn);mediaWrap.appendChild(mediaActions);mediaWrap.appendChild(mediaStatus);
+            aiBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري الاتصال بـ Gemini وتوليد الصورة…';try{await generateSceneAIImage(slide,aiBtn);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-emerald-400';mediaStatus.innerText='تمت إضافة الصورة إلى مواد المشهد.'}catch(e){console.error(e);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-red-400';mediaStatus.innerText='فشل توليد الصورة: '+String(e?.message||e)}};pollinationsBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري توليد صورة Pollinations…';await generateScenePollinationsImage(slide,pollinationsBtn);};searchBtn.onclick=()=>searchSceneBroll(slide);const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*,video/*';mediaInput.multiple=true; mediaInput.className='hidden';uploadBtn.onclick=()=>mediaInput.click();
             if(slide.visualType){const type=document.createElement('div');type.className='text-[9px] text-brandRed font-cairo font-bold';type.innerText='نوع المادة المقترح: '+slide.visualType;mediaWrap.appendChild(type);}if(slide.visualQuery){const hint=document.createElement('div');hint.className='text-[10px] text-gray-500 font-tajawal';hint.innerText='اقتراح B-roll من Gemini: '+slide.visualQuery;mediaWrap.appendChild(hint);} mediaInput.onchange=e=>{Array.from(e.target.files||[]).forEach(file=>{const url=URL.createObjectURL(file);addSceneMedia(slide,{url,preview:url,kind:file.type.startsWith('video/')?'video':'image',credit:file.name,generated:false,local:true})});e.target.value='';}; mediaWrap.appendChild(mediaInput);
             const mediaItems=getSceneMedia(slide);if(mediaItems.length){const list=document.createElement('div');list.className='flex flex-col gap-1';mediaItems.forEach((item,itemIndex)=>{const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded border border-navy-light bg-black/20 px-2 py-1';const name=document.createElement('span');name.className='text-[9px] text-gray-300 truncate';name.innerText=`${itemIndex+1}. ${item.kind==='video'?'فيديو':'صورة'}${item.credit?' — '+item.credit:''}`;const remove=document.createElement('button');remove.type='button';remove.className='text-[9px] text-brandRed shrink-0';remove.innerText='إزالة';remove.onclick=()=>removeSceneMedia(slide,itemIndex);row.append(name,remove);list.appendChild(row)});mediaWrap.appendChild(list);const distribution=document.createElement('div');distribution.className='text-[9px] text-emerald-400 font-tajawal';distribution.innerText=`سيتم تبديل ${mediaItems.length} مواد تلقائياً داخل مدة المشهد.`;mediaWrap.appendChild(distribution);} container.appendChild(mediaWrap);
 
@@ -1187,9 +1273,10 @@
             if (!target || !wrapper) return;
 
             if (activeTab === 'carousel') {
-                wrapper.className = 'preview-carousel shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
-                target.style.width = '360px';
-                target.style.height = '640px';
+                const presentationMode=activeTopic==='customScript'&&activeGeneratedOutputType==='slides';
+                wrapper.className = (presentationMode?'preview-presentation':'preview-social-post')+' shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
+                target.style.width = presentationMode?'640px':'360px';
+                target.style.height = presentationMode?'360px':'450px';
                 target.style.padding = '24px';
                 
                 const slides = topics[activeTopic].slides;
@@ -1640,12 +1727,12 @@
             const slides=topics[activeTikTokTopic]?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتصديرها.','error');
             const quality=Number(document.getElementById('video-quality')?.value||1080),W=quality===720?720:1080,H=quality===720?1280:1920,fps=30;
             const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d'),stream=canvas.captureStream(fps);
-            const audioFile=document.getElementById('video-audio-file')?.files?.[0];let audioEl=null,audioUrl=null,audioCtx=null;
-            if(audioFile||window.aiVoiceoverBlob){audioUrl=audioFile?URL.createObjectURL(audioFile):window.aiVoiceoverUrl;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(resolve=>{audioEl.onloadedmetadata=resolve;audioEl.onerror=resolve;audioEl.load()});audioEl.playbackRate=1;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaElementSource(audioEl),dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e)}}
+            let audioEl=null,audioUrl=null,audioCtx=null;
+            if(window.aiVoiceoverBlob){audioUrl=window.aiVoiceoverUrl;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(resolve=>{audioEl.onloadedmetadata=resolve;audioEl.onerror=resolve;audioEl.load()});audioEl.playbackRate=1;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaElementSource(audioEl),dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e)}}
             const syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio',requestedTotal=Math.max(5,Number(document.getElementById('video-total-duration')?.value||30));
             let total=syncMode==='fit-audio'?requestedTotal:(audioEl&&Number.isFinite(audioEl.duration)?audioEl.duration:requestedTotal);
             const weights=slides.map(s=>String(s.voiceover||'').trim().split(/\s+/).filter(Boolean).length),weightTotal=weights.reduce((a,b)=>a+b,0);
-            let durations=!audioFile&&Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length?window.aiSceneDurations.map(d=>Math.max(.05,Number(d)||.05)):slides.map(s=>Number(s.duration)>0?Number(s.duration):0);
+            let durations=Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length?window.aiSceneDurations.map(d=>Math.max(.05,Number(d)||.05)):slides.map(s=>Number(s.duration)>0?Number(s.duration):0);
             if(!durations.every(Boolean)){durations=slides.map((s,i)=>weightTotal?Math.max(.3,total*weights[i]/weightTotal):total/slides.length)}
             const durationSum=durations.reduce((a,b)=>a+b,0);if(audioEl&&Math.abs(durationSum-total)>.15)durations=durations.map(d=>d*total/durationSum);else total=durationSum;
             const boundaries=[];durations.reduce((sum,d,i)=>(boundaries[i]=sum+d,sum+d),0);const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=total.toFixed(1);
@@ -1673,7 +1760,7 @@
                 }
                 recorder.stop();await done;const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);setAIStatus(`تم تصدير فيديو ${ext.toUpperCase()} متزامن مع الصوت (${total.toFixed(1)} ثانية).`,'success');
             }catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error')}
-            finally{sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}if(audioUrl&&audioFile)URL.revokeObjectURL(audioUrl);activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
+            finally{sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
         }
 
         async function exportVerticalVideoLegacy() {
@@ -1691,8 +1778,7 @@
             const fps = 30, canvas = document.createElement('canvas'); canvas.width=W; canvas.height=H;
             const ctx=canvas.getContext('2d'); const stream=canvas.captureStream(fps);
             let audioEl=null, audioUrl=null, audioCtx=null, audioSource=null, audioDest=null;
-            const audioFile=document.getElementById('video-audio-file')?.files?.[0];
-            if(audioFile || window.aiVoiceoverBlob){audioUrl=audioFile?URL.createObjectURL(audioFile):window.aiVoiceoverUrl;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(r=>{audioEl.onloadedmetadata=r;audioEl.onerror=r;audioEl.load()});if(Number.isFinite(audioEl.duration)&&audioEl.duration>0){requestedTotal=audioEl.duration;const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=Math.ceil(requestedTotal);audioEl.playbackRate=1;}try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();audioSource=audioCtx.createMediaElementSource(audioEl);audioDest=audioCtx.createMediaStreamDestination();audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);audioDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e);try{const audioStream=audioEl.captureStream?audioEl.captureStream():audioEl.mozCaptureStream?.();audioStream?.getAudioTracks().forEach(t=>stream.addTrack(t));}catch{}}}
+            if(window.aiVoiceoverBlob){audioUrl=window.aiVoiceoverUrl;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(r=>{audioEl.onloadedmetadata=r;audioEl.onerror=r;audioEl.load()});if(Number.isFinite(audioEl.duration)&&audioEl.duration>0){requestedTotal=audioEl.duration;const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=Math.ceil(requestedTotal);audioEl.playbackRate=1;}try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();audioSource=audioCtx.createMediaElementSource(audioEl);audioDest=audioCtx.createMediaStreamDestination();audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);audioDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e);try{const audioStream=audioEl.captureStream?audioEl.captureStream():audioEl.mozCaptureStream?.();audioStream?.getAudioTracks().forEach(t=>stream.addTrack(t));}catch{}}}
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond: quality===720?5000000:9000000}); const chunks=[];
             recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
             const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
@@ -1743,7 +1829,7 @@
                 recorder.stop(); await done; const ext=mimeType.startsWith('video/mp4')?'mp4':'webm'; const blob=new Blob(chunks,{type:mimeType}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
                 setAIStatus(ext==='mp4'?'تم تصدير فيديو MP4 فعلي.':'تم تصدير فيديو WebM فعلي لأن متصفحك لا يدعم تسجيل MP4 مباشرة.','success');
             } catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{} setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error');}
-            finally {if(audioEl){audioEl.pause();}if(audioCtx)try{await audioCtx.close()}catch{}if(audioUrl && audioFile)URL.revokeObjectURL(audioUrl);activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
+            finally {if(audioEl){audioEl.pause();}if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
         }
 
         async function exportAllTikTokSlides() {

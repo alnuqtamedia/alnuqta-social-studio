@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/validate-studio.mjs"
+    "build": "node scripts/build-pages.mjs",
+    "test": "node scripts/validate-studio.mjs && npm run build && node scripts/inspect-pages-bundle.mjs"
   }
 }
