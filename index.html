@@ -277,6 +277,20 @@
                 </div>
                 <button id="ai-tts-btn" onclick="generateAIVoiceover()" class="w-full py-2.5 bg-navy border border-brandRed/60 hover:bg-brandRed text-white rounded font-cairo font-bold text-xs">مطابقة المدة وتوليد التعليق الصوتي</button>
                 <audio id="ai-tts-preview" controls class="hidden w-full"></audio>
+                <div class="border border-navy-light rounded-lg p-3 bg-navy-card/50 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <div><h4 class="font-cairo font-black text-xs text-white">تسجيل صوت بشري — اختياري</h4><p class="text-[10px] text-gray-400 font-tajawal">Gemini هو المصدر الأساسي. يمكنك تسجيل تعليق واحد متصل بالمايك واختياره بدلاً منه.</p></div>
+                        <span id="active-voice-source" class="shrink-0 text-[10px] text-emerald-300 font-cairo">المصدر: Gemini</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="human-record-start" type="button" onclick="startHumanVoiceRecording()" class="py-2 bg-navy border border-emerald-500/60 hover:bg-emerald-700 text-white rounded text-xs font-cairo font-bold">بدء التسجيل</button>
+                        <button id="human-record-stop" type="button" onclick="stopHumanVoiceRecording()" disabled class="py-2 bg-navy border border-amber-500/60 hover:bg-amber-700 text-white rounded text-xs font-cairo font-bold disabled:opacity-40">إيقاف التسجيل</button>
+                        <button id="use-gemini-voice" type="button" onclick="setActiveVoiceSource('gemini')" class="py-2 bg-navy border border-brandRed/50 hover:bg-brandRed text-white rounded text-[10px] font-cairo font-bold">استخدام صوت Gemini</button>
+                        <button id="human-record-delete" type="button" onclick="deleteHumanVoiceRecording()" disabled class="py-2 bg-navy border border-gray-500/50 hover:bg-gray-700 text-white rounded text-[10px] font-cairo font-bold disabled:opacity-40">حذف التسجيل</button>
+                    </div>
+                    <p id="human-record-status" class="text-[10px] text-gray-400 font-tajawal">لم يبدأ تسجيل بشري.</p>
+                    <audio id="human-record-preview" controls class="hidden w-full"></audio>
+                </div>
                 <button id="export-video-btn" onclick="exportVerticalVideo()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-xs flex items-center justify-center gap-2 transition shadow-lg">
                     <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو فعلي
                 </button>
@@ -1179,6 +1193,56 @@
 
         function prepareVisualPlan(){const slides=topics[activeTikTokTopic]?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتحليلها.','error');let needs=0;slides.forEach((s,i)=>{if(!s.visualType)s.visualType=(i===slides.length-1?'text-only':'broll');if(!s.visualQuery)s.visualQuery=[s.title,s.subtitle,(s.points||[])[0]].filter(Boolean).join(' — ').slice(0,180);s.mediaStatus=s.mediaUrl?'ready':'needed';if(!s.mediaUrl)needs++;});const st=document.getElementById('visual-plan-status');if(st)st.innerText='الخطة جاهزة: '+needs+' مشاهد تحتاج مادة بصرية.';updateTikTokInputs();renderCanvas();setAIStatus('تم تجهيز الخطة البصرية للمادة.','success');}
 
+        function getActiveVoiceover(){
+            if(window.activeVoiceSource==='human'&&window.humanVoiceoverBlob&&window.humanVoiceoverUrl)return {source:'human',blob:window.humanVoiceoverBlob,url:window.humanVoiceoverUrl,duration:Number(window.humanVoiceoverDuration)||0};
+            if(window.aiVoiceoverBlob&&window.aiVoiceoverUrl)return {source:'gemini',blob:window.aiVoiceoverBlob,url:window.aiVoiceoverUrl,duration:Number(window.aiVoiceoverDuration)||0};
+            if(window.humanVoiceoverBlob&&window.humanVoiceoverUrl)return {source:'human',blob:window.humanVoiceoverBlob,url:window.humanVoiceoverUrl,duration:Number(window.humanVoiceoverDuration)||0};
+            return null;
+        }
+
+        function setActiveVoiceSource(source){
+            if(source==='human'&&!window.humanVoiceoverBlob)return setAIStatus('سجّل تعليقاً بشرياً أولاً.','error');
+            if(source==='gemini'&&!window.aiVoiceoverBlob)return setAIStatus('ولّد تعليق Gemini أولاً.','error');
+            window.activeVoiceSource=source;
+            const label=document.getElementById('active-voice-source');if(label)label.innerText='المصدر: '+(source==='human'?'التسجيل البشري':'Gemini');
+            setAIStatus(source==='human'?'سيُستخدم التسجيل البشري في التصدير.':'سيُستخدم صوت Gemini في التصدير.','success');
+        }
+
+        async function startHumanVoiceRecording(){
+            if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)return setAIStatus('هذا المتصفح لا يدعم تسجيل المايك. استخدم Chrome أو Edge حديثاً عبر HTTPS.','error');
+            const start=document.getElementById('human-record-start'),stop=document.getElementById('human-record-stop'),status=document.getElementById('human-record-status');
+            try{
+                const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+                const mimeType=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(type=>MediaRecorder.isTypeSupported(type))||'';
+                const recorder=new MediaRecorder(stream,mimeType?{mimeType}:undefined),chunks=[];window.humanVoiceRecorder=recorder;window.humanVoiceStream=stream;
+                recorder.ondataavailable=event=>{if(event.data?.size)chunks.push(event.data)};
+                recorder.onstop=async()=>{
+                    stream.getTracks().forEach(track=>track.stop());window.humanVoiceStream=null;
+                    const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});if(!blob.size){if(status)status.innerText='لم يلتقط المايك صوتاً. أعد المحاولة.';return}
+                    if(window.humanVoiceoverUrl)URL.revokeObjectURL(window.humanVoiceoverUrl);window.humanVoiceoverBlob=blob;window.humanVoiceoverUrl=URL.createObjectURL(blob);
+                    try{const context=new (window.AudioContext||window.webkitAudioContext)();window.humanVoiceoverDuration=(await context.decodeAudioData(await blob.arrayBuffer())).duration;await context.close()}catch{window.humanVoiceoverDuration=0}
+                    const preview=document.getElementById('human-record-preview');preview.src=window.humanVoiceoverUrl;preview.classList.remove('hidden');preview.load();
+                    document.getElementById('human-record-delete').disabled=false;window.activeVoiceSource='human';const label=document.getElementById('active-voice-source');if(label)label.innerText='المصدر: التسجيل البشري';
+                    if(window.humanVoiceoverDuration>0){const total=document.getElementById('video-total-duration');if(total)total.value=window.humanVoiceoverDuration.toFixed(1)}
+                    if(status)status.innerText=`اكتمل التسجيل${window.humanVoiceoverDuration?` — ${window.humanVoiceoverDuration.toFixed(1)} ثانية`:''}. تم اختياره للتصدير.`;setAIStatus('تم حفظ التسجيل البشري محلياً داخل المتصفح واختياره للتصدير.','success');
+                };
+                recorder.start(250);start.disabled=true;stop.disabled=false;if(status)status.innerText='التسجيل جارٍ الآن… اضغط إيقاف عند الانتهاء.';setAIStatus('سمح المتصفح للمايك وبدأ التسجيل.','busy');
+            }catch(error){console.error('Microphone recording error',error);if(status)status.innerText='تعذر فتح المايك. تحقق من إذن الميكروفون في المتصفح.';setAIStatus('تعذر استخدام المايك: '+(error?.message||error),'error')}
+        }
+
+        function stopHumanVoiceRecording(){
+            const recorder=window.humanVoiceRecorder;if(recorder?.state==='recording')recorder.stop();
+            document.getElementById('human-record-start').disabled=false;document.getElementById('human-record-stop').disabled=true;
+        }
+
+        function deleteHumanVoiceRecording(){
+            if(window.humanVoiceStream)window.humanVoiceStream.getTracks().forEach(track=>track.stop());if(window.humanVoiceoverUrl)URL.revokeObjectURL(window.humanVoiceoverUrl);
+            window.humanVoiceRecorder=null;window.humanVoiceStream=null;window.humanVoiceoverBlob=null;window.humanVoiceoverUrl='';window.humanVoiceoverDuration=0;
+            const preview=document.getElementById('human-record-preview');if(preview){preview.pause();preview.removeAttribute('src');preview.classList.add('hidden')}
+            document.getElementById('human-record-delete').disabled=true;document.getElementById('human-record-start').disabled=false;document.getElementById('human-record-stop').disabled=true;document.getElementById('human-record-status').innerText='تم حذف التسجيل البشري.';
+            window.activeVoiceSource=window.aiVoiceoverBlob?'gemini':'';const label=document.getElementById('active-voice-source');if(label)label.innerText=window.aiVoiceoverBlob?'المصدر: Gemini':'لا يوجد مصدر صوت';setAIStatus('تم حذف التسجيل البشري.','success');
+        }
+
         function invalidateGeneratedVoiceover(){
             if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);
             (window.aiSceneVoiceovers||[]).forEach(item=>{if(item?.url)URL.revokeObjectURL(item.url)});
@@ -1666,6 +1730,7 @@
                     if(syncMode!=='fit-audio'||duration<=target+1||pass===1)break;await fitNarrationToDuration(slides,target,Math.max(.55,target/duration*.92));
                 }
                 if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);(window.aiSceneVoiceovers||[]).forEach(x=>{if(x?.url)URL.revokeObjectURL(x.url)});window.aiSceneVoiceovers=[];window.aiVoiceoverBlob=blob;window.aiVoiceoverUrl=URL.createObjectURL(blob);window.aiVoiceoverDuration=duration;
+                window.activeVoiceSource='gemini';const sourceLabel=document.getElementById('active-voice-source');if(sourceLabel)sourceLabel.innerText='المصدر: Gemini';
                 const audio=document.getElementById('ai-tts-preview');audio.src=window.aiVoiceoverUrl;audio.classList.remove('hidden');audio.load();setAIStatus('تم توليد الصوت. جاري مطابقة الوقفات مع انتقالات المشاهد…','busy');
                 window.aiSceneDurations=await detectNarrationSceneDurations(blob,texts,duration);if(syncMode==='fit-audio'){const sum=window.aiSceneDurations.reduce((a,b)=>a+b,0)||1;window.aiSceneDurations=window.aiSceneDurations.map(value=>value*target/sum)}
                 window.aiSceneDurations.forEach((value,index)=>{if(slides[index])slides[index].duration=Number(value.toFixed(2))});if(syncMode==='extend-visuals')document.getElementById('video-total-duration').value=duration.toFixed(1);
@@ -1712,6 +1777,7 @@
                 const combinedBlob=audioBufferToWavBlob(combined);
                 if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);
                 window.aiSceneVoiceovers=sceneAudio;window.aiSceneDurations=sceneDurations;window.aiVoiceoverBlob=combinedBlob;window.aiVoiceoverUrl=URL.createObjectURL(combinedBlob);window.aiVoiceoverDuration=combined.duration;
+                window.activeVoiceSource='gemini';const sourceLabel=document.getElementById('active-voice-source');if(sourceLabel)sourceLabel.innerText='المصدر: Gemini';
                 const audio=document.getElementById('ai-tts-preview');audio.src=window.aiVoiceoverUrl;audio.classList.remove('hidden');audio.load();
                 const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=combined.duration.toFixed(1);
                 setAIStatus(`تم توليد ${sceneAudio.filter(Boolean).length} مقاطع صوتية. مدة الفيديو الدقيقة ${combined.duration.toFixed(1)} ثانية، وكل مشهد مرتبط بصوته.`,'success');
@@ -1727,8 +1793,8 @@
             const slides=topics[activeTikTokTopic]?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتصديرها.','error');
             const quality=Number(document.getElementById('video-quality')?.value||1080),W=quality===720?720:1080,H=quality===720?1280:1920,fps=30;
             const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d'),stream=canvas.captureStream(fps);
-            let audioEl=null,audioUrl=null,audioCtx=null;
-            if(window.aiVoiceoverBlob){audioUrl=window.aiVoiceoverUrl;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(resolve=>{audioEl.onloadedmetadata=resolve;audioEl.onerror=resolve;audioEl.load()});audioEl.playbackRate=1;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaElementSource(audioEl),dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e)}}
+            let audioEl=null,audioUrl=null,audioCtx=null;const activeVoice=getActiveVoiceover();
+            if(activeVoice){audioUrl=activeVoice.url;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(resolve=>{audioEl.onloadedmetadata=resolve;audioEl.onerror=resolve;audioEl.load()});audioEl.playbackRate=1;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaElementSource(audioEl),dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e)}}
             const syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio',requestedTotal=Math.max(5,Number(document.getElementById('video-total-duration')?.value||30));
             let total=syncMode==='fit-audio'?requestedTotal:(audioEl&&Number.isFinite(audioEl.duration)?audioEl.duration:requestedTotal);
             const weights=slides.map(s=>String(s.voiceover||'').trim().split(/\s+/).filter(Boolean).length),weightTotal=weights.reduce((a,b)=>a+b,0);
@@ -1777,8 +1843,8 @@
             let requestedTotal = Math.max(5, Math.min(180, Number(document.getElementById('video-total-duration')?.value || 30)));
             const fps = 30, canvas = document.createElement('canvas'); canvas.width=W; canvas.height=H;
             const ctx=canvas.getContext('2d'); const stream=canvas.captureStream(fps);
-            let audioEl=null, audioUrl=null, audioCtx=null, audioSource=null, audioDest=null;
-            if(window.aiVoiceoverBlob){audioUrl=window.aiVoiceoverUrl;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(r=>{audioEl.onloadedmetadata=r;audioEl.onerror=r;audioEl.load()});if(Number.isFinite(audioEl.duration)&&audioEl.duration>0){requestedTotal=audioEl.duration;const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=Math.ceil(requestedTotal);audioEl.playbackRate=1;}try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();audioSource=audioCtx.createMediaElementSource(audioEl);audioDest=audioCtx.createMediaStreamDestination();audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);audioDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e);try{const audioStream=audioEl.captureStream?audioEl.captureStream():audioEl.mozCaptureStream?.();audioStream?.getAudioTracks().forEach(t=>stream.addTrack(t));}catch{}}}
+            let audioEl=null, audioUrl=null, audioCtx=null, audioSource=null, audioDest=null;const activeVoice=getActiveVoiceover();
+            if(activeVoice){audioUrl=activeVoice.url;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(r=>{audioEl.onloadedmetadata=r;audioEl.onerror=r;audioEl.load()});if(Number.isFinite(audioEl.duration)&&audioEl.duration>0){requestedTotal=audioEl.duration;const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=Math.ceil(requestedTotal);audioEl.playbackRate=1;}try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();audioSource=audioCtx.createMediaElementSource(audioEl);audioDest=audioCtx.createMediaStreamDestination();audioSource.connect(audioDest);audioSource.connect(audioCtx.destination);audioDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e);try{const audioStream=audioEl.captureStream?audioEl.captureStream():audioEl.mozCaptureStream?.();audioStream?.getAudioTracks().forEach(t=>stream.addTrack(t));}catch{}}}
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond: quality===720?5000000:9000000}); const chunks=[];
             recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
             const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
