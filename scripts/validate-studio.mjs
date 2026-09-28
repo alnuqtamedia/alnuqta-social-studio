@@ -15,6 +15,8 @@ const required = [
   'STUDIO_OUTPUT_SCHEMA',
   'validateGeminiResult',
   'generateScenePollinationsImage',
+  'startHumanVoiceRecording()',
+  'getActiveVoiceover()',
   'exportAllSlides()',
   'exportAllTikTokSlides()',
   "target.style.height = presentationMode?'360px':'450px'",
@@ -34,7 +36,7 @@ const forbiddenBrowserPatterns = [
   [/GEMINI_API_KEY/i, 'Gemini secret name'],
   [/AIza[0-9A-Za-z_-]{20,}/, 'Google API key'],
   [/sk-[0-9A-Za-z_-]{20,}/, 'generic secret key'],
-  [/getUserMedia|SpeechRecognition|webkitSpeechRecognition|ai-voice-btn|video-audio-file|accept=["']audio\/\*/i, 'human microphone/audio input'],
+  [/SpeechRecognition|webkitSpeechRecognition|ai-voice-btn|video-audio-file|accept=["']audio\/\*/i, 'speech command or uploaded human audio input'],
 ];
 for (const [pattern, label] of forbiddenBrowserPatterns) if (pattern.test(html)) throw new Error(`${label} must not appear in the browser application.`);
 
