@@ -1728,7 +1728,7 @@
                 const response=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command,currentContent:{...getCurrentStudioContent(),durationTarget:targetSeconds,narrationScenes:current}})}),raw=await response.text();
                 let result;try{result=JSON.parse(raw)}catch{throw new Error('Gemini أعاد جواباً غير مكتمل')};if(!response.ok)throw new Error(result.error||'تعذر اختصار النص');
                 const returned=Array.isArray(result.slides)?result.slides:[];if(returned.length!==slides.length)throw new Error('عدد المشاهد المعاد لا يطابق الفيديو');
-                returned.forEach((item,index)=>{const value=String(item.voiceover||item.narration||'').trim();if(value)slides[index].voiceover=value});
+                const replacements=returned.map(item=>String(item.voiceover||item.narration||'').trim());if(replacements.some((value,index)=>!value&&current[index].text))throw new Error('الاختصار حذف تعليق مشهد؛ النص الأصلي محفوظ');replacements.forEach((value,index)=>{slides[index].voiceover=value});
             }catch(error){
                 throw new Error('تعذر اختصار النص دون الإخلال به؛ النص الأصلي محفوظ. '+error.message);
             }
@@ -1747,7 +1747,7 @@
         async function generateAIVoiceover(){
             const btn=document.getElementById('ai-tts-btn'),slides=topics[activeTikTokTopic]?.slides||[],syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio';let target=0;
             if(!slides.some(s=>String(s.voiceover||'').trim()))return setAIStatus('لا يوجد نص تعليق صوتي. ولّد فيديو عبر Gemini أولاً أو اكتب نص التعليق داخل المشاهد.','error');
-            if(btn)btn.disabled=true;
+            if(btn)btn.disabled=true;const originalNarration=slides.map(slide=>slide.voiceover);
             try{
                 target=requestedVideoSeconds();if(syncMode==='fit-audio')await fitNarrationToDuration(slides,target);
                 let blob,duration=0,texts=[];
@@ -1764,7 +1764,7 @@
                 window.aiSceneDurations.forEach((value,index)=>{if(slides[index])slides[index].duration=Number(value.toFixed(2))});if(syncMode==='extend-visuals')document.getElementById('video-total-duration').value=duration.toFixed(1);
                 updateTikTokInputs();const finalDuration=syncMode==='fit-audio'?target:duration;
                 if(syncMode==='fit-audio'&&duration>target){setAIStatus(`الصوت ${duration.toFixed(1)} ثانية ويتجاوز المطلوب ${target.toFixed(1)} ثانية؛ محفوظ للمعاينة، والتصدير متوقف حتى تعديل النص.`,'error');return;}setAIStatus(`الصوت ${duration.toFixed(1)} ثانية، والفيديو المطلوب ${finalDuration.toFixed(1)} ثانية. توقيت المشاهد تقديري من الوقفات؛ راجع المعاينة.`,'success');
-            }catch(e){console.error(e);setAIStatus('تعذر توليد التعليق الصوتي: '+(e?.message||e),'error')}
+            }catch(e){slides.forEach((slide,index)=>{slide.voiceover=originalNarration[index]});updateTikTokInputs();console.error(e);setAIStatus('تعذر توليد التعليق الصوتي؛ النص السابق محفوظ: '+(e?.message||e),'error')}
             finally{if(btn)btn.disabled=false}
         }
 
