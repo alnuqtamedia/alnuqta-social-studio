@@ -1890,6 +1890,31 @@
             const holder=document.getElementById('social-platform-buttons');
             for(const platform of ['Facebook','Instagram','TikTok','YouTube','LinkedIn','Threads','X']){const button=document.createElement('button');button.type='button';button.className='text-xs border border-navy-light rounded p-2';button.textContent=platform;button.onclick=()=>{document.getElementById('social-platform').value=platform;loadSocialDraft();document.getElementById('social-status').textContent=platform+': النشر المباشر يحتاج ربط حساب وخدمة نشر. يمكنك الآن تنزيل الفيديو ونسخ النص أو مشاركة الملف عبر الجهاز.';};holder.appendChild(button);}loadSocialDraft();
         });
+        async function loadExportMedia(item){
+            const kind=item.kind==='video'?'video':'image',url=String(item.url||(kind==='image'?item.preview:'')||'');
+            if(!url)throw new Error('رابط الوسيط مفقود');
+            for(let attempt=0;attempt<2;attempt++){
+                const element=kind==='video'?document.createElement('video'):new Image();
+                // Set CORS and handlers before src: src starts fetching immediately.
+                element.crossOrigin='anonymous';
+                if(kind==='video'){element.muted=true;element.playsInline=true;element.preload='auto'}
+                try{
+                    await new Promise((resolve,reject)=>{
+                        const timer=setTimeout(()=>reject(new Error('انتهت مهلة التحميل')),20000);
+                        const loaded=()=>{clearTimeout(timer);resolve()};
+                        element.onerror=()=>{clearTimeout(timer);reject(new Error(url.startsWith('blob:')?'الملف المحلي لم يعد متاحاً؛ أعد رفعه من جهازك':'تعذر قراءة الرابط للتصدير؛ قد يكون غير متاح أو يمنع الوصول من المتصفح'))};
+                        if(kind==='video')element.onloadeddata=loaded;else element.onload=loaded;
+                        element.src=url;
+                        if(kind==='video')element.load();else if(element.complete&&element.naturalWidth)loaded();
+                    });
+                    return {kind,element};
+                }catch(error){
+                    if(kind==='video'){element.pause();element.removeAttribute('src');element.load()}else element.src='';
+                    if(attempt===1||url.startsWith('blob:'))throw error;
+                }
+            }
+        }
+
         async function measureExportedVideo(blob){
             const url=URL.createObjectURL(blob),video=document.createElement('video');video.preload='metadata';
             try{return await new Promise((resolve,reject)=>{
@@ -1926,9 +1951,12 @@
             try{
             for(let i=0;i<slides.length;i++){activeTikTokSlide=i;renderCanvas();await new Promise(r=>setTimeout(r,90));sceneShots[i]=await html2canvas(document.getElementById('export-target'),{scale:2,backgroundColor:'#0A1A2F',useCORS:true,letterRendering:false});}
             activeTikTokSlide=original;renderCanvas();
-            sceneAssets=await Promise.all(slides.map(slide=>Promise.all(getSceneMedia(slide).map(async item=>{try{if(item.kind==='video'){const element=document.createElement('video');element.src=item.url;element.crossOrigin='anonymous';element.muted=true;element.playsInline=true;element.preload='auto';await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('timeout')),8000);element.onloadeddata=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('load'))};element.load()});return {kind:'video',element}}const element=new Image();element.crossOrigin='anonymous';element.src=item.url||item.preview;await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('انتهت مهلة تحميل الصورة')),8000);element.onload=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('تعذر تحميل الصورة'))};if(element.complete&&element.naturalWidth){clearTimeout(timer);resolve()}});return {kind:'image',element}}catch(e){console.warn('Visual load failed',e);return null}})).then(items=>items)));
-            if(sceneAssets.some(items=>items.some(item=>!item)))throw new Error('تعذر تحميل إحدى وسائط المشاهد. أصلح الصورة أو الفيديو ثم أعد التصدير؛ لن تُحذف الوسائط من المشروع.');
-            }catch(error){stream.getTracks().forEach(track=>track.stop());if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');setAIStatus('تعذر تجهيز الفيديو: '+error.message,'error');return;}
+            const mediaFailures=[];
+            sceneAssets=await Promise.all(slides.map((slide,sceneIndex)=>Promise.all(getSceneMedia(slide).map(async(item,mediaIndex)=>{
+                try{return await loadExportMedia(item)}catch(error){mediaFailures.push(`المشهد ${sceneIndex+1}، الوسيط ${mediaIndex+1}: ${error.message}`);return null}
+            }))));
+            if(mediaFailures.length)throw new Error(mediaFailures.join('؛ ')+'. الوسائط والنص محفوظان.');
+            }catch(error){sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});stream.getTracks().forEach(track=>track.stop());if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');setAIStatus('تعذر تجهيز الفيديو: '+error.message,'error');return;}
             const phrases=text=>{const out=[];String(text||'').split(/(?<=[.!؟،؛:])\s+/).filter(Boolean).forEach(part=>{const words=part.trim().split(/\s+/);for(let i=0;i<words.length;i+=7)out.push(words.slice(i,i+7).join(' '))});return out};
             const drawImageCover=(source,zoom=1,ox=0,oy=0)=>{const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height,sr=sw/sh,tr=W/H;let sx=0,sy=0,cw=sw,ch=sh;if(sr>tr){cw=sh*tr;sx=(sw-cw)/2}else{ch=sw/tr;sy=(sh-ch)/2}const dw=W*zoom,dh=H*zoom;ctx.drawImage(source,sx,sy,cw,ch,(W-dw)/2+ox,(H-dh)/2+oy,dw,dh)};
             try{
@@ -2272,6 +2300,7 @@
     </script>
 </body>
 </html>
+
 
 
 
