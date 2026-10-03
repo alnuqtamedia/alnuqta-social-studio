@@ -1685,7 +1685,7 @@
                 for(let scene=0;scene<texts.length-1;scene++){
                     cumulativeWords+=words[scene];
                     const expected=totalDuration*cumulativeWords/wordTotal;
-                    const remainingScenes=texts.length-scene-1,minTime=boundaries[boundaries.length-1]+.65,maxTime=totalDuration-remainingScenes*.65;
+                    const remainingScenes=texts.length-scene-1,minTime=boundaries[boundaries.length-1]+Math.min(.65,totalDuration/(texts.length*2)),maxTime=totalDuration-remainingScenes*Math.min(.65,totalDuration/(texts.length*2));
                     const radius=Math.min(4,Math.max(1.4,totalDuration*.065)),from=Math.max(minTime,expected-radius),to=Math.min(maxTime,expected+radius);
                     let bestTime=Math.max(minTime,Math.min(maxTime,expected)),bestScore=Infinity;
                     for(let t=from;t<=to;t+=.025){
@@ -1698,7 +1698,7 @@
                     boundaries.push(bestTime);
                 }
                 boundaries.push(totalDuration);
-                return boundaries.slice(1).map((end,i)=>Math.max(.4,end-boundaries[i]));
+                return boundaries.slice(1).map((end,i)=>end-boundaries[i]);
             }catch(error){console.warn('Narration pause detection fallback',error);return fallback()}
             finally{try{await context.close()}catch{}}
         }
@@ -1744,10 +1744,10 @@
                 if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);(window.aiSceneVoiceovers||[]).forEach(x=>{if(x?.url)URL.revokeObjectURL(x.url)});window.aiSceneVoiceovers=[];window.aiVoiceoverBlob=blob;window.aiVoiceoverUrl=URL.createObjectURL(blob);window.aiVoiceoverDuration=duration;
                 window.activeVoiceSource='gemini';const sourceLabel=document.getElementById('active-voice-source');if(sourceLabel)sourceLabel.innerText='المصدر: Gemini';
                 const audio=document.getElementById('ai-tts-preview');audio.src=window.aiVoiceoverUrl;audio.classList.remove('hidden');audio.load();setAIStatus('تم توليد الصوت. جاري مطابقة الوقفات مع انتقالات المشاهد…','busy');
-                window.aiSceneDurations=await detectNarrationSceneDurations(blob,texts,duration);if(syncMode==='fit-audio'){const sum=window.aiSceneDurations.reduce((a,b)=>a+b,0)||1;window.aiSceneDurations=window.aiSceneDurations.map(value=>value*target/sum)}
+                window.aiSceneDurations=await detectNarrationSceneDurations(blob,texts,duration);window.aiTimelineApproximate=true;
                 window.aiSceneDurations.forEach((value,index)=>{if(slides[index])slides[index].duration=Number(value.toFixed(2))});if(syncMode==='extend-visuals')document.getElementById('video-total-duration').value=duration.toFixed(1);
                 updateTikTokInputs();const finalDuration=syncMode==='fit-audio'?target:duration;
-                setAIStatus(`قياس أولي: الصوت ${duration.toFixed(1)} ثانية، والفيديو ${finalDuration.toFixed(1)} ثانية، وانتقالات المواد موزعة تلقائياً.`,'success');
+                if(syncMode==='fit-audio'&&duration>target){setAIStatus(`الصوت ${duration.toFixed(1)} ثانية ويتجاوز المطلوب ${target.toFixed(1)} ثانية؛ محفوظ للمعاينة، والتصدير متوقف حتى تعديل النص.`,'error');return;}setAIStatus(`الصوت ${duration.toFixed(1)} ثانية، والفيديو المطلوب ${finalDuration.toFixed(1)} ثانية. توقيت المشاهد تقديري من الوقفات؛ راجع المعاينة.`,'success');
             }catch(e){console.error(e);setAIStatus('تعذر توليد التعليق الصوتي: '+(e?.message||e),'error')}
             finally{if(btn)btn.disabled=false}
         }
@@ -1847,7 +1847,7 @@
             const weights=slides.map(s=>String(s.voiceover||'').trim().split(/\s+/).filter(Boolean).length),weightTotal=weights.reduce((a,b)=>a+b,0);
             let durations=Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length?window.aiSceneDurations.map(d=>Math.max(.05,Number(d)||.05)):slides.map(s=>Number(s.duration)>0?Number(s.duration):0);
             if(!durations.every(Boolean)){durations=slides.map((s,i)=>weightTotal?Math.max(.3,total*weights[i]/weightTotal):total/slides.length)}
-            const durationSum=durations.reduce((a,b)=>a+b,0);durations=durations.map(d=>d*total/durationSum);
+            const durationSum=durations.reduce((a,b)=>a+b,0);if(audioEl&&Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length){durations=durations.map(d=>d*audioEl.duration/durationSum);durations[durations.length-1]+=Math.max(0,total-audioEl.duration);}else{durations=durations.map(d=>d*total/durationSum);}
             const boundaries=[];durations.reduce((sum,d,i)=>(boundaries[i]=sum+d,sum+d),0);const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=total.toFixed(1);
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:quality===720?5000000:9000000}),chunks=[];recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
             const original=activeTikTokSlide,sceneShots=[];if(btn)btn.disabled=true;if(status){status.classList.remove('hidden');statusText.innerText='جاري تجهيز مشاهد الفيديو...'}
@@ -2197,3 +2197,4 @@
     </script>
 </body>
 </html>
+
