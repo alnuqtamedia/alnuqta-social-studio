@@ -491,7 +491,7 @@
                 const at = `المشهد ${index + 1}`;
                 const words = String(scene.title || '').split(/\s+/).filter(Boolean).length;
                 if (!scene.id) errors.push(`${at}: المعرّف مفقود`);
-                if (words < 3 || words > 7) errors.push(`${at}: العنوان يجب أن يكون من 3 إلى 7 كلمات`);
+                if (!words) errors.push(`${at}: العنوان مفقود`);
                 if (typeof scene.voiceover !== 'string') errors.push(`${at}: نص التعليق غير صالح`);
                 if (typeof scene.caption !== 'string') errors.push(`${at}: الترجمة غير صالحة`);
                 if (!scene.visualAsset || typeof scene.visualAsset.id !== 'string' || typeof scene.visualAsset.url !== 'string') errors.push(`${at}: الأصل البصري غير صالح`);
@@ -2272,5 +2272,6 @@
     </script>
 </body>
 </html>
+
 
 
