@@ -633,10 +633,10 @@
                     catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
                     if(response.ok)break;
                     const message=String(result.error||'فشل الاتصال بخدمة Gemini'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),isRateLimit=response.status===429||/quota|rate.?limit|high demand/i.test(message);
-                    if(!isRateLimit||attempt===4)throw new Error(message);
-                    const waitSeconds=Math.max(3,Math.ceil(Number(retryMatch?.[1]||60))+2);
+                    const waitSeconds=generationRetryDelay(response.status,message,attempt);
+                    if(waitSeconds===null)throw new Error(message);
                     for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`Gemini مشغول أو الحصة ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
-                    setAIStatus(`إعادة المحاولة تلقائياً (${attempt+2} من 5)…`,'busy');
+                    setAIStatus(`إعادة المحاولة تلقائياً (${attempt+2} من 3)…`,'busy');
                 }
                 applyGeminiResult(result);
                 if(explicitDuration!==null){document.getElementById('video-total-duration').value=String(explicitDuration);document.getElementById('video-sync-mode').value='fit-audio';}
@@ -1737,13 +1737,23 @@
             }
         }
 
+        function generationRetryDelay(status,message,attempt){
+            const text=String(message||'');
+            if(attempt>=2||/per[ _-]?day|requests?\s*per\s*day|daily|free[ _-]?tier|limit\s*:\s*0|upgrade|billing|insufficient|quota[^\n]*(?:exhausted|exceeded)/i.test(text))return null;
+            if(status!==429&&status!==503&&!/rate.?limit|high demand|temporarily unavailable/i.test(text))return null;
+            const retry=text.match(/retry (?:in|after)\s+([\d.]+)\s*s/i);
+            const seconds=retry?Number(retry[1])+2:5;
+            if(!Number.isFinite(seconds)||seconds>30)return null;
+            return Math.max(3,Math.ceil(seconds));
+        }
+
         async function requestNarrationTts(text){
             let data;
             for(let attempt=0;attempt<5;attempt++){
                 const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:document.getElementById('ai-tts-style')?.value||''})});
                 data=await r.json();if(r.ok)return data;
-                const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),limited=r.status===429||/quota|rate.?limit|high demand/i.test(message);if(!limited||attempt===4)throw new Error(message);
-                const waitSeconds=Math.max(10,Math.ceil(Number(retryMatch?.[1]||60))+2);for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة الصوت ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
+                const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),limited=r.status===429||/quota|rate.?limit|high demand/i.test(message);const waitSeconds=generationRetryDelay(r.status,message,attempt);if(waitSeconds===null)throw new Error(message);
+                for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة الصوت ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
             }
         }
 
@@ -1787,8 +1797,8 @@
                         const data=await r.json();
                         if(r.ok)return data;
                         const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),isQuota=r.status===429||/quota|rate.?limit/i.test(message);
-                        if(!isQuota||attempt===4)throw new Error(`المشهد ${sceneNumber}: ${message}`);
-                        const waitSeconds=Math.max(10,Math.ceil(Number(retryMatch?.[1]||60))+2);
+                        const waitSeconds=generationRetryDelay(r.status,message,attempt);
+                        if(waitSeconds===null)throw new Error(`المشهد ${sceneNumber}: ${message}`);
                         for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة Gemini ممتلئة مؤقتاً. إعادة محاولة المشهد ${sceneNumber} تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
                     }
                 };
@@ -1901,9 +1911,13 @@
             const boundaries=[];durations.reduce((sum,d,i)=>(boundaries[i]=sum+d,sum+d),0);const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=total.toFixed(1);
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:quality===720?5000000:9000000}),chunks=[];recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
             const original=activeTikTokSlide,sceneShots=[];if(btn)btn.disabled=true;if(status){status.classList.remove('hidden');statusText.innerText='جاري تجهيز مشاهد الفيديو...'}
+            let sceneAssets=[];
+            try{
             for(let i=0;i<slides.length;i++){activeTikTokSlide=i;renderCanvas();await new Promise(r=>setTimeout(r,90));sceneShots[i]=await html2canvas(document.getElementById('export-target'),{scale:2,backgroundColor:'#0A1A2F',useCORS:true,letterRendering:false});}
             activeTikTokSlide=original;renderCanvas();
-            const sceneAssets=await Promise.all(slides.map(slide=>Promise.all(getSceneMedia(slide).map(async item=>{try{if(item.kind==='video'){const element=document.createElement('video');element.src=item.url;element.crossOrigin='anonymous';element.muted=true;element.playsInline=true;element.preload='auto';await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('timeout')),8000);element.onloadeddata=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('load'))};element.load()});return {kind:'video',element}}const element=new Image();element.crossOrigin='anonymous';element.src=item.url||item.preview;await new Promise((resolve,reject)=>{element.onload=resolve;element.onerror=reject});return {kind:'image',element}}catch(e){console.warn('Visual fallback',e);return null}})).then(items=>items.filter(Boolean))));
+            sceneAssets=await Promise.all(slides.map(slide=>Promise.all(getSceneMedia(slide).map(async item=>{try{if(item.kind==='video'){const element=document.createElement('video');element.src=item.url;element.crossOrigin='anonymous';element.muted=true;element.playsInline=true;element.preload='auto';await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('timeout')),8000);element.onloadeddata=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('load'))};element.load()});return {kind:'video',element}}const element=new Image();element.crossOrigin='anonymous';element.src=item.url||item.preview;await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('انتهت مهلة تحميل الصورة')),8000);element.onload=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('تعذر تحميل الصورة'))};if(element.complete&&element.naturalWidth){clearTimeout(timer);resolve()}});return {kind:'image',element}}catch(e){console.warn('Visual load failed',e);return null}})).then(items=>items)));
+            if(sceneAssets.some(items=>items.some(item=>!item)))throw new Error('تعذر تحميل إحدى وسائط المشاهد. أصلح الصورة أو الفيديو ثم أعد التصدير؛ لن تُحذف الوسائط من المشروع.');
+            }catch(error){stream.getTracks().forEach(track=>track.stop());if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');setAIStatus('تعذر تجهيز الفيديو: '+error.message,'error');return;}
             const phrases=text=>{const out=[];String(text||'').split(/(?<=[.!؟،؛:])\s+/).filter(Boolean).forEach(part=>{const words=part.trim().split(/\s+/);for(let i=0;i<words.length;i+=7)out.push(words.slice(i,i+7).join(' '))});return out};
             const drawImageCover=(source,zoom=1,ox=0,oy=0)=>{const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height,sr=sw/sh,tr=W/H;let sx=0,sy=0,cw=sw,ch=sh;if(sr>tr){cw=sh*tr;sx=(sw-cw)/2}else{ch=sw/tr;sy=(sh-ch)/2}const dw=W*zoom,dh=H*zoom;ctx.drawImage(source,sx,sy,cw,ch,(W-dw)/2+ox,(H-dh)/2+oy,dw,dh)};
             try{
@@ -2247,4 +2261,5 @@
     </script>
 </body>
 </html>
+
 
