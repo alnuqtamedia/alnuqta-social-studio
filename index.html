@@ -1195,13 +1195,13 @@
         function addSceneMedia(slide,item){
             slide.mediaItems=getSceneMedia(slide).slice();slide.mediaItems.push(item);
             const first=slide.mediaItems[0];slide.mediaUrl=first.preview||first.url||'';slide.mediaVideoUrl=first.kind==='video'?(first.url||''):'';slide.mediaCredit=first.credit||'';slide.mediaSourceUrl=first.sourceUrl||'';slide.mediaGenerated=Boolean(first.generated);
-            invalidateGeneratedVoiceover();renderCanvas();updateTikTokInputs();
+            renderCanvas();updateTikTokInputs();
         }
 
         function removeSceneMedia(slide,index){
             const items=getSceneMedia(slide).slice(),removed=items.splice(index,1)[0];if(removed?.local&&removed.url?.startsWith('blob:'))URL.revokeObjectURL(removed.url);
             slide.mediaItems=items;const first=items[0];slide.mediaUrl=first?.preview||first?.url||'';slide.mediaVideoUrl=first?.kind==='video'?(first.url||''):'';slide.mediaCredit=first?.credit||'';slide.mediaSourceUrl=first?.sourceUrl||'';slide.mediaGenerated=Boolean(first?.generated);
-            invalidateGeneratedVoiceover();renderCanvas();updateTikTokInputs();
+            renderCanvas();updateTikTokInputs();
         }
 
         async function generateSceneAIImage(slide,btn){const prompt=String(slide.visualQuery||slide.title||slide.subtitle||'').trim();if(!prompt)return setAIStatus('لا يوجد وصف بصري لهذا المشهد.','error');const old=btn.innerText;btn.disabled=true;btn.innerText='جاري التوليد…';try{const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(!r.ok){const code=d.code?` [${d.code}]`:'';const detail=d.detail?` — ${d.detail}`:'';throw new Error((d.error||'فشل توليد الصورة')+code+detail);}const bytes=Uint8Array.from(atob(d.image),x=>x.charCodeAt(0));const blob=new Blob([bytes],{type:d.mimeType||'image/jpeg'}),url=URL.createObjectURL(blob);addSceneMedia(slide,{url,preview:url,kind:'image',credit:d.label||'صورة مولدة بالذكاء الاصطناعي',generated:true,local:true});setAIStatus('تم توليد صورة توضيحية AI وإضافتها إلى مواد المشهد.','success')}catch(e){console.error('Gemini image generation error',e);const msg=String(e?.message||e||'خطأ غير معروف');setAIStatus('تعذر توليد الصورة — '+msg+' | انسخ هذه الرسالة إذا استمرت المشكلة.','error')}finally{btn.disabled=false;btn.innerText=old}}
@@ -1812,6 +1812,37 @@
             }catch(e){console.error(e);setAIStatus('تعذر توليد التعليق الصوتي: '+(e?.message||e),'error')}
             finally{try{await decodeCtx.close()}catch{}if(btn)btn.disabled=false}
         }
+
+        const restoredProjectUrls=[];
+        function openProjectDatabase(){return new Promise((resolve,reject)=>{const request=indexedDB.open('alnuqta-studio-projects',1);request.onupgradeneeded=()=>request.result.createObjectStore('projects',{keyPath:'id'});request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+        async function projectStore(mode,action){const db=await openProjectDatabase();try{return await new Promise((resolve,reject)=>{const tx=db.transaction('projects',mode);let result;const req=action(tx.objectStore('projects'));req.onsuccess=()=>{result=req.result};tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('تعذر الحفظ'));});}finally{db.close();}}
+        async function packProjectValue(value){
+            if(typeof value==='string'&&value.startsWith('blob:')){const response=await fetch(value);if(!response.ok)throw new Error('تعذر حفظ ملف محلي');return {studioLocalBlob:await response.blob()};}
+            if(Array.isArray(value))return Promise.all(value.map(packProjectValue));
+            if(value&&typeof value==='object'){const result={};for(const [key,item] of Object.entries(value))result[key]=await packProjectValue(item);return result;}return value;
+        }
+        function unpackProjectValue(value,urls){
+            if(value?.studioLocalBlob instanceof Blob){const url=URL.createObjectURL(value.studioLocalBlob);urls.push(url);return url;}
+            if(Array.isArray(value))return value.map(item=>unpackProjectValue(item,urls));
+            if(value&&typeof value==='object'){const result={};for(const [key,item] of Object.entries(value))result[key]=unpackProjectValue(item,urls);return result;}return value;
+        }
+        async function refreshSavedProjects(){try{const list=await projectStore('readonly',store=>store.getAll());const select=document.getElementById('saved-studio-projects');select.replaceChildren();for(const item of list.sort((a,b)=>b.savedAt-a.savedAt)){const option=document.createElement('option');option.value=item.id;option.textContent=item.title+' — '+new Date(item.savedAt).toLocaleString('ar-IQ');select.appendChild(option);}}catch(error){document.getElementById('project-save-status').textContent='الحفظ المحلي غير متاح: '+error.message;}}
+        async function saveStudioProject(){const status=document.getElementById('project-save-status');status.textContent='جاري حفظ النص والوسائط والصوت…';try{
+            saveSocialDraft();const topic=await packProjectValue(topics[activeTikTokTopic]);const controls={};for(const id of ['video-total-duration','video-sync-mode','ai-tts-voice','ai-tts-style','video-quality'])controls[id]=document.getElementById(id)?.value;
+            await projectStore('readwrite',store=>store.put({id:crypto.randomUUID(),version:1,savedAt:Date.now(),title:String(topic.title||topic.label||'مشروع الاستوديو'),topicKey:activeTikTokTopic,topic,controls,social:JSON.parse(JSON.stringify(socialDrafts)),voice:{source:window.activeVoiceSource,ai:window.aiVoiceoverBlob,human:window.humanVoiceoverBlob,aiDuration:window.aiVoiceoverDuration,humanDuration:window.humanVoiceoverDuration,sceneDurations:window.aiSceneDurations}}));
+            status.textContent='حُفظت نسخة محلية جديدة بالنص والوسائط والصوت. الروابط الخارجية محفوظة كرابط؛ الحفظ على هذا الجهاز والمتصفح فقط.';await refreshSavedProjects();
+        }catch(error){status.textContent='لم يكتمل الحفظ؛ العمل الحالي باقٍ: '+error.message;}}
+        async function restoreStudioProject(){const status=document.getElementById('project-save-status'),id=document.getElementById('saved-studio-projects').value;if(!id){status.textContent='لا توجد نسخة محفوظة.';return;}try{
+            const snapshot=await projectStore('readonly',store=>store.get(id));if(snapshot?.version!==1||!Array.isArray(snapshot.topic?.slides))throw new Error('نسخة غير صالحة');
+            const urls=[],topic=unpackProjectValue(snapshot.topic,urls);invalidateGeneratedVoiceover();deleteHumanVoiceRecording();restoredProjectUrls.splice(0).forEach(url=>URL.revokeObjectURL(url));restoredProjectUrls.push(...urls);
+            topics.customScript=topic;activeTopic=activeTikTokTopic='customScript';currentSlideIndex=activeTikTokSlide=0;
+            for(const [id,value] of Object.entries(snapshot.controls||{})){const element=document.getElementById(id);if(element&&value!==undefined)element.value=value;}
+            for(const [key,draft] of Object.entries(snapshot.social||{})){const restoredKey=key.replace('alnuqta-social-draft:'+snapshot.topicKey+':','alnuqta-social-draft:customScript:');socialDrafts[restoredKey]=draft;}const voice=snapshot.voice||{};
+            for(const [kind,blob] of [['ai',voice.ai],['human',voice.human]])if(blob instanceof Blob){window[kind+'VoiceoverBlob']=blob;window[kind+'VoiceoverUrl']=URL.createObjectURL(blob);window[kind+'VoiceoverDuration']=Number(voice[kind+'Duration'])||0;const audio=document.getElementById(kind==='ai'?'ai-tts-preview':'human-record-preview');audio.src=window[kind+'VoiceoverUrl'];audio.classList.remove('hidden');audio.load();if(kind==='human')document.getElementById('human-record-delete').disabled=false;}
+            window.activeVoiceSource=voice.source;window.aiSceneDurations=voice.sceneDurations||[];document.getElementById('active-voice-source').textContent='المصدر: '+(voice.source==='human'?'التسجيل البشري':voice.source==='gemini'?'Gemini':'لا يوجد');
+            initTikTokSlideButtons();updateTikTokInputs();switchTab('tiktok');renderCanvas();loadSocialDraft();status.textContent='استُعيد المشروع والصوت والوسائط؛ لم يُنشر شيء.';
+        }catch(error){status.textContent='تعذر الاسترجاع: '+error.message;}}
+        document.addEventListener('DOMContentLoaded',()=>{const panel=document.createElement('div');panel.className='border border-navy-light rounded p-3 space-y-2';panel.innerHTML='<button type="button" onclick="saveStudioProject()" class="w-full bg-brandRed rounded p-2 text-xs">حفظ نسخة من المشروع على الجهاز</button><select id="saved-studio-projects" class="w-full bg-navy rounded p-2 text-xs"></select><button type="button" onclick="restoreStudioProject()" class="w-full border rounded p-2 text-xs">استرجاع النسخة المحددة</button><p id="project-save-status" class="text-[10px] text-gray-400">يحفظ الوسائط المحلية والصوت؛ لا يغني عن نسخة احتياطية مستقلة.</p>';document.getElementById('video-total-duration').parentElement.parentElement.before(panel);refreshSavedProjects();});
 
         function requestedVideoSeconds(){
             const raw=String(document.getElementById('video-total-duration')?.value||'').trim().replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c)));
