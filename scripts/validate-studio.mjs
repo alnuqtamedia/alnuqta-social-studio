@@ -40,7 +40,7 @@ const forbiddenBrowserPatterns = [
 ];
 for (const [pattern, label] of forbiddenBrowserPatterns) if (pattern.test(html)) throw new Error(`${label} must not appear in the browser application.`);
 
-for (const obsolete of ['wrangler.json', 'netlify.toml', 'vercel.json', 'netlify', 'api', 'src/cloudflare-worker.js']) {
+for (const obsolete of ['wrangler.json', 'netlify.toml', 'netlify', 'api', 'src/cloudflare-worker.js']) {
   if (fs.existsSync(path.join(root, obsolete))) throw new Error(`Obsolete deployment path still exists: ${obsolete}`);
 }
 
