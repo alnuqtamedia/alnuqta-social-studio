@@ -258,7 +258,7 @@
                         <select id="video-quality" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option value="1080">1080×1920</option><option value="720">720×1280</option></select>
                     </label>
                 </div>
-                <label class="text-[10px] text-gray-400 font-cairo">مدة الفيديو المطلوبة (ثانية)<input id="video-total-duration" type="number" min="5" max="180" value="30" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"></label>
+                <label class="text-[10px] text-gray-400 font-cairo">مدة الفيديو المطلوبة (ثوانٍ أو دقائق:ثواني)<input id="video-total-duration" type="text" inputmode="decimal" value="30" placeholder="47 أو 3:17" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"></label>
                 <label class="text-[10px] text-gray-400 font-cairo">طريقة المطابقة
                     <select id="video-sync-mode" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white">
                         <option value="fit-audio">اختصار التعليق ليلائم مدة المحتوى (موصى به)</option>
@@ -295,6 +295,20 @@
                     <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو فعلي
                 </button>
                 <p class="text-[10px] text-gray-500 font-tajawal">يُصدّر الفيديو مباشرة من المتصفح. WebM مدعوم على Chrome/Edge؛ MP4 يظهر تلقائياً إذا كان المتصفح يدعم تسجيل H.264/MP4.</p>
+                <section class="border border-navy-light rounded-lg p-3 space-y-2" aria-label="معاينة ومشاركة الفيديو">
+                    <h4 class="font-cairo font-bold text-xs">معاينة الفيديو والصوت والمشاركة</h4>
+                    <video id="social-video-preview" controls playsinline class="hidden w-full rounded"></video>
+                    <p id="social-export-info" class="text-xs text-gray-400">صدّر الفيديو لتظهر معاينة الملف النهائي بصوته.</p>
+                    <label class="block text-xs">المنصة<select id="social-platform" class="w-full bg-navy-card p-2 rounded" onchange="loadSocialDraft()"><option>Facebook</option><option>Instagram</option><option>TikTok</option><option>YouTube</option><option>LinkedIn</option><option>Threads</option><option>X</option></select></label>
+                    <label class="block text-xs">عنوان المنشور<input id="social-title" class="w-full bg-navy-card p-2 rounded" oninput="saveSocialDraft()"></label>
+                    <label class="block text-xs">الكابشن<textarea id="social-caption" class="w-full bg-navy-card p-2 rounded" rows="3" oninput="saveSocialDraft()"></textarea></label>
+                    <label class="block text-xs">الهاشتاغ<textarea id="social-hashtags" class="w-full bg-navy-card p-2 rounded" rows="2" oninput="saveSocialDraft()"></textarea></label>
+                    <div id="social-platform-buttons" class="flex flex-wrap gap-2"></div>
+                    <button type="button" onclick="copySocialText()" class="text-xs border rounded p-2">نسخ نص المنشور</button>
+                    <button type="button" onclick="downloadSocialVideo()" class="text-xs border rounded p-2">تنزيل الفيديو المعاين</button>
+                    <button type="button" onclick="shareSocialVideo()" class="text-xs border rounded p-2">مشاركة الملف عبر الجهاز</button>
+                    <p id="social-status" role="status" class="text-xs text-gray-400">النشر المباشر غير مفعّل: حسابات المنصات غير مربوطة. مشاركة الجهاز لا تؤكد النشر.</p>
+                </section>
 
                 <div class="border border-brandRed/30 rounded-lg p-3 bg-navy-card/50"><h4 class="font-cairo font-black text-xs text-white mb-2">المساعد البصري للمادة</h4><p class="text-[10px] text-gray-400 font-tajawal mb-2">يحلل المشاهد ويحدد احتياج الصورة وB-roll لكل مشهد.</p><button onclick="prepareVisualPlan()" class="w-full py-2 bg-navy border border-brandRed/60 hover:bg-brandRed rounded text-xs font-cairo font-bold">جهّز المادة بصرياً</button><div id="visual-plan-status" class="text-[10px] text-gray-400 mt-2"></div></div>
                 <!-- TikTok Batch ZIP Export Button -->
@@ -582,6 +596,19 @@
             renderCanvas();
         }
 
+        function commandVideoDuration(command) {
+            let text=String(command||'').replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
+            text=text.split(/(?:مشهد|المشهد|scene)/i)[0].replace(/دقيقتين/g,'2 دقيقة').replace(/(?<![\d\s])دقيقة/g,'1 دقيقة');
+            text=text.replace(/(^|[^\d]\s)(دقيقة|دقيقه)(?=\s|$)/g,'$1 1 دقيقة');
+            const clock=text.match(/(?:مدته|مدة|لمدة|duration)\s*(\d+):(\d{1,2})(?!\d)/i);
+            if(clock){if(Number(clock[2])>=60)throw new Error('الثواني بعد النقطتين يجب أن تكون أقل من 60');return Number(clock[1])*60+Number(clock[2]);}
+            const units=[...text.matchAll(/(\d+(?:\.\d+)?)\s*(ثانية|ثواني|ثوان|دقائق|دقيقة|دقيقه|seconds?|minutes?)/gi)];
+            if(units.length)return units.reduce((sum,m)=>sum+Number(m[1])*(/دق|minute/i.test(m[2])?60:1),0);
+            if(/(?:مدته|مدة|لمدة)\s*دقيقتين/.test(text))return 120;
+            if(/(?:مدته|مدة|لمدة)\s*دقيقة/.test(text))return 60;
+            return null;
+        }
+
         async function runGeminiStudioCommand() {
             const input = document.getElementById('ai-command-input');
             const btn = document.getElementById('ai-run-btn');
@@ -590,11 +617,13 @@
             if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); }
             setAIStatus('Gemini يحلل الأمر والمحتوى الحالي ويجهز التصميم…', 'busy');
             try {
+                const explicitDuration=commandVideoDuration(command);if(explicitDuration!==null&&explicitDuration<=0)throw new Error('مدة الفيديو يجب أن تكون أكبر من صفر');
+                const currentContent=getCurrentStudioContent();if(explicitDuration!==null)currentContent.durationTarget=explicitDuration;
                 let result;
                 for(let attempt=0;attempt<5;attempt++){
                     const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ command, currentContent: getCurrentStudioContent(), schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
+                        body: JSON.stringify({ command, currentContent, schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
                     });
                     const contentType = response.headers.get('content-type') || '';
                     if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
@@ -604,12 +633,13 @@
                     catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
                     if(response.ok)break;
                     const message=String(result.error||'فشل الاتصال بخدمة Gemini'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),isRateLimit=response.status===429||/quota|rate.?limit|high demand/i.test(message);
-                    if(!isRateLimit||attempt===4)throw new Error(message);
-                    const waitSeconds=Math.max(3,Math.ceil(Number(retryMatch?.[1]||60))+2);
+                    const waitSeconds=generationRetryDelay(response.status,message,attempt);
+                    if(waitSeconds===null)throw new Error(message);
                     for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`Gemini مشغول أو الحصة ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
-                    setAIStatus(`إعادة المحاولة تلقائياً (${attempt+2} من 5)…`,'busy');
+                    setAIStatus(`إعادة المحاولة تلقائياً (${attempt+2} من 3)…`,'busy');
                 }
                 applyGeminiResult(result);
+                if(explicitDuration!==null){document.getElementById('video-total-duration').value=String(explicitDuration);document.getElementById('video-sync-mode').value='fit-audio';}
                 setAIStatus(['video','reel','story','tiktok'].includes(String(result.outputType || result.output || '').toLowerCase()) ? `تم تجهيز ${topics.customScript.slides.length} مشاهد عمودية. استخدم زر «تصدير فيديو فعلي» في إعدادات الريلز/تيك توك/الستوري. سيُصدّر MP4 إذا كان المتصفح يدعمه، وإلا WebM.` : `تم التنفيذ: ${result.outputType || result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
             } catch (error) {
                 console.error(error);
@@ -1156,6 +1186,7 @@
             updateTikTokInputs();
         }
 
+        function sceneMediaCells(count,width,height){const columns=count<=1?1:2,rows=Math.ceil(count/columns);return Array.from({length:count},(_,index)=>({x:(index%columns)*width/columns,y:Math.floor(index/columns)*height/rows,width:width/columns,height:height/rows}));}
         function getSceneMedia(slide){
             if(Array.isArray(slide.mediaItems)&&slide.mediaItems.length)return slide.mediaItems;
             if(slide.mediaUrl||slide.mediaVideoUrl)return [{url:slide.mediaVideoUrl||slide.mediaUrl,preview:slide.mediaUrl||slide.mediaVideoUrl,kind:slide.mediaVideoUrl?'video':'image',credit:slide.mediaCredit||'',sourceUrl:slide.mediaSourceUrl||'',generated:Boolean(slide.mediaGenerated)}];
@@ -1165,16 +1196,16 @@
         function addSceneMedia(slide,item){
             slide.mediaItems=getSceneMedia(slide).slice();slide.mediaItems.push(item);
             const first=slide.mediaItems[0];slide.mediaUrl=first.preview||first.url||'';slide.mediaVideoUrl=first.kind==='video'?(first.url||''):'';slide.mediaCredit=first.credit||'';slide.mediaSourceUrl=first.sourceUrl||'';slide.mediaGenerated=Boolean(first.generated);
-            invalidateGeneratedVoiceover();renderCanvas();updateTikTokInputs();
+            renderCanvas();updateTikTokInputs();
         }
 
         function removeSceneMedia(slide,index){
             const items=getSceneMedia(slide).slice(),removed=items.splice(index,1)[0];if(removed?.local&&removed.url?.startsWith('blob:'))URL.revokeObjectURL(removed.url);
             slide.mediaItems=items;const first=items[0];slide.mediaUrl=first?.preview||first?.url||'';slide.mediaVideoUrl=first?.kind==='video'?(first.url||''):'';slide.mediaCredit=first?.credit||'';slide.mediaSourceUrl=first?.sourceUrl||'';slide.mediaGenerated=Boolean(first?.generated);
-            invalidateGeneratedVoiceover();renderCanvas();updateTikTokInputs();
+            renderCanvas();updateTikTokInputs();
         }
 
-        async function generateSceneAIImage(slide,btn){const prompt=String(slide.visualQuery||slide.title||slide.subtitle||'').trim();if(!prompt)return setAIStatus('لا يوجد وصف بصري لهذا المشهد.','error');const old=btn.innerText;btn.disabled=true;btn.innerText='جاري التوليد…';try{const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(!r.ok){const code=d.code?` [${d.code}]`:'';const detail=d.detail?` — ${d.detail}`:'';throw new Error((d.error||'فشل توليد الصورة')+code+detail);}const bytes=Uint8Array.from(atob(d.image),x=>x.charCodeAt(0));const blob=new Blob([bytes],{type:d.mimeType||'image/jpeg'}),url=URL.createObjectURL(blob);addSceneMedia(slide,{url,preview:url,kind:'image',credit:d.label||'صورة مولدة بالذكاء الاصطناعي',generated:true,local:true});setAIStatus('تم توليد صورة توضيحية AI وإضافتها إلى مواد المشهد.','success')}catch(e){console.error('Gemini image generation error',e);const msg=String(e?.message||e||'خطأ غير معروف');setAIStatus('تعذر توليد الصورة — '+msg+' | انسخ هذه الرسالة إذا استمرت المشكلة.','error')}finally{btn.disabled=false;btn.innerText=old}}
+        async function generateSceneAIImage(slide,btn){const prompt=String(slide.visualQuery||slide.title||slide.subtitle||'').trim();if(!prompt){setAIStatus('لا يوجد وصف بصري لهذا المشهد.','error');return false;}const old=btn.innerText;btn.disabled=true;btn.innerText='جاري التوليد…';try{const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(!r.ok){const code=d.code?` [${d.code}]`:'';const detail=d.detail?` — ${d.detail}`:'';throw new Error((d.error||'فشل توليد الصورة')+code+detail);}const bytes=Uint8Array.from(atob(d.image),x=>x.charCodeAt(0));const blob=new Blob([bytes],{type:d.mimeType||'image/jpeg'}),url=URL.createObjectURL(blob);addSceneMedia(slide,{url,preview:url,kind:'image',credit:d.label||'صورة مولدة بالذكاء الاصطناعي',generated:true,local:true});setAIStatus('تم توليد صورة توضيحية AI وإضافتها إلى مواد المشهد.','success');return true;}catch(e){console.error('Gemini image generation error',e);const msg=String(e?.message||e||'خطأ غير معروف');setAIStatus('تعذر توليد الصورة — '+msg+' | انسخ هذه الرسالة إذا استمرت المشكلة.','error');return false;}finally{btn.disabled=false;btn.innerText=old}}
         async function generateScenePollinationsImage(slide,btn){
             const prompt=String(slide.visualQuery||slide.title||slide.subtitle||'').trim();if(!prompt)return setAIStatus('لا يوجد وصف بصري لهذا المشهد.','error');
             const old=btn.innerText;btn.disabled=true;btn.innerText='جاري التوليد…';
@@ -1302,16 +1333,17 @@
             const motionWrap=document.createElement('div');motionWrap.className='grid grid-cols-2 gap-2';
             const selectField=(label,value,options,onchange)=>{const wrap=document.createElement('label');wrap.className='text-[10px] text-gray-400 font-cairo';wrap.innerText=label;const select=document.createElement('select');select.className='mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white';options.forEach(([key,text])=>{const option=document.createElement('option');option.value=key;option.innerText=text;option.selected=key===value;select.appendChild(option)});select.onchange=event=>onchange(event.target.value);wrap.appendChild(select);return wrap};
             motionWrap.append(selectField('حركة الصورة',slide.motion||'zoom-in',[['zoom-in','تقريب'],['zoom-out','إبعاد'],['pan-left','حركة لليسار'],['pan-right','حركة لليمين']],value=>{slide.motion=value}));
+            motionWrap.append(selectField('عرض مواد المشهد',slide.mediaLayout||'sequence',[['sequence','بالتتابع'],['grid','معًا داخل شبكة']],value=>{slide.mediaLayout=value;renderCanvas()}));
             motionWrap.append(selectField('الانتقال',slide.transition||'crossfade',[['cut','قطع مباشر'],['crossfade','تلاشي ناعم'],['slide','انزلاق'],['dip-black','سواد قصير']],value=>{slide.transition=value}));container.appendChild(motionWrap);
 
             const durationWrap=document.createElement('div'); durationWrap.className='flex flex-col gap-1';
             durationWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مدة هذا المشهد (ثانية)</label>';
-            const durationInput=document.createElement('input'); durationInput.type='number'; durationInput.min='1'; durationInput.max='30'; durationInput.value=slide.duration||4; durationInput.className='w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white'; durationInput.oninput=e=>{slide.duration=Math.max(1,Number(e.target.value)||4)}; durationWrap.appendChild(durationInput); container.appendChild(durationWrap);
+            const durationInput=document.createElement('input'); durationInput.type='number'; durationInput.min='0.1'; durationInput.step='0.1'; durationInput.value=slide.duration||4; durationInput.className='w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white'; durationInput.oninput=e=>{slide.duration=Math.max(.1,Number(e.target.value)||4)}; durationWrap.appendChild(durationInput); container.appendChild(durationWrap);
             container.appendChild(createTextareaField('نص التعليق الصوتي للمشهد', slide.voiceover || '', v => { slide.voiceover=v; }));
             const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-2'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مواد المشهد — صور أو فيديوهات متعددة</label>';const mediaActions=document.createElement('div');mediaActions.className='grid grid-cols-2 gap-1';const makeMediaBtn=(label,disabled,title)=>{const b=document.createElement('button');b.type='button';b.className='py-1.5 rounded border border-navy-light text-[9px] font-cairo '+(disabled?'opacity-45 cursor-not-allowed':'hover:border-brandRed');b.innerText=label;if(title)b.title=title;return b};const aiBtn=makeMediaBtn('Gemini Image',false,'إضافة صورة توضيحية من Gemini');const pollinationsBtn=makeMediaBtn('Pollinations',false,'مولد صور احتياطي مجاني بلا مفتاح داخل الاستوديو');const mediaStatus=document.createElement('div');mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-gray-400';mediaStatus.innerText='';const searchBtn=makeMediaBtn('بحث B-roll',false,'إضافة صور أو فيديوهات Pexels');const uploadBtn=makeMediaBtn('رفع مواد',false,'يمكن اختيار عدة صور وفيديوهات');mediaActions.append(aiBtn,pollinationsBtn,searchBtn,uploadBtn);mediaWrap.appendChild(mediaActions);mediaWrap.appendChild(mediaStatus);
-            aiBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري الاتصال بـ Gemini وتوليد الصورة…';try{await generateSceneAIImage(slide,aiBtn);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-emerald-400';mediaStatus.innerText='تمت إضافة الصورة إلى مواد المشهد.'}catch(e){console.error(e);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-red-400';mediaStatus.innerText='فشل توليد الصورة: '+String(e?.message||e)}};pollinationsBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري توليد صورة Pollinations…';await generateScenePollinationsImage(slide,pollinationsBtn);};searchBtn.onclick=()=>searchSceneBroll(slide);const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*,video/*';mediaInput.multiple=true; mediaInput.className='hidden';uploadBtn.onclick=()=>mediaInput.click();
+            aiBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري الاتصال بـ Gemini وتوليد الصورة…';try{const added=await generateSceneAIImage(slide,aiBtn);if(!added)throw new Error('تعذر توليد الصورة؛ راجع رسالة الخطأ التفصيلية.');mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-emerald-400';mediaStatus.innerText='تمت إضافة الصورة إلى مواد المشهد.'}catch(e){console.error(e);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-red-400';mediaStatus.innerText='فشل توليد الصورة: '+String(e?.message||e)}};pollinationsBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري توليد صورة Pollinations…';await generateScenePollinationsImage(slide,pollinationsBtn);};searchBtn.onclick=()=>searchSceneBroll(slide);const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*,video/*';mediaInput.multiple=true; mediaInput.className='hidden';uploadBtn.onclick=()=>mediaInput.click();
             if(slide.visualType){const type=document.createElement('div');type.className='text-[9px] text-brandRed font-cairo font-bold';type.innerText='نوع المادة المقترح: '+slide.visualType;mediaWrap.appendChild(type);}if(slide.visualQuery){const hint=document.createElement('div');hint.className='text-[10px] text-gray-500 font-tajawal';hint.innerText='اقتراح B-roll من Gemini: '+slide.visualQuery;mediaWrap.appendChild(hint);} mediaInput.onchange=e=>{Array.from(e.target.files||[]).forEach(file=>{const url=URL.createObjectURL(file);addSceneMedia(slide,{url,preview:url,kind:file.type.startsWith('video/')?'video':'image',credit:file.name,generated:false,local:true})});e.target.value='';}; mediaWrap.appendChild(mediaInput);
-            const mediaItems=getSceneMedia(slide);if(mediaItems.length){const list=document.createElement('div');list.className='flex flex-col gap-1';mediaItems.forEach((item,itemIndex)=>{const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded border border-navy-light bg-black/20 px-2 py-1';const name=document.createElement('span');name.className='text-[9px] text-gray-300 truncate';name.innerText=`${itemIndex+1}. ${item.kind==='video'?'فيديو':'صورة'}${item.credit?' — '+item.credit:''}`;const remove=document.createElement('button');remove.type='button';remove.className='text-[9px] text-brandRed shrink-0';remove.innerText='إزالة';remove.onclick=()=>removeSceneMedia(slide,itemIndex);row.append(name,remove);list.appendChild(row)});mediaWrap.appendChild(list);const distribution=document.createElement('div');distribution.className='text-[9px] text-emerald-400 font-tajawal';distribution.innerText=`سيتم تبديل ${mediaItems.length} مواد تلقائياً داخل مدة المشهد.`;mediaWrap.appendChild(distribution);} container.appendChild(mediaWrap);
+            const mediaItems=getSceneMedia(slide);if(mediaItems.length){const list=document.createElement('div');list.className='flex flex-col gap-1';mediaItems.forEach((item,itemIndex)=>{const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded border border-navy-light bg-black/20 px-2 py-1';const name=document.createElement('span');name.className='text-[9px] text-gray-300 truncate';name.innerText=`${itemIndex+1}. ${item.kind==='video'?'فيديو':'صورة'}${item.credit?' — '+item.credit:''}`;const remove=document.createElement('button');remove.type='button';remove.className='text-[9px] text-brandRed shrink-0';remove.innerText='إزالة';remove.onclick=()=>removeSceneMedia(slide,itemIndex);row.append(name,remove);list.appendChild(row)});mediaWrap.appendChild(list);const distribution=document.createElement('div');distribution.className='text-[9px] text-emerald-400 font-tajawal';distribution.innerText=slide.mediaLayout==='grid'?`تظهر ${mediaItems.length} مواد معًا داخل المشهد.`:`سيتم تبديل ${mediaItems.length} مواد تلقائياً داخل مدة المشهد.`;mediaWrap.appendChild(distribution);} container.appendChild(mediaWrap);
 
             if (slide.points) {
                 slide.points.forEach((pt, idx) => {
@@ -1362,6 +1394,7 @@
                 target.style.backgroundImage = slide?.mediaUrl ? `linear-gradient(rgba(7,18,32,.18),rgba(7,18,32,.35)), url("${slide.mediaUrl}")` : 'linear-gradient(145deg,#071220,#102a46 58%,#050a10)';
                 target.style.backgroundSize = 'cover'; target.style.backgroundPosition = 'center';
                 target.innerHTML = buildVideoSceneHTML(slide, activeTikTokSlide + 1, totalSlides);
+                if(slide.mediaLayout==='grid'){const items=getSceneMedia(slide),cells=sceneMediaCells(items.length,100,100),layer=document.createElement('div');layer.style.cssText='position:absolute;inset:0;pointer-events:none';items.forEach((item,index)=>{const cell=cells[index],element=document.createElement(item.kind==='video'?'video':'img');element.src=item.preview||item.url;element.style.cssText=`position:absolute;object-fit:cover;left:${cell.x}%;top:${cell.y}%;width:${cell.width}%;height:${cell.height}%`;if(item.kind==='video'){element.src=item.url;element.muted=true;element.playsInline=true;}layer.appendChild(element);});target.prepend(layer);}
             } 
             else if (activeTab === 'thumbnail') {
                 wrapper.className = 'preview-yt-thumb shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
@@ -1671,7 +1704,7 @@
                 for(let scene=0;scene<texts.length-1;scene++){
                     cumulativeWords+=words[scene];
                     const expected=totalDuration*cumulativeWords/wordTotal;
-                    const remainingScenes=texts.length-scene-1,minTime=boundaries[boundaries.length-1]+.65,maxTime=totalDuration-remainingScenes*.65;
+                    const remainingScenes=texts.length-scene-1,minTime=boundaries[boundaries.length-1]+Math.min(.65,totalDuration/(texts.length*2)),maxTime=totalDuration-remainingScenes*Math.min(.65,totalDuration/(texts.length*2));
                     const radius=Math.min(4,Math.max(1.4,totalDuration*.065)),from=Math.max(minTime,expected-radius),to=Math.min(maxTime,expected+radius);
                     let bestTime=Math.max(minTime,Math.min(maxTime,expected)),bestScore=Infinity;
                     for(let t=from;t<=to;t+=.025){
@@ -1684,26 +1717,34 @@
                     boundaries.push(bestTime);
                 }
                 boundaries.push(totalDuration);
-                return boundaries.slice(1).map((end,i)=>Math.max(.4,end-boundaries[i]));
+                return boundaries.slice(1).map((end,i)=>end-boundaries[i]);
             }catch(error){console.warn('Narration pause detection fallback',error);return fallback()}
             finally{try{await context.close()}catch{}}
         }
 
         async function fitNarrationToDuration(slides,targetSeconds,ratio=1){
-            const maxWords=Math.max(12,Math.floor(targetSeconds*2.05*ratio)),current=slides.map((slide,index)=>({scene:index+1,type:slide.type||'content',text:String(slide.voiceover||'').trim()}));
-            const currentWords=current.reduce((sum,item)=>sum+item.text.split(/\s+/).filter(Boolean).length,0);if(currentWords<=maxWords)return;
+            const current=slides.map((slide,index)=>({scene:index+1,type:slide.type||'content',text:String(slide.voiceover||'').trim()}));
+            const currentWords=current.reduce((sum,item)=>sum+item.text.split(/\s+/).filter(Boolean).length,0);const maxWords=Math.max(1,Math.floor(ratio<1?currentWords*ratio:targetSeconds*2.05));if(currentWords<=maxWords)return;
             setAIStatus(`Gemini يختصر التعليق إلى نحو ${maxWords} كلمة ليلائم ${targetSeconds} ثانية…`,'busy');
             try{
                 const command=`اختصر نصوص التعليق الصوتي فقط للفيديو الحالي إلى مجموع لا يتجاوز ${maxWords} كلمة. حافظ على عدد المشاهد وترتيبها والحقائق الأساسية، ولا تضف معلومات جديدة. اجعل الغلاف والخاتمة شديدي الإيجاز. أعد فيديو بنفس عدد المشاهد، وضع النص المختصر في voiceover لكل مشهد.`;
                 const response=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command,currentContent:{...getCurrentStudioContent(),durationTarget:targetSeconds,narrationScenes:current}})}),raw=await response.text();
                 let result;try{result=JSON.parse(raw)}catch{throw new Error('Gemini أعاد جواباً غير مكتمل')};if(!response.ok)throw new Error(result.error||'تعذر اختصار النص');
                 const returned=Array.isArray(result.slides)?result.slides:[];if(returned.length!==slides.length)throw new Error('عدد المشاهد المعاد لا يطابق الفيديو');
-                returned.forEach((item,index)=>{const value=String(item.voiceover||item.narration||'').trim();if(value)slides[index].voiceover=value});
+                const replacements=returned.map(item=>String(item.voiceover||item.narration||'').trim());if(replacements.some((value,index)=>!value&&current[index].text))throw new Error('الاختصار حذف تعليق مشهد؛ النص الأصلي محفوظ');const replacementWords=replacements.reduce((sum,text)=>sum+text.split(/\s+/).filter(Boolean).length,0);if(replacementWords>maxWords||replacementWords>=currentWords)throw new Error('الجواب لم يلتزم بميزانية النص؛ لم يُبدّل النص الحالي');replacements.forEach((value,index)=>{slides[index].voiceover=value});
             }catch(error){
-                console.warn('Gemini narration fit fallback',error);let remaining=maxWords;
-                slides.forEach((slide,index)=>{const words=String(slide.voiceover||'').trim().split(/\s+/).filter(Boolean),scenesLeft=slides.length-index,share=Math.max(2,Math.min(words.length,Math.floor(remaining/scenesLeft)));slide.voiceover=words.slice(0,share).join(' ');remaining-=share});
-                setAIStatus('تعذر الاختصار الذكي، فتم تطبيق اختصار آمن حسب عدد الكلمات. يمكنك مراجعة النص قبل التصدير.','error');
+                throw new Error('تعذر اختصار النص دون الإخلال به؛ النص الأصلي محفوظ. '+error.message);
             }
+        }
+
+        function generationRetryDelay(status,message,attempt){
+            const text=String(message||'');
+            if(attempt>=2||/per[ _-]?day|requests?\s*per\s*day|daily|free[ _-]?tier|limit\s*:\s*0|upgrade|billing|insufficient|quota[^\n]*(?:exhausted|exceeded)/i.test(text))return null;
+            if(status!==429&&status!==503&&!/rate.?limit|high demand|temporarily unavailable/i.test(text))return null;
+            const retry=text.match(/retry (?:in|after)\s+([\d.]+)\s*s/i);
+            const seconds=retry?Number(retry[1])+2:5;
+            if(!Number.isFinite(seconds)||seconds>30)return null;
+            return Math.max(3,Math.ceil(seconds));
         }
 
         async function requestNarrationTts(text){
@@ -1711,32 +1752,32 @@
             for(let attempt=0;attempt<5;attempt++){
                 const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:document.getElementById('ai-tts-style')?.value||''})});
                 data=await r.json();if(r.ok)return data;
-                const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),limited=r.status===429||/quota|rate.?limit|high demand/i.test(message);if(!limited||attempt===4)throw new Error(message);
-                const waitSeconds=Math.max(10,Math.ceil(Number(retryMatch?.[1]||60))+2);for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة الصوت ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
+                const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),limited=r.status===429||/quota|rate.?limit|high demand/i.test(message);const waitSeconds=generationRetryDelay(r.status,message,attempt);if(waitSeconds===null)throw new Error(message);
+                for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة الصوت ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
             }
         }
 
         async function generateAIVoiceover(){
-            const btn=document.getElementById('ai-tts-btn'),slides=topics[activeTikTokTopic]?.slides||[],syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio',target=Math.max(5,Number(document.getElementById('video-total-duration')?.value||30));
+            const btn=document.getElementById('ai-tts-btn'),slides=topics[activeTikTokTopic]?.slides||[],syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio';let target=0;
             if(!slides.some(s=>String(s.voiceover||'').trim()))return setAIStatus('لا يوجد نص تعليق صوتي. ولّد فيديو عبر Gemini أولاً أو اكتب نص التعليق داخل المشاهد.','error');
-            if(btn)btn.disabled=true;
+            if(btn)btn.disabled=true;const originalNarration=slides.map(slide=>slide.voiceover);
             try{
-                if(syncMode==='fit-audio')await fitNarrationToDuration(slides,target);
+                target=requestedVideoSeconds();if(syncMode==='fit-audio')await fitNarrationToDuration(slides,target);
                 let blob,duration=0,texts=[];
-                for(let pass=0;pass<2;pass++){
-                    texts=slides.map(s=>String(s.voiceover||'').trim());const text=texts.filter(Boolean).join('\n\n');setAIStatus(pass?'الصوت أطول من المطلوب؛ يجري اختصاره وإعادة توليده مرة أخيرة…':'جاري توليد تعليق صوتي واحد متصل…','busy');
+                for(let pass=0;pass<3;pass++){
+                    texts=slides.map(s=>String(s.voiceover||'').trim());const text=texts.filter(Boolean).join('\n\n');setAIStatus(pass?'الصوت أطول من المطلوب؛ يجري اختصاره حسب المدة المقاسة وإعادة توليده…':'جاري توليد تعليق صوتي واحد متصل…','busy');
                     const data=await requestNarrationTts(text);blob=(data.mimeType||'').toLowerCase().includes('l16')?pcm16ToWavBlob(data.audio,24000):new Blob([Uint8Array.from(atob(data.audio),x=>x.charCodeAt(0))],{type:data.mimeType||'audio/wav'});
                     const context=new (window.AudioContext||window.webkitAudioContext)();try{duration=(await context.decodeAudioData(await blob.arrayBuffer())).duration}finally{await context.close()}
-                    if(syncMode!=='fit-audio'||duration<=target+1||pass===1)break;await fitNarrationToDuration(slides,target,Math.max(.55,target/duration*.92));
+                    if(syncMode!=='fit-audio'||duration<=target||pass===2)break;await fitNarrationToDuration(slides,target,Math.min(.95,target/duration*.92));
                 }
                 if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);(window.aiSceneVoiceovers||[]).forEach(x=>{if(x?.url)URL.revokeObjectURL(x.url)});window.aiSceneVoiceovers=[];window.aiVoiceoverBlob=blob;window.aiVoiceoverUrl=URL.createObjectURL(blob);window.aiVoiceoverDuration=duration;
                 window.activeVoiceSource='gemini';const sourceLabel=document.getElementById('active-voice-source');if(sourceLabel)sourceLabel.innerText='المصدر: Gemini';
                 const audio=document.getElementById('ai-tts-preview');audio.src=window.aiVoiceoverUrl;audio.classList.remove('hidden');audio.load();setAIStatus('تم توليد الصوت. جاري مطابقة الوقفات مع انتقالات المشاهد…','busy');
-                window.aiSceneDurations=await detectNarrationSceneDurations(blob,texts,duration);if(syncMode==='fit-audio'){const sum=window.aiSceneDurations.reduce((a,b)=>a+b,0)||1;window.aiSceneDurations=window.aiSceneDurations.map(value=>value*target/sum)}
+                window.aiSceneDurations=await detectNarrationSceneDurations(blob,texts,duration);window.aiTimelineApproximate=true;
                 window.aiSceneDurations.forEach((value,index)=>{if(slides[index])slides[index].duration=Number(value.toFixed(2))});if(syncMode==='extend-visuals')document.getElementById('video-total-duration').value=duration.toFixed(1);
                 updateTikTokInputs();const finalDuration=syncMode==='fit-audio'?target:duration;
-                setAIStatus(`تمت المطابقة: الصوت ${duration.toFixed(1)} ثانية، والفيديو ${finalDuration.toFixed(1)} ثانية، وانتقالات المواد موزعة تلقائياً.`,'success');
-            }catch(e){console.error(e);setAIStatus('تعذر توليد التعليق الصوتي: '+(e?.message||e),'error')}
+                if(syncMode==='fit-audio'&&duration>target){setAIStatus(`الصوت ${duration.toFixed(1)} ثانية ويتجاوز المطلوب ${target.toFixed(1)} ثانية؛ محفوظ للمعاينة، والتصدير متوقف حتى تعديل النص.`,'error');return;}setAIStatus(`الصوت ${duration.toFixed(1)} ثانية، والفيديو المطلوب ${finalDuration.toFixed(1)} ثانية. توقيت المشاهد تقديري من الوقفات؛ راجع المعاينة.`,'success');
+            }catch(e){slides.forEach((slide,index)=>{slide.voiceover=originalNarration[index]});updateTikTokInputs();console.error(e);setAIStatus('تعذر توليد التعليق الصوتي؛ النص السابق محفوظ: '+(e?.message||e),'error')}
             finally{if(btn)btn.disabled=false}
         }
 
@@ -1756,8 +1797,8 @@
                         const data=await r.json();
                         if(r.ok)return data;
                         const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),isQuota=r.status===429||/quota|rate.?limit/i.test(message);
-                        if(!isQuota||attempt===4)throw new Error(`المشهد ${sceneNumber}: ${message}`);
-                        const waitSeconds=Math.max(10,Math.ceil(Number(retryMatch?.[1]||60))+2);
+                        const waitSeconds=generationRetryDelay(r.status,message,attempt);
+                        if(waitSeconds===null)throw new Error(`المشهد ${sceneNumber}: ${message}`);
                         for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة Gemini ممتلئة مؤقتاً. إعادة محاولة المشهد ${sceneNumber} تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));}
                     }
                 };
@@ -1785,6 +1826,81 @@
             finally{try{await decodeCtx.close()}catch{}if(btn)btn.disabled=false}
         }
 
+        const restoredProjectUrls=[];
+        function openProjectDatabase(){return new Promise((resolve,reject)=>{const request=indexedDB.open('alnuqta-studio-projects',1);request.onupgradeneeded=()=>request.result.createObjectStore('projects',{keyPath:'id'});request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+        async function projectStore(mode,action){const db=await openProjectDatabase();try{return await new Promise((resolve,reject)=>{const tx=db.transaction('projects',mode);let result;const req=action(tx.objectStore('projects'));req.onsuccess=()=>{result=req.result};tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('تعذر الحفظ'));});}finally{db.close();}}
+        async function packProjectValue(value){
+            if(typeof value==='string'&&value.startsWith('blob:')){const response=await fetch(value);if(!response.ok)throw new Error('تعذر حفظ ملف محلي');return {studioLocalBlob:await response.blob()};}
+            if(Array.isArray(value))return Promise.all(value.map(packProjectValue));
+            if(value&&typeof value==='object'){const result={};for(const [key,item] of Object.entries(value))result[key]=await packProjectValue(item);return result;}return value;
+        }
+        function unpackProjectValue(value,urls){
+            if(value?.studioLocalBlob instanceof Blob){const url=URL.createObjectURL(value.studioLocalBlob);urls.push(url);return url;}
+            if(Array.isArray(value))return value.map(item=>unpackProjectValue(item,urls));
+            if(value&&typeof value==='object'){const result={};for(const [key,item] of Object.entries(value))result[key]=unpackProjectValue(item,urls);return result;}return value;
+        }
+        async function refreshSavedProjects(){try{const list=await projectStore('readonly',store=>store.getAll());const select=document.getElementById('saved-studio-projects');select.replaceChildren();for(const item of list.sort((a,b)=>b.savedAt-a.savedAt)){const option=document.createElement('option');option.value=item.id;option.textContent=item.title+' — '+new Date(item.savedAt).toLocaleString('ar-IQ');select.appendChild(option);}}catch(error){document.getElementById('project-save-status').textContent='الحفظ المحلي غير متاح: '+error.message;}}
+        async function saveStudioProject(){const status=document.getElementById('project-save-status');status.textContent='جاري حفظ النص والوسائط والصوت…';try{
+            saveSocialDraft();const topic=await packProjectValue(topics[activeTikTokTopic]);const controls={};for(const id of ['video-total-duration','video-sync-mode','ai-tts-voice','ai-tts-style','video-quality'])controls[id]=document.getElementById(id)?.value;
+            await projectStore('readwrite',store=>store.put({id:crypto.randomUUID(),version:1,savedAt:Date.now(),title:String(topic.title||topic.label||'مشروع الاستوديو'),topicKey:activeTikTokTopic,topic,controls,social:JSON.parse(JSON.stringify(socialDrafts)),voice:{source:window.activeVoiceSource,ai:window.aiVoiceoverBlob,human:window.humanVoiceoverBlob,aiDuration:window.aiVoiceoverDuration,humanDuration:window.humanVoiceoverDuration,sceneDurations:window.aiSceneDurations}}));
+            status.textContent='حُفظت نسخة محلية جديدة بالنص والوسائط والصوت. الروابط الخارجية محفوظة كرابط؛ الحفظ على هذا الجهاز والمتصفح فقط.';await refreshSavedProjects();
+        }catch(error){status.textContent='لم يكتمل الحفظ؛ العمل الحالي باقٍ: '+error.message;}}
+        async function restoreStudioProject(){const status=document.getElementById('project-save-status'),id=document.getElementById('saved-studio-projects').value;if(!id){status.textContent='لا توجد نسخة محفوظة.';return;}try{
+            const snapshot=await projectStore('readonly',store=>store.get(id));if(snapshot?.version!==1||!Array.isArray(snapshot.topic?.slides))throw new Error('نسخة غير صالحة');
+            const urls=[],topic=unpackProjectValue(snapshot.topic,urls);invalidateGeneratedVoiceover();deleteHumanVoiceRecording();restoredProjectUrls.splice(0).forEach(url=>URL.revokeObjectURL(url));restoredProjectUrls.push(...urls);
+            topics.customScript=topic;activeTopic=activeTikTokTopic='customScript';currentSlideIndex=activeTikTokSlide=0;
+            for(const [id,value] of Object.entries(snapshot.controls||{})){const element=document.getElementById(id);if(element&&value!==undefined)element.value=value;}
+            for(const [key,draft] of Object.entries(snapshot.social||{})){const restoredKey=key.replace('alnuqta-social-draft:'+snapshot.topicKey+':','alnuqta-social-draft:customScript:');socialDrafts[restoredKey]=draft;}const voice=snapshot.voice||{};
+            for(const [kind,blob] of [['ai',voice.ai],['human',voice.human]])if(blob instanceof Blob){window[kind+'VoiceoverBlob']=blob;window[kind+'VoiceoverUrl']=URL.createObjectURL(blob);window[kind+'VoiceoverDuration']=Number(voice[kind+'Duration'])||0;const audio=document.getElementById(kind==='ai'?'ai-tts-preview':'human-record-preview');audio.src=window[kind+'VoiceoverUrl'];audio.classList.remove('hidden');audio.load();if(kind==='human')document.getElementById('human-record-delete').disabled=false;}
+            window.activeVoiceSource=voice.source;window.aiSceneDurations=voice.sceneDurations||[];document.getElementById('active-voice-source').textContent='المصدر: '+(voice.source==='human'?'التسجيل البشري':voice.source==='gemini'?'Gemini':'لا يوجد');
+            initTikTokSlideButtons();updateTikTokInputs();switchTab('tiktok');renderCanvas();loadSocialDraft();status.textContent='استُعيد المشروع والصوت والوسائط؛ لم يُنشر شيء.';
+        }catch(error){status.textContent='تعذر الاسترجاع: '+error.message;}}
+        document.addEventListener('DOMContentLoaded',()=>{const panel=document.createElement('div');panel.className='border border-navy-light rounded p-3 space-y-2';panel.innerHTML='<button type="button" onclick="saveStudioProject()" class="w-full bg-brandRed rounded p-2 text-xs">حفظ نسخة من المشروع على الجهاز</button><select id="saved-studio-projects" class="w-full bg-navy rounded p-2 text-xs"></select><button type="button" onclick="restoreStudioProject()" class="w-full border rounded p-2 text-xs">استرجاع النسخة المحددة</button><p id="project-save-status" class="text-[10px] text-gray-400">يحفظ الوسائط المحلية والصوت؛ لا يغني عن نسخة احتياطية مستقلة.</p>';document.getElementById('video-total-duration').parentElement.parentElement.before(panel);refreshSavedProjects();});
+
+        function requestedVideoSeconds(){
+            const raw=String(document.getElementById('video-total-duration')?.value||'').trim().replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c)));
+            let seconds=NaN;
+            if(/^\d+(?:\.\d+)?$/.test(raw))seconds=Number(raw);
+            else if(/^\d+:\d{1,2}(?:\.\d+)?$/.test(raw)){const [m,s]=raw.split(':').map(Number);if(s<60)seconds=m*60+s;}
+            if(!Number.isFinite(seconds)||seconds<=0)throw new Error('أدخل مدة موجبة بالثواني أو دقائق:ثواني.');
+            return seconds;
+        }
+        const socialDrafts={};
+        let socialVideo=null;
+        function socialDraftKey(){return 'alnuqta-social-draft:'+activeTikTokTopic+':'+document.getElementById('social-platform').value;}
+        function saveSocialDraft(){const key=socialDraftKey(),draft={};for(const field of ['title','caption','hashtags'])draft[field]=document.getElementById('social-'+field).value;socialDrafts[key]=draft;try{localStorage.setItem(key,JSON.stringify(draft));}catch{document.getElementById('social-status').textContent='تعذر الحفظ الدائم؛ النص محفوظ لهذه الجلسة فقط.';}}
+        function loadSocialDraft(){let draft=socialDrafts[socialDraftKey()];if(!draft)try{draft=JSON.parse(localStorage.getItem(socialDraftKey())||'{}');}catch{draft={};}for(const field of ['title','caption','hashtags'])document.getElementById('social-'+field).value=typeof draft?.[field]==='string'?draft[field]:'';}
+        function socialText(){return ['title','caption','hashtags'].map(field=>document.getElementById('social-'+field).value.trim()).filter(Boolean).join('\n\n');}
+        async function copySocialText(){try{await navigator.clipboard.writeText(socialText());document.getElementById('social-status').textContent='تم نسخ النص؛ لم يتم نشره.';}catch{document.getElementById('social-status').textContent='تعذر النسخ التلقائي؛ انسخ النص من الحقول.';}}
+        function downloadSocialVideo(){if(!socialVideo)return setAIStatus('صدّر الفيديو أولاً.','error');const a=document.createElement('a');a.href=socialVideo.url;a.download=socialVideo.name;a.click();}
+        async function shareSocialVideo(){
+            if(!socialVideo)return setAIStatus('صدّر الفيديو وراجع معاينته أولاً.','error');
+            const file=new File([socialVideo.blob],socialVideo.name,{type:socialVideo.blob.type}),data={files:[file],text:socialText()};
+            if(!navigator.share||!navigator.canShare?.({files:[file]})){document.getElementById('social-status').textContent='مشاركة الملفات غير مدعومة هنا؛ نزّل الفيديو وانسخ النص. النشر المباشر غير مفعّل.';return;}
+            try{await navigator.share(data);document.getElementById('social-status').textContent='تم تسليم الملف لمسار مشاركة الجهاز؛ لم تؤكد المنصة النشر.';}catch(error){document.getElementById('social-status').textContent=error.name==='AbortError'?'أُلغيت المشاركة.':'تعذرت المشاركة؛ نزّل الفيديو وانسخ النص.';}
+        }
+        function retainSocialVideo(blob,ext,target){
+            if(socialVideo)URL.revokeObjectURL(socialVideo.url);
+            socialVideo={blob,url:URL.createObjectURL(blob),name:`alnuqta-video-${Date.now()}.${ext}`};
+            const preview=document.getElementById('social-video-preview');preview.src=socialVideo.url;preview.classList.remove('hidden');preview.load();
+            document.getElementById('social-export-info').textContent=`المدة المخططة ${target.toFixed(2)} ثانية. راجع الصوت والصورة في الملف؛ التزامن الحالي تقديري.`;
+            preview.onloadedmetadata=()=>{document.getElementById('social-export-info').textContent=`المطلوب ${target.toFixed(2)} ثانية — مدة الملف ${Number.isFinite(preview.duration)?preview.duration.toFixed(2)+' ثانية':'غير متاحة من المتصفح'}؛ راجع التزامن قبل المشاركة.`;};
+        }
+        document.addEventListener('DOMContentLoaded',()=>{
+            const holder=document.getElementById('social-platform-buttons');
+            for(const platform of ['Facebook','Instagram','TikTok','YouTube','LinkedIn','Threads','X']){const button=document.createElement('button');button.type='button';button.className='text-xs border border-navy-light rounded p-2';button.textContent=platform;button.onclick=()=>{document.getElementById('social-platform').value=platform;loadSocialDraft();document.getElementById('social-status').textContent=platform+': النشر المباشر يحتاج ربط حساب وخدمة نشر. يمكنك الآن تنزيل الفيديو ونسخ النص أو مشاركة الملف عبر الجهاز.';};holder.appendChild(button);}loadSocialDraft();
+        });
+        async function measureExportedVideo(blob){
+            const url=URL.createObjectURL(blob),video=document.createElement('video');video.preload='metadata';
+            try{return await new Promise((resolve,reject)=>{
+                const timer=setTimeout(()=>reject(new Error('تعذر التحقق من مدة ملف الفيديو')),8000);
+                const check=()=>{if(Number.isFinite(video.duration)&&video.duration>0){clearTimeout(timer);resolve(video.duration)}};
+                video.onloadedmetadata=()=>{check();if(!Number.isFinite(video.duration))video.currentTime=1e10};
+                video.ondurationchange=check;video.ontimeupdate=check;
+                video.onerror=()=>{clearTimeout(timer);reject(new Error('تعذر قراءة ملف الفيديو الناتج'))};video.src=url;
+            });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
+        }
+
         async function exportVerticalVideo() {
             const btn=document.getElementById('export-video-btn'),status=document.getElementById('export-status'),statusText=document.getElementById('export-status-text');
             if(!window.MediaRecorder)return setAIStatus('متصفحك لا يدعم تصدير الفيديو. استخدم Chrome أو Edge حديث.','error');
@@ -1795,38 +1911,44 @@
             const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d'),stream=canvas.captureStream(fps);
             let audioEl=null,audioUrl=null,audioCtx=null;const activeVoice=getActiveVoiceover();
             if(activeVoice){audioUrl=activeVoice.url;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(resolve=>{audioEl.onloadedmetadata=resolve;audioEl.onerror=resolve;audioEl.load()});audioEl.playbackRate=1;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaElementSource(audioEl),dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e)}}
-            const syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio',requestedTotal=Math.max(5,Number(document.getElementById('video-total-duration')?.value||30));
+            const syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio';let requestedTotal;try{requestedTotal=requestedVideoSeconds();}catch(error){stream.getTracks().forEach(t=>t.stop());if(audioCtx)await audioCtx.close();return setAIStatus(error.message,'error');}
+            if(activeVoice&&(!audioCtx||!stream.getAudioTracks().length||!Number.isFinite(audioEl.duration)||audioEl.duration<=0)){stream.getTracks().forEach(t=>t.stop());if(audioCtx)await audioCtx.close();return setAIStatus('تعذر تحميل الصوت أو دمجه؛ أوقف التصدير لتجنب فيديو صامت.','error');}
+            if(syncMode==='fit-audio'&&audioEl&&audioEl.duration>requestedTotal){stream.getTracks().forEach(t=>t.stop());if(audioCtx)await audioCtx.close();return setAIStatus('الصوت أطول من المدة المطلوبة. راجع النص وأعد توليده؛ لن تُقطع الكلمات.','error');}
             let total=syncMode==='fit-audio'?requestedTotal:(audioEl&&Number.isFinite(audioEl.duration)?audioEl.duration:requestedTotal);
             const weights=slides.map(s=>String(s.voiceover||'').trim().split(/\s+/).filter(Boolean).length),weightTotal=weights.reduce((a,b)=>a+b,0);
             let durations=Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length?window.aiSceneDurations.map(d=>Math.max(.05,Number(d)||.05)):slides.map(s=>Number(s.duration)>0?Number(s.duration):0);
             if(!durations.every(Boolean)){durations=slides.map((s,i)=>weightTotal?Math.max(.3,total*weights[i]/weightTotal):total/slides.length)}
-            const durationSum=durations.reduce((a,b)=>a+b,0);if(audioEl&&Math.abs(durationSum-total)>.15)durations=durations.map(d=>d*total/durationSum);else total=durationSum;
+            const durationSum=durations.reduce((a,b)=>a+b,0);if(audioEl&&Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length){durations=durations.map(d=>d*audioEl.duration/durationSum);durations[durations.length-1]+=Math.max(0,total-audioEl.duration);}else{durations=durations.map(d=>d*total/durationSum);}
             const boundaries=[];durations.reduce((sum,d,i)=>(boundaries[i]=sum+d,sum+d),0);const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=total.toFixed(1);
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:quality===720?5000000:9000000}),chunks=[];recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
             const original=activeTikTokSlide,sceneShots=[];if(btn)btn.disabled=true;if(status){status.classList.remove('hidden');statusText.innerText='جاري تجهيز مشاهد الفيديو...'}
+            let sceneAssets=[];
+            try{
             for(let i=0;i<slides.length;i++){activeTikTokSlide=i;renderCanvas();await new Promise(r=>setTimeout(r,90));sceneShots[i]=await html2canvas(document.getElementById('export-target'),{scale:2,backgroundColor:'#0A1A2F',useCORS:true,letterRendering:false});}
             activeTikTokSlide=original;renderCanvas();
-            const sceneAssets=await Promise.all(slides.map(slide=>Promise.all(getSceneMedia(slide).map(async item=>{try{if(item.kind==='video'){const element=document.createElement('video');element.src=item.url;element.crossOrigin='anonymous';element.muted=true;element.playsInline=true;element.preload='auto';await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('timeout')),8000);element.onloadeddata=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('load'))};element.load()});return {kind:'video',element}}const element=new Image();element.crossOrigin='anonymous';element.src=item.url||item.preview;await new Promise((resolve,reject)=>{element.onload=resolve;element.onerror=reject});return {kind:'image',element}}catch(e){console.warn('Visual fallback',e);return null}})).then(items=>items.filter(Boolean))));
+            sceneAssets=await Promise.all(slides.map(slide=>Promise.all(getSceneMedia(slide).map(async item=>{try{if(item.kind==='video'){const element=document.createElement('video');element.src=item.url;element.crossOrigin='anonymous';element.muted=true;element.playsInline=true;element.preload='auto';await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('timeout')),8000);element.onloadeddata=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('load'))};element.load()});return {kind:'video',element}}const element=new Image();element.crossOrigin='anonymous';element.src=item.url||item.preview;await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('انتهت مهلة تحميل الصورة')),8000);element.onload=()=>{clearTimeout(timer);resolve()};element.onerror=()=>{clearTimeout(timer);reject(new Error('تعذر تحميل الصورة'))};if(element.complete&&element.naturalWidth){clearTimeout(timer);resolve()}});return {kind:'image',element}}catch(e){console.warn('Visual load failed',e);return null}})).then(items=>items)));
+            if(sceneAssets.some(items=>items.some(item=>!item)))throw new Error('تعذر تحميل إحدى وسائط المشاهد. أصلح الصورة أو الفيديو ثم أعد التصدير؛ لن تُحذف الوسائط من المشروع.');
+            }catch(error){stream.getTracks().forEach(track=>track.stop());if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');setAIStatus('تعذر تجهيز الفيديو: '+error.message,'error');return;}
             const phrases=text=>{const out=[];String(text||'').split(/(?<=[.!؟،؛:])\s+/).filter(Boolean).forEach(part=>{const words=part.trim().split(/\s+/);for(let i=0;i<words.length;i+=7)out.push(words.slice(i,i+7).join(' '))});return out};
             const drawImageCover=(source,zoom=1,ox=0,oy=0)=>{const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height,sr=sw/sh,tr=W/H;let sx=0,sy=0,cw=sw,ch=sh;if(sr>tr){cw=sh*tr;sx=(sw-cw)/2}else{ch=sw/tr;sy=(sh-ch)/2}const dw=W*zoom,dh=H*zoom;ctx.drawImage(source,sx,sy,cw,ch,(W-dw)/2+ox,(H-dh)/2+oy,dw,dh)};
             try{
-                if(document.fonts)await document.fonts.ready;if(audioCtx?.state==='suspended')await audioCtx.resume();recorder.start(1000);const masterStart=performance.now();if(audioEl){audioEl.currentTime=0;await audioEl.play()}let lastAssetKey='',activeVideo=null;
+                if(document.fonts)await document.fonts.ready;if(audioCtx?.state==='suspended')await audioCtx.resume();recorder.start(1000);const masterStart=performance.now();if(audioEl){audioEl.currentTime=0;await audioEl.play()}let lastAssetKey='',activeVideos=[];
                 while(true){
                     const wallElapsed=(performance.now()-masterStart)/1000,elapsed=syncMode==='fit-audio'?Math.min(total,wallElapsed):(audioEl?(audioEl.ended?total:Math.min(total,audioEl.currentTime)):wallElapsed);
                     let i=boundaries.findIndex(end=>elapsed<end);if(i<0)i=slides.length-1;const start=i?boundaries[i-1]:0,duration=durations[i],local=Math.max(0,Math.min(duration,elapsed-start)),t=Math.min(1,local/Math.max(.001,duration));
-                    const assets=sceneAssets[i]||[],assetIndex=assets.length?Math.min(assets.length-1,Math.floor(t*assets.length)):0,asset=assets[assetIndex]||null,assetKey=`${i}:${assetIndex}`;
-                    if(assetKey!==lastAssetKey){if(activeVideo)activeVideo.pause();activeVideo=asset?.kind==='video'?asset.element:null;if(activeVideo){activeVideo.currentTime=0;activeVideo.play().catch(()=>{})}lastAssetKey=assetKey;if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length} — مادة ${assetIndex+1} من ${Math.max(1,assets.length)}`}
+                    const assets=sceneAssets[i]||[],grid=slides[i].mediaLayout==='grid',assetIndex=assets.length?Math.min(assets.length-1,Math.floor(t*assets.length)):0,asset=assets[assetIndex]||null,assetKey=grid?`${i}:grid`:`${i}:${assetIndex}`;
+                    if(assetKey!==lastAssetKey){activeVideos.forEach(video=>video.pause());activeVideos=(grid?assets:[asset]).filter(item=>item?.kind==='video').map(item=>item.element);for(const video of activeVideos){video.currentTime=0;video.play().catch(()=>{})}lastAssetKey=assetKey;if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length} — مادة ${assetIndex+1} من ${Math.max(1,assets.length)}`}
                     ctx.fillStyle='#071220';ctx.fillRect(0,0,W,H);let zoom=1,ox=0,oy=0;const motion=slides[i].motion||'zoom-in';if(motion==='zoom-in')zoom=1+.045*t;else if(motion==='zoom-out')zoom=1.045-.045*t;else if(motion==='pan-left'){zoom=1.04;ox=-W*.035*t}else if(motion==='pan-right'){zoom=1.04;ox=W*.035*t}
-                    const visual=asset?.element||sceneShots[i];drawImageCover(visual,zoom,ox,oy);if(asset){ctx.fillStyle='rgba(3,10,20,.24)';ctx.fillRect(0,0,W,H)}
+                    const visual=asset?.element||sceneShots[i];if(grid&&assets.length){const cells=sceneMediaCells(assets.length,W,H);assets.forEach((item,index)=>{const cell=cells[index],source=item.element,sw=source.videoWidth||source.width,sh=source.videoHeight||source.height;if(!sw||!sh)return;const scale=Math.max(cell.width/sw,cell.height/sh)*zoom,dw=sw*scale,dh=sh*scale;ctx.save();ctx.beginPath();ctx.rect(cell.x,cell.y,cell.width,cell.height);ctx.clip();ctx.drawImage(source,cell.x+(cell.width-dw)/2,cell.y+(cell.height-dh)/2,dw,dh);ctx.restore();});}else{drawImageCover(visual,zoom,ox,oy);}if(asset){ctx.fillStyle='rgba(3,10,20,.24)';ctx.fillRect(0,0,W,H)}
                     const transition=slides[i].transition==='fade'?'crossfade':(slides[i].transition||'cut'),transitionSeconds=Math.min(.45,duration*.12),mix=i<slides.length-1&&transition!=='cut'&&local>duration-transitionSeconds?(local-duration+transitionSeconds)/transitionSeconds:0;
                     if(mix>0){ctx.save();if(transition==='slide')ctx.drawImage(sceneShots[i+1],W*(1-mix),0,W,H);else if(transition==='dip-black'){ctx.fillStyle=`rgba(0,0,0,${Math.sin(mix*Math.PI)*.92})`;ctx.fillRect(0,0,W,H);if(mix>.5){ctx.globalAlpha=(mix-.5)*2;ctx.drawImage(sceneShots[i+1],0,0,W,H)}}else{ctx.globalAlpha=mix;ctx.drawImage(sceneShots[i+1],0,0,W,H)}ctx.restore()}
                     if(slides[i].type!=='outro'){const list=phrases(slides[i].voiceover),lens=list.map(x=>x.length),sum=lens.reduce((a,b)=>a+b,0)||1,target=t*sum;let acc=0,p=0;for(;p<lens.length;p++){acc+=lens[p];if(target<=acc)break}const visible=list[Math.min(p,list.length-1)]||'';if(visible){ctx.direction='rtl';ctx.textAlign='center';ctx.font=`700 ${Math.round(H*.024)}px Tajawal, Arial`;const maxW=W*.76,lineH=H*.034,words=visible.split(' ');let lines=[],line='';for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxW&&line){lines.push(line);line=word}else line=test}if(line)lines.push(line);lines=lines.slice(0,2);const boxH=lines.length*lineH+H*.024,boxY=H*.845-boxH/2;ctx.fillStyle='rgba(3,10,20,.82)';ctx.fillRect(W*.10,boxY,W*.80,boxH);ctx.fillStyle='#fff';lines.forEach((ln,k)=>ctx.fillText(ln,W/2,boxY+H*.017+(k+1)*lineH-H*.006,maxW))}}
                     const barW=W*.78,barH=Math.max(6,H*.004),x=(W-barW)/2,y=H*.92;ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y,barW,barH);ctx.fillStyle='#E31217';ctx.fillRect(x,y,barW*Math.min(1,elapsed/total),barH);
                     if(elapsed>=total-.01)break;await new Promise(requestAnimationFrame);
                 }
-                recorder.stop();await done;const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);setAIStatus(`تم تصدير فيديو ${ext.toUpperCase()} متزامن مع الصوت (${total.toFixed(1)} ثانية).`,'success');
+                recorder.stop();await done;const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});const measured=await measureExportedVideo(blob);retainSocialVideo(blob,ext,total);const tolerance=total<=120?.5:total*.01;if(Math.abs(measured-total)>tolerance){setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`,'success');}
             }catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error')}
-            finally{sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
+            finally{stream.getTracks().forEach(track=>track.stop());sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
         }
 
         async function exportVerticalVideoLegacy() {
@@ -2150,3 +2272,5 @@
     </script>
 </body>
 </html>
+
+
