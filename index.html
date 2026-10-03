@@ -1890,6 +1890,17 @@
             const holder=document.getElementById('social-platform-buttons');
             for(const platform of ['Facebook','Instagram','TikTok','YouTube','LinkedIn','Threads','X']){const button=document.createElement('button');button.type='button';button.className='text-xs border border-navy-light rounded p-2';button.textContent=platform;button.onclick=()=>{document.getElementById('social-platform').value=platform;loadSocialDraft();document.getElementById('social-status').textContent=platform+': النشر المباشر يحتاج ربط حساب وخدمة نشر. يمكنك الآن تنزيل الفيديو ونسخ النص أو مشاركة الملف عبر الجهاز.';};holder.appendChild(button);}loadSocialDraft();
         });
+        async function measureExportedVideo(blob){
+            const url=URL.createObjectURL(blob),video=document.createElement('video');video.preload='metadata';
+            try{return await new Promise((resolve,reject)=>{
+                const timer=setTimeout(()=>reject(new Error('تعذر التحقق من مدة ملف الفيديو')),8000);
+                const check=()=>{if(Number.isFinite(video.duration)&&video.duration>0){clearTimeout(timer);resolve(video.duration)}};
+                video.onloadedmetadata=()=>{check();if(!Number.isFinite(video.duration))video.currentTime=1e10};
+                video.ondurationchange=check;video.ontimeupdate=check;
+                video.onerror=()=>{clearTimeout(timer);reject(new Error('تعذر قراءة ملف الفيديو الناتج'))};video.src=url;
+            });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
+        }
+
         async function exportVerticalVideo() {
             const btn=document.getElementById('export-video-btn'),status=document.getElementById('export-status'),statusText=document.getElementById('export-status-text');
             if(!window.MediaRecorder)return setAIStatus('متصفحك لا يدعم تصدير الفيديو. استخدم Chrome أو Edge حديث.','error');
@@ -1935,7 +1946,7 @@
                     const barW=W*.78,barH=Math.max(6,H*.004),x=(W-barW)/2,y=H*.92;ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y,barW,barH);ctx.fillStyle='#E31217';ctx.fillRect(x,y,barW*Math.min(1,elapsed/total),barH);
                     if(elapsed>=total-.01)break;await new Promise(requestAnimationFrame);
                 }
-                recorder.stop();await done;const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});retainSocialVideo(blob,ext,total);downloadSocialVideo();setAIStatus('تم إنشاء الفيديو؛ راجع معاينة الصوت والصورة قبل المشاركة.','success');
+                recorder.stop();await done;const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});const measured=await measureExportedVideo(blob);retainSocialVideo(blob,ext,measured);const tolerance=total<=120?.5:total*.01;if(Math.abs(measured-total)>tolerance){setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`,'success');}
             }catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error')}
             finally{stream.getTracks().forEach(track=>track.stop());sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
         }
