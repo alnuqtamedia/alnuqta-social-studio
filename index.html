@@ -596,6 +596,19 @@
             renderCanvas();
         }
 
+        function commandVideoDuration(command) {
+            let text=String(command||'').replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
+            text=text.split(/(?:مشهد|المشهد|scene)/i)[0].replace(/دقيقتين/g,'2 دقيقة').replace(/(?<![\d\s])دقيقة/g,'1 دقيقة');
+            text=text.replace(/(^|[^\d]\s)(دقيقة|دقيقه)(?=\s|$)/g,'$1 1 دقيقة');
+            const clock=text.match(/(?:مدته|مدة|لمدة|duration)\s*(\d+):(\d{1,2})(?!\d)/i);
+            if(clock){if(Number(clock[2])>=60)throw new Error('الثواني بعد النقطتين يجب أن تكون أقل من 60');return Number(clock[1])*60+Number(clock[2]);}
+            const units=[...text.matchAll(/(\d+(?:\.\d+)?)\s*(ثانية|ثواني|ثوان|دقائق|دقيقة|دقيقه|seconds?|minutes?)/gi)];
+            if(units.length)return units.reduce((sum,m)=>sum+Number(m[1])*(/دق|minute/i.test(m[2])?60:1),0);
+            if(/(?:مدته|مدة|لمدة)\s*دقيقتين/.test(text))return 120;
+            if(/(?:مدته|مدة|لمدة)\s*دقيقة/.test(text))return 60;
+            return null;
+        }
+
         async function runGeminiStudioCommand() {
             const input = document.getElementById('ai-command-input');
             const btn = document.getElementById('ai-run-btn');
@@ -604,11 +617,13 @@
             if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); }
             setAIStatus('Gemini يحلل الأمر والمحتوى الحالي ويجهز التصميم…', 'busy');
             try {
+                const explicitDuration=commandVideoDuration(command);if(explicitDuration!==null&&explicitDuration<=0)throw new Error('مدة الفيديو يجب أن تكون أكبر من صفر');
+                const currentContent=getCurrentStudioContent();if(explicitDuration!==null)currentContent.durationTarget=explicitDuration;
                 let result;
                 for(let attempt=0;attempt<5;attempt++){
                     const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ command, currentContent: getCurrentStudioContent(), schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
+                        body: JSON.stringify({ command, currentContent, schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
                     });
                     const contentType = response.headers.get('content-type') || '';
                     if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
@@ -624,6 +639,7 @@
                     setAIStatus(`إعادة المحاولة تلقائياً (${attempt+2} من 5)…`,'busy');
                 }
                 applyGeminiResult(result);
+                if(explicitDuration!==null){document.getElementById('video-total-duration').value=String(explicitDuration);document.getElementById('video-sync-mode').value='fit-audio';}
                 setAIStatus(['video','reel','story','tiktok'].includes(String(result.outputType || result.output || '').toLowerCase()) ? `تم تجهيز ${topics.customScript.slides.length} مشاهد عمودية. استخدم زر «تصدير فيديو فعلي» في إعدادات الريلز/تيك توك/الستوري. سيُصدّر MP4 إذا كان المتصفح يدعمه، وإلا WebM.` : `تم التنفيذ: ${result.outputType || result.output || 'تصميم جديد'} — ${topics.customScript.slides.length} عناصر جاهزة للمعاينة.`);
             } catch (error) {
                 console.error(error);
