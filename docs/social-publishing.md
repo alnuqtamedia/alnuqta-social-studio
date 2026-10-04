@@ -1,4 +1,18 @@
-# Social account linking — implementation status
+# Social account linking — current deployment status
+
+Independent studio Supabase project: `jlqveqfybjknviqvebeo`. Provider credentials are NOT configured and no live social account has been connected.
+
+Deployed `studio-social` Edge Function version 1: `/health` returns HTTP 200 with `oauthConfigured:false` and `publishingAvailable:false`. `/youtube/callback` rejects missing state/cookie with HTTP 400. Callback: `https://jlqveqfybjknviqvebeo.supabase.co/functions/v1/studio-social/youtube/callback`.
+
+Private `studio_oauth_records` table has RLS, no client grants/policies, service-only invoker RPCs for atomic state/ticket consumption, active Auth-session checks and five starts per user per minute. Database checks verified single use, expiry, rate limiting and denied client SELECT. RLS-with-no-policy INFO is intentional: clients have no direct credential access. No news-site database was changed.
+
+The Edge handler implements authenticated owner-only initiation, first-party single-use handoff, HttpOnly/Secure/SameSite=Lax cookie binding, revocation-aware session checks, callback exchange/encrypted token storage and metadata-only account list. Google adapter adds exchange, identity, refresh and revoke. Tests use mock HTTP, not a live Google grant.
+
+Still required: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `STUDIO_TOKEN_ENCRYPTION_KEY` (random 32 bytes encoded base64) through Edge secrets; independent studio owner Auth account and frontend login/account management; real browser consent and refresh/disconnect verification; provider upload pipeline. Callback redirect targets `social-accounts.html`, which is NOT yet deployed. Do not begin a real consent test until that frontend exists. Supabase gateway JWT verification is disabled only because callbacks cannot send it; authenticated routes validate bearer tokens with Auth and active sessions, callbacks require single-use state plus a bound server cookie.
+
+Code history and remaining publication requirements follow:
+
+## Original OAuth core scope
 
 The current public studio is NOT connected to any social account. This branch adds a tested server-only OAuth/publication core. It does not deploy a service or configure a provider application. Do not add enabled connect/publish buttons until the remaining integration works.
 
