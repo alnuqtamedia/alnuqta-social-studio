@@ -1,3 +1,7 @@
+## Live update 2026-10-04
+
+All three OAuth secrets are present: `/health` returns `oauthConfigured:true`. This verifies presence only, not Google's acceptance of the credentials. `social-accounts.html` was added to main and GitHub Pages; production browser showed the ready-to-sign-in message with a successful live health request. Validate Studio and Pages deployment passed at main commit e031a07801ff3fce8e053f67b0a1e91cd461616c. Independent project Site URL and exact allowlist now point to that page, verified after dashboard reload. No real user signup, Google consent, account connection, refresh, revoke or video publication has yet been tested. User must create/verify their independent studio account, then grant channel access. New page uses a public publishable key, a hash-based script CSP, text-only account rendering, sessionStorage and server-validated bearer sessions. A local mock test covered sign-in, unsafe-looking channel titles rendered as text and successful 204 logout cleanup. Publishing remains unavailable.
+
 # Social account linking — current deployment status
 
 Independent studio Supabase project: `jlqveqfybjknviqvebeo`. Provider credentials are NOT configured and no live social account has been connected.
