@@ -1971,6 +1971,10 @@
             return Math.min(total,Math.max(0,audioTime)+Math.max(0,wallElapsed-audioEndWall));
         }
 
+        async function exportStage(task,milliseconds,message){
+            let timer;try{return await Promise.race([Promise.resolve().then(task),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),milliseconds)})])}finally{clearTimeout(timer)}
+        }
+
         async function exportVerticalVideo() {
             const btn=document.getElementById('export-video-btn'),status=document.getElementById('export-status'),statusText=document.getElementById('export-status-text');
             if(!window.MediaRecorder)return setAIStatus('متصفحك لا يدعم تصدير الفيديو. استخدم Chrome أو Edge حديث.','error');
@@ -1991,18 +1995,33 @@
             const original=activeTikTokSlide,sceneShots=[];if(btn)btn.disabled=true;if(status){status.classList.remove('hidden');statusText.innerText='جاري تجهيز مشاهد الفيديو...'}
             let sceneAssets=[];
             try{
-            for(let i=0;i<slides.length;i++){activeTikTokSlide=i;renderCanvas();await new Promise(r=>setTimeout(r,90));sceneShots[i]=await html2canvas(document.getElementById('export-target'),{scale:2,backgroundColor:'#0A1A2F',useCORS:true,letterRendering:false});}
+            for(let i=0;i<slides.length;i++){
+                activeTikTokSlide=i;
+                if(statusText)statusText.innerText=`تجهيز القالب: المشهد ${i+1} من ${slides.length}`;
+                document.getElementById('social-status').textContent=`تجهيز المشهد ${i+1} من ${slides.length}…`;
+                renderCanvas();await new Promise(r=>setTimeout(r,90));
+                sceneShots[i]=await exportStage(()=>html2canvas(document.getElementById('export-target'),{
+                    scale:quality===720?1:1.5,backgroundColor:'#0A1A2F',useCORS:true,letterRendering:false,imageTimeout:7000,
+                    onclone:cloned=>{cloned.querySelectorAll('#export-target video').forEach(video=>{const placeholder=cloned.createElement('div');placeholder.className=video.className;placeholder.style.cssText=video.style.cssText;placeholder.style.background='#0A1A2F';video.replaceWith(placeholder)})}
+                }),15000,`توقف تصوير قالب المشهد ${i+1}. احفظ المشروع وأعد المحاولة بجودة 720p؛ لم تُحذف أي وسائط.`);
+            }
             activeTikTokSlide=original;renderCanvas();
             const mediaFailures=[];
-            sceneAssets=await Promise.all(slides.map((slide,sceneIndex)=>Promise.all(getSceneMedia(slide).map(async(item,mediaIndex)=>{
-                try{return await loadExportMedia(item)}catch(error){mediaFailures.push(`المشهد ${sceneIndex+1}، الوسيط ${mediaIndex+1}: ${error.message}`);return null}
-            }))));
+            for(let sceneIndex=0;sceneIndex<slides.length;sceneIndex++){
+                sceneAssets[sceneIndex]=[];
+                const media=getSceneMedia(slides[sceneIndex]);
+                for(let mediaIndex=0;mediaIndex<media.length;mediaIndex++){
+                    if(statusText)statusText.innerText=`تحميل الوسائط: المشهد ${sceneIndex+1} من ${slides.length} — الوسيط ${mediaIndex+1} من ${media.length}`;
+                    document.getElementById('social-status').textContent=statusText.innerText;
+                    try{sceneAssets[sceneIndex].push(await loadExportMedia(media[mediaIndex]))}catch(error){mediaFailures.push(`المشهد ${sceneIndex+1}، الوسيط ${mediaIndex+1}: ${error.message}`);sceneAssets[sceneIndex].push(null)}
+                }
+            }
             if(mediaFailures.length)throw new Error(mediaFailures.join('؛ ')+'. الوسائط والنص محفوظان.');
             }catch(error){sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});stream.getTracks().forEach(track=>track.stop());if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');document.getElementById('social-status').textContent='تعذر تجهيز الفيديو: '+error.message;setAIStatus('تعذر تجهيز الفيديو: '+error.message,'error');return;}
             const phrases=text=>{const out=[];String(text||'').split(/(?<=[.!؟،؛:])\s+/).filter(Boolean).forEach(part=>{const words=part.trim().split(/\s+/);for(let i=0;i<words.length;i+=7)out.push(words.slice(i,i+7).join(' '))});return out};
             const drawImageCover=(source,zoom=1,ox=0,oy=0)=>{const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height,sr=sw/sh,tr=W/H;let sx=0,sy=0,cw=sw,ch=sh;if(sr>tr){cw=sh*tr;sx=(sw-cw)/2}else{ch=sw/tr;sy=(sh-ch)/2}const dw=W*zoom,dh=H*zoom;ctx.drawImage(source,sx,sy,cw,ch,(W-dw)/2+ox,(H-dh)/2+oy,dw,dh)};
             try{
-                if(document.fonts)await document.fonts.ready;if(audioCtx?.state==='suspended')await audioCtx.resume();ctx.drawImage(sceneShots[0],0,0,W,H);await new Promise((resolve,reject)=>{recorder.addEventListener('start',resolve,{once:true});recorder.addEventListener('error',event=>reject(event.error||event),{once:true});recorder.start(1000)});ctx.drawImage(sceneShots[0],0,0,W,H);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await audioEl.play()}let lastAssetKey='',activeVideos=[];
+                if(document.fonts)await exportStage(()=>document.fonts.ready,10000,'تعذر اكتمال تحميل خطوط التصميم. احفظ المشروع ثم أعد المحاولة.');if(audioCtx?.state==='suspended')await exportStage(()=>audioCtx.resume(),10000,'تعذر تشغيل محرك الصوت.');ctx.drawImage(sceneShots[0],0,0,W,H);await new Promise((resolve,reject)=>{recorder.addEventListener('start',resolve,{once:true});recorder.addEventListener('error',event=>reject(event.error||event),{once:true});recorder.start(1000)});ctx.drawImage(sceneShots[0],0,0,W,H);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await audioEl.play()}let lastAssetKey='',activeVideos=[];
                 while(true){
                     const wallElapsed=(performance.now()-masterStart)/1000;
                     if(audioEl?.ended&&audioEndWall===null)audioEndWall=wallElapsed;
