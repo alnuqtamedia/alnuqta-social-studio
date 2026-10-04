@@ -1956,7 +1956,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-04-r4';
+        const STUDIO_BUILD='2026-10-04-r4.1';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2040,6 +2040,9 @@
                     let bytes;try{bytes=await bounded(fetch(audioUrl,{signal:controller.signal}).then(response=>{if(!response.ok)throw new Error('تعذر قراءة ملف الصوت');return response.arrayBuffer()}),'تحميل ملف الصوت',12000)}finally{controller.abort()}
                     const buffer=await bounded(audioCtx.decodeAudioData(bytes),'فك ترميز الصوت',12000);
                     const destination=audioCtx.createMediaStreamDestination();
+                    // Keep audio packets flowing before narration starts so codec startup cannot wait on play().
+                    const idleSource=audioCtx.createConstantSource(),idleGain=audioCtx.createGain();idleGain.gain.value=0;
+                    idleSource.connect(idleGain);idleGain.connect(destination);idleSource.start();
                     destination.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
                     audioEl=createDecodedExportVoice(audioCtx,buffer,destination);
                     diag.audioDuration=buffer.duration;diag.audioSource='decoded-buffer';
