@@ -1,4 +1,4 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>تنزيل نسخة مشروع النقطة</title><style>body{background:#0b1220;color:#fff;font:17px system-ui;line-height:1.8;margin:0}main{max-width:640px;margin:5vh auto;padding:24px}button,select,a{font:inherit}select{width:100%;padding:12px;background:#17253a;color:#fff;border-radius:8px}button,a.download{display:inline-block;background:#e31217;color:white;border:0;padding:12px;border-radius:8px;margin-top:16px;cursor:pointer}a{color:#78d7cf}button:disabled{opacity:.5;cursor:wait}#status{white-space:pre-wrap}[hidden]{display:none!important}</style></head><body><main><h1>تنزيل نسخة المشروع</h1><p>هذه الصفحة تقرأ النسخ المحفوظة داخل هذا المتصفح فقط. خلّ صفحة التصميم الأصلية مفتوحة؛ لا تحتاج تحديثها.</p><label for="saved">النسخة المحفوظة — الأحدث أولاً</label><select id="saved"></select><button id="prepare" disabled>تجهيز نسخة المشروع للتنزيل</button><p id="status" role="status" aria-live="polite">جارٍ قراءة النسخ المحلية…</p><a id="download" class="download" hidden>تنزيل ملف المشروع ZIP</a><p>يشمل النص والإعدادات والصوت والوسائط المحلية. الروابط الخارجية محفوظة كرابط ولا تُحمَّل هنا. لا يُرسل الملف إلى أي خادم؛ شاركه فقط مع من تختاره.</p><a href="./" target="_blank" rel="noopener">فتح الاستوديو بتبويب جديد</a></main><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script><script>
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>تنزيل نسخة مشروع النقطة</title><style>body{background:#0b1220;color:#fff;font:17px system-ui;line-height:1.8;margin:0}main{max-width:640px;margin:5vh auto;padding:24px}button,select,a{font:inherit}select{width:100%;padding:12px;background:#17253a;color:#fff;border-radius:8px}button,a.download{display:inline-block;background:#e31217;color:white;border:0;padding:12px;border-radius:8px;margin-top:16px;cursor:pointer}a{color:#78d7cf}button:disabled{opacity:.5;cursor:wait}#status{white-space:pre-wrap}[hidden]{display:none!important}</style></head><body><main><h1>تنزيل نسخة المشروع</h1><p>هذه الصفحة تقرأ النسخ المحفوظة داخل هذا المتصفح فقط. خلّ صفحة التصميم الأصلية مفتوحة؛ لا تحتاج تحديثها.</p><details><summary>استيراد ملف نسخة محفوظة</summary><label for="import-file">ملف مشروع ZIP</label><input id="import-file" type="file" accept=".zip,application/zip"><button id="import-btn">إضافة الملف كنسخة محلية جديدة</button></details><label for="saved">النسخة المحفوظة — الأحدث أولاً</label><select id="saved"></select><button id="prepare" disabled>تجهيز نسخة المشروع للتنزيل</button><p id="status" role="status" aria-live="polite">جارٍ قراءة النسخ المحلية…</p><a id="download" class="download" hidden>تنزيل ملف المشروع ZIP</a><p>يشمل النص والإعدادات والصوت والوسائط المحلية. الروابط الخارجية محفوظة كرابط ولا تُحمَّل هنا. لا يُرسل الملف إلى أي خادم؛ شاركه فقط مع من تختاره.</p><a href="./" target="_blank" rel="noopener">فتح الاستوديو بتبويب جديد</a></main><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script><script>
 const $=id=>document.getElementById(id);let db=null,lastURL=null;
 function read(action){return new Promise((resolve,reject)=>{const tx=db.transaction('projects','readonly');let value;const req=action(tx.objectStore('projects'));req.onsuccess=()=>value=req.result;tx.oncomplete=()=>resolve(value);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('تعذر قراءة النسخة'));});}
 async function packBackup(value,zip,counter){
@@ -20,5 +20,35 @@ $('prepare').onclick=async()=>{
   $('status').textContent='الملف جاهز: '+counter.value+' ملف محلي، '+snapshot.topic.slides.length+' مشهد. اضغط «تنزيل ملف المشروع ZIP»، ثم ارفعه في المحادثة. النسخة الأصلية باقية.';
  }catch(error){$('status').textContent='تعذر تجهيز الملف: '+error.message;}finally{$('prepare').disabled=false;}
 };
+
+async function decodeBackup(value,zip,budget){
+ if(value && typeof value==='object' && typeof value.studioBackupBlob==='string'){
+  if(!/^assets\/[0-9]+\.bin$/.test(value.studioBackupBlob) || !Number.isSafeInteger(value.size) || value.size<0 || value.size>262144000)throw new Error('ملف وسيط غير صالح');
+  budget.total+=value.size;if(budget.total>262144000)throw new Error('الوسائط أكبر من 250 MiB');
+  const file=zip.file(value.studioBackupBlob);if(!file)throw new Error('ملف وسيط مفقود');
+  const bytes=await file.async('uint8array');if(bytes.length!==value.size)throw new Error('حجم وسيط غير مطابق');
+  return new Blob([bytes],{type:typeof value.mimeType==='string'?value.mimeType:''});
+ }
+ if(Array.isArray(value)){const out=[];for(const item of value)out.push(await decodeBackup(item,zip,budget));return out;}
+ if(value && typeof value==='object'){const out={};for(const [key,item] of Object.entries(value)){if(['__proto__','constructor','prototype'].includes(key))throw new Error('مفتاح غير صالح');out[key]=await decodeBackup(item,zip,budget);}return out;}
+ return value;
+}
+$('import-btn').onclick=async()=>{
+ const file=$('import-file').files[0];if(!file){$('status').textContent='اختر ملف ZIP أولاً.';return;}
+ if(!db){$('status').textContent='افتح الاستوديو واحفظ نسخة محلية أولاً.';return;}
+ $('import-btn').disabled=true;
+ try{
+  if(file.size>262144000)throw new Error('الملف أكبر من 250 MiB');
+  const zip=await JSZip.loadAsync(file);if(Object.keys(zip.files).length>502)throw new Error('عدد الملفات كبير');
+  const manifest=zip.file('project.json');if(!manifest)throw new Error('لا يوجد project.json');
+  const text=await manifest.async('string');if(text.length>10000000)throw new Error('ملف إعدادات كبير');
+  const packed=JSON.parse(text);if(packed.format!=='alnuqta-studio-backup'||packed.formatVersion!==1||packed.snapshot?.version!==1||!Array.isArray(packed.snapshot.topic?.slides))throw new Error('نسخة مشروع غير صالحة');
+  const snapshot=await decodeBackup(packed.snapshot,zip,{total:0});snapshot.id=crypto.randomUUID();snapshot.savedAt=Date.now();
+  await new Promise((resolve,reject)=>{const tx=db.transaction('projects','readwrite');tx.objectStore('projects').put(snapshot);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+  const option=document.createElement('option');option.value=snapshot.id;option.textContent=String(snapshot.title||'مشروع')+' — نسخة مستوردة';$('saved').prepend(option);$('saved').value=snapshot.id;$('prepare').disabled=false;
+  $('status').textContent='أضيفت نسخة محلية جديدة بالنص والوسائط والصوت. افتح الاستوديو واخترها ثم اضغط استرجاع النسخة المحددة. النسخ السابقة باقية.';
+ }catch(error){$('status').textContent='تعذر الاستيراد: '+error.message;}finally{$('import-btn').disabled=false;}
+};
+
 const opening=indexedDB.open('alnuqta-studio-projects');opening.onupgradeneeded=()=>opening.transaction.abort();opening.onerror=()=>{$('status').textContent='لا توجد قاعدة مشاريع محفوظة في هذا المتصفح. افتح الصفحة بنفس Chrome ونفس ملف المستخدم الذي حفظت منه المشروع.';};opening.onsuccess=async()=>{db=opening.result;if(!db.objectStoreNames.contains('projects')){$('status').textContent='لا توجد نسخ مشاريع محفوظة.';db.close();return;}try{const rows=await read(store=>store.getAll());rows.filter(row=>row.version===1).sort((a,b)=>b.savedAt-a.savedAt).forEach(row=>{const option=document.createElement('option');option.value=row.id;option.textContent=String(row.title||'مشروع')+' — '+new Date(row.savedAt).toLocaleString('ar-IQ');$('saved').append(option);});$('prepare').disabled=!$('saved').options.length;$('status').textContent=$('saved').options.length?'اختر النسخة ثم اضغط تجهيز نسخة المشروع للتنزيل.':'لا توجد نسخ محفوظة. ارجع إلى صفحة التصميم واضغط حفظ نسخة محلية.';}catch(error){$('status').textContent='تعذر قراءة النسخ: '+error.message;}};
 </script></body></html>
