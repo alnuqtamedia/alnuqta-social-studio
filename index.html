@@ -1974,7 +1974,7 @@
             const phrases=text=>{const out=[];String(text||'').split(/(?<=[.!؟،؛:])\s+/).filter(Boolean).forEach(part=>{const words=part.trim().split(/\s+/);for(let i=0;i<words.length;i+=7)out.push(words.slice(i,i+7).join(' '))});return out};
             const drawImageCover=(source,zoom=1,ox=0,oy=0)=>{const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height,sr=sw/sh,tr=W/H;let sx=0,sy=0,cw=sw,ch=sh;if(sr>tr){cw=sh*tr;sx=(sw-cw)/2}else{ch=sw/tr;sy=(sh-ch)/2}const dw=W*zoom,dh=H*zoom;ctx.drawImage(source,sx,sy,cw,ch,(W-dw)/2+ox,(H-dh)/2+oy,dw,dh)};
             try{
-                if(document.fonts)await document.fonts.ready;if(audioCtx?.state==='suspended')await audioCtx.resume();ctx.drawImage(sceneShots[0],0,0,W,H);recorder.start(1000);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await audioEl.play()}let lastAssetKey='',activeVideos=[];
+                if(document.fonts)await document.fonts.ready;if(audioCtx?.state==='suspended')await audioCtx.resume();ctx.drawImage(sceneShots[0],0,0,W,H);await new Promise((resolve,reject)=>{recorder.addEventListener('start',resolve,{once:true});recorder.addEventListener('error',event=>reject(event.error||event),{once:true});recorder.start(1000)});ctx.drawImage(sceneShots[0],0,0,W,H);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await audioEl.play()}let lastAssetKey='',activeVideos=[];
                 while(true){
                     const wallElapsed=(performance.now()-masterStart)/1000;
                     if(audioEl?.ended&&audioEndWall===null)audioEndWall=wallElapsed;
@@ -2316,7 +2316,6 @@
     </script>
 </body>
 </html>
-
 
 
 
