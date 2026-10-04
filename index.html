@@ -1956,7 +1956,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-04-r2';
+        const STUDIO_BUILD='2026-10-04-r3';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2009,7 +2009,7 @@
             const stage=label=>{diag.stage=label;diag.log.push(Math.round(performance.now()-t0)+'ms '+label);if(statusText)statusText.innerText=label};
             const bounded=(work,label,ms)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error(label+' تجاوز المهلة ('+Math.round(ms/1000)+' ث)')),ms);Promise.resolve(work).then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})});
             if(!window.MediaRecorder)return setAIStatus('متصفحك لا يدعم تصدير الفيديو. استخدم Chrome أو Edge حديث.','error');
-            const mimeType=['video/mp4;codecs="avc1.42E01E,mp4a.40.2"','video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(x=>MediaRecorder.isTypeSupported(x));
+            const mimeCandidates=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm','video/mp4;codecs="avc1.42E01E,mp4a.40.2"','video/mp4'].filter(x=>MediaRecorder.isTypeSupported(x));let mimeType=mimeCandidates[0];diag.codecAttempts=[];
             if(!mimeType)return setAIStatus('لا يوجد ترميز فيديو مدعوم في هذا المتصفح.','error');diag.mimeType=mimeType;
             const slides=topics[activeTikTokTopic]?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتصديرها.','error');
             const quality=Number(document.getElementById('video-quality')?.value||1080),W=quality===720?720:1080,H=quality===720?1280:1920,fps=30;
@@ -2024,7 +2024,7 @@
             let total=syncMode==='fit-audio'?requestedTotal:(audioEl&&Number.isFinite(audioEl.duration)?audioEl.duration:requestedTotal);
             const durations=exportSceneDurations(slides,activeVoice,total,audioEl?.duration,window.aiSceneDurations);
             const boundaries=[];durations.reduce((sum,d,i)=>(boundaries[i]=sum+d,sum+d),0);const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=total.toFixed(1);
-            const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:quality===720?5000000:9000000}),chunks=[];recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
+            let recorder=null,done=null,chunks=[];
             const original=activeTikTokSlide,sceneShots=[];stage('تجهيز قوالب المشاهد')
             let sceneAssets=[];
             try{
@@ -2059,7 +2059,28 @@
             const phrases=text=>{const out=[];String(text||'').split(/(?<=[.!؟،؛:])\s+/).filter(Boolean).forEach(part=>{const words=part.trim().split(/\s+/);for(let i=0;i<words.length;i+=7)out.push(words.slice(i,i+7).join(' '))});return out};
             const drawImageCover=(source,zoom=1,ox=0,oy=0)=>{const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height,sr=sw/sh,tr=W/H;let sx=0,sy=0,cw=sw,ch=sh;if(sr>tr){cw=sh*tr;sx=(sw-cw)/2}else{ch=sw/tr;sy=(sh-ch)/2}const dw=W*zoom,dh=H*zoom;ctx.drawImage(source,sx,sy,cw,ch,(W-dw)/2+ox,(H-dh)/2+oy,dw,dh)};
             try{
-                stage('بدء تسجيل الفيديو');if(document.fonts)await Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,3000))]);if(audioCtx?.state==='suspended')await Promise.race([audioCtx.resume(),new Promise(resolve=>setTimeout(resolve,2000))]);if(audioEl&&audioCtx?.state!=='running')throw new Error('المتصفح منع تشغيل الصوت؛ أعد الضغط على تصدير وأبقِ هذه الصفحة ظاهرة (لن يُصدَّر فيديو صامت).');ctx.drawImage(sceneShots[0],0,0,W,H);await bounded(new Promise((resolve,reject)=>{recorder.addEventListener('start',resolve,{once:true});recorder.addEventListener('error',event=>reject(event.error||event),{once:true});recorder.start(1000)}),'بدء المسجّل',5000);ctx.drawImage(sceneShots[0],0,0,W,H);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await bounded(audioEl.play(),'تشغيل الصوت',8000)}let lastAssetKey='',activeVideos=[];
+                stage('بدء تسجيل الفيديو');if(document.fonts)await Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,3000))]);if(audioCtx?.state==='suspended')await Promise.race([audioCtx.resume(),new Promise(resolve=>setTimeout(resolve,2000))]);if(audioEl&&audioCtx?.state!=='running')throw new Error('المتصفح منع تشغيل الصوت؛ أعد الضغط على تصدير وأبقِ هذه الصفحة ظاهرة (لن يُصدَّر فيديو صامت).');ctx.drawImage(sceneShots[0],0,0,W,H);for(const candidate of mimeCandidates){
+                    stage('بدء المسجّل: '+candidate);const attempt={mimeType:candidate};diag.codecAttempts.push(attempt);
+                    const candidateChunks=[];let candidateRecorder=null,pump=null;
+                    try{
+                        candidateRecorder=new MediaRecorder(stream,{mimeType:candidate,videoBitsPerSecond:quality===720?5000000:9000000});
+                        candidateRecorder.ondataavailable=e=>{if(e.data?.size)candidateChunks.push(e.data)};
+                        await bounded(new Promise((resolve,reject)=>{
+                            const started=()=>{candidateRecorder.removeEventListener('error',failed);resolve()};
+                            const failed=event=>{candidateRecorder.removeEventListener('start',started);reject(event.error||new Error('فشل الترميز'))};
+                            candidateRecorder.addEventListener('start',started,{once:true});candidateRecorder.addEventListener('error',failed,{once:true});
+                            candidateRecorder.start(1000);
+                            // Feed frames while waiting: some encoders do not emit start until a frame arrives.
+                            const feed=()=>{ctx.drawImage(sceneShots[0],0,0,W,H);stream.getVideoTracks()[0]?.requestFrame?.()};
+                            feed();pump=setInterval(feed,100);
+                        }),'بدء المسجّل '+candidate,5000);
+                        recorder=candidateRecorder;chunks=candidateChunks;mimeType=candidateRecorder.mimeType||candidate;diag.mimeType=mimeType;attempt.started=true;
+                        done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=event=>reject(event.error||event)});done.catch(()=>{});
+                        break;
+                    }catch(error){attempt.error=String(error?.message||error);if(candidateRecorder){candidateRecorder.ondataavailable=null;try{if(candidateRecorder.state!=='inactive')candidateRecorder.stop()}catch{}}}
+                    finally{if(pump)clearInterval(pump)}
+                }
+                if(!recorder)throw new Error('تعذر تشغيل جميع ترميزات الفيديو المدعومة؛ انسخ تقرير التشخيص.');ctx.drawImage(sceneShots[0],0,0,W,H);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await bounded(audioEl.play(),'تشغيل الصوت',8000)}let lastAssetKey='',activeVideos=[];
                 while(true){
                     const wallElapsed=(performance.now()-masterStart)/1000;
                     if(audioEl?.ended&&audioEndWall===null)audioEndWall=wallElapsed;
@@ -2076,7 +2097,7 @@
                     if(elapsed>=total-.01)break;await new Promise(requestAnimationFrame);
                 }
                 recorder.stop();stage('إنهاء الملف');await bounded(done,'إنهاء التسجيل',15000);const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});retainSocialVideo(blob,ext,total);diag.fileBytes=blob.size;diag.outcome='file-created';let measured;try{measured=await measureExportedVideo(blob)}catch(measureError){document.getElementById('social-status').textContent='الملف جاهز للحفظ لكن تعذر قياس مدته تلقائياً؛ راجع المعاينة.';setAIStatus('الفيديو محفوظ للمعاينة والتنزيل، لكن تعذر قياس مدته تلقائياً ('+measureError.message+'). راجع المدة يدوياً.','error');return}diag.requestedSeconds=total;diag.actualSeconds=measured;const tolerance=total<=120?.5:total*.01;diag.durationPassed=Math.abs(measured-total)<=tolerance;if(Math.abs(measured-total)>tolerance){document.getElementById('social-status').textContent=`الملف جاهز للحفظ، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية؛ لم يجتز فحص المدة. اضغط حفظ ملف الفيديو الناتج للمراجعة، وأعد التصدير إذا تحتاج المطابقة الدقيقة.`;setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`+(diag.fallbackScenes.length?' | استُخدم قالب نصي بديل للمشاهد '+diag.fallbackScenes.map(f=>f.scene).join('، ')+' لأن تصوير القالب الأصلي تعذّر.':''),'success');}
-            }catch(err){diag.error=String(err?.message||err);diag.outcome='failed';console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err)+' [المرحلة: '+diag.stage+']','error')}
+            }catch(err){diag.error=String(err?.message||err);diag.outcome='failed';console.error(err);try{if(recorder&&recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err)+' [المرحلة: '+diag.stage+']','error')}
             finally{stream.getTracks().forEach(track=>track.stop());sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
         }
 
