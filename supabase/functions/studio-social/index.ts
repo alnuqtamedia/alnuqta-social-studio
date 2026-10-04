@@ -60,7 +60,7 @@ export async function handle(req:Request) {
   if (route==='/health' && req.method==='GET') {
     let oauthRuntimeReady=false;
     if(configured()) { try { oauth(); oauthRuntimeReady=true; } catch {} }
-    return json({service:'studio-social',deployed:true,oauthConfigured:configured(),oauthRuntimeReady,googleClientIdFormatValid:/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(Deno.env.get('GOOGLE_CLIENT_ID') || ''),googleClientIdHasOuterWhitespace:(Deno.env.get('GOOGLE_CLIENT_ID') || '').trim()!==(Deno.env.get('GOOGLE_CLIENT_ID') || ''),publishingAvailable:false,callback});
+    return json({service:'studio-social',deployed:true,oauthConfigured:configured(),oauthRuntimeReady,googleClientIdFormatValid:/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(Deno.env.get('GOOGLE_CLIENT_ID') || ''),googleClientIdHasOuterWhitespace:(Deno.env.get('GOOGLE_CLIENT_ID') || '').trim()!==(Deno.env.get('GOOGLE_CLIENT_ID') || ''),googleClientSecretHasCopyFormatting:/[\s"{}]/.test(Deno.env.get('GOOGLE_CLIENT_SECRET') || ''),publishingAvailable:false,callback});
   }
   try {
     if (route==='/youtube/start' && req.method==='POST') {
@@ -104,7 +104,7 @@ export async function handle(req:Request) {
   } catch (error) {
     const known = new Set(['Authentication required','Studio access denied','Session is no longer active','Private storage unavailable','Invalid or expired authorization','Offline authorization was not granted','Required YouTube permissions were not granted','A single YouTube channel must be selected','Invalid Google token response','A 32-byte encryption key is required']);
     const message=error instanceof Error ? error.message : '';
-    const reason=known.has(message) || /^Google request failed \(\d{3}\)$/.test(message) ? message : 'Internal account linking error';
+    const reason=known.has(message) || /^Google request failed \(\d{3}\)(: (invalid_client|invalid_grant|unauthorized_client|access_denied|invalid_request))?$/.test(message) ? message : 'Internal account linking error';
     console.warn(JSON.stringify({event:'studio_oauth_rejected',route,reason}));
     return json({error:reason},400);
   }
