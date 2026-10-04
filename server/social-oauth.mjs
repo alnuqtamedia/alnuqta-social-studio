@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { randomBytes, createHash, createCipheriv, createDecipheriv } from 'node:crypto';
 
 const digest = value => createHash('sha256').update(value).digest('base64url');
