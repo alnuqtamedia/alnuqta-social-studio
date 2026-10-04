@@ -57,7 +57,11 @@ export async function handle(req:Request) {
   const redirect=(location:string,extra:Record<string,string>={})=>new Response(null,{status:303,headers:{...headers,Location:location,...extra}});
   if (req.method==='OPTIONS') return origin && origins.has(origin) ? new Response(null,{status:204,headers}) : json({error:'Origin denied'},403);
   if (origin && !origins.has(origin)) return json({error:'Origin denied'},403);
-  if (route==='/health' && req.method==='GET') return json({service:'studio-social',deployed:true,oauthConfigured:configured(),publishingAvailable:false,callback});
+  if (route==='/health' && req.method==='GET') {
+    let oauthRuntimeReady=false;
+    if(configured()) { try { oauth(); oauthRuntimeReady=true; } catch {} }
+    return json({service:'studio-social',deployed:true,oauthConfigured:configured(),oauthRuntimeReady,publishingAvailable:false,callback});
+  }
   try {
     if (route==='/youtube/start' && req.method==='POST') {
       const user=await owner(req);
@@ -97,6 +101,12 @@ export async function handle(req:Request) {
       return json({accounts:rows.map((r:any)=>({provider:r.payload.provider,accountId:r.payload.accountId,name:r.payload.name,connectedAt:r.payload.connectedAt}))});
     }
     return json({error:'Route unavailable'},404);
-  } catch { return json({error:'Request rejected; sign in again or restart account linking'},400); }
+  } catch (error) {
+    const known = new Set(['Authentication required','Studio access denied','Session is no longer active','Private storage unavailable','Invalid or expired authorization','Offline authorization was not granted','Required YouTube permissions were not granted','A single YouTube channel must be selected','Invalid Google token response','A 32-byte encryption key is required']);
+    const message=error instanceof Error ? error.message : '';
+    const reason=known.has(message) || /^Google request failed \(\d{3}\)$/.test(message) ? message : 'Internal account linking error';
+    console.warn(JSON.stringify({event:'studio_oauth_rejected',route,reason}));
+    return json({error:reason},400);
+  }
 }
 if (import.meta.main) Deno.serve(handle);
