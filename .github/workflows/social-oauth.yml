@@ -1,0 +1,16 @@
+name: Test social OAuth core
+on:
+  pull_request:
+  push:
+    branches: [studio-social-oauth]
+permissions:
+  contents: read
+jobs:
+  security-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/test-social-oauth.mjs
