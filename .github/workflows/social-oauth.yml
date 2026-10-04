@@ -16,3 +16,4 @@ jobs:
       - run: node scripts/test-social-oauth.mjs
       - run: node scripts/test-youtube-oauth.mjs
       - run: node scripts/test-social-handler.mjs
+      - run: node scripts/test-youtube-upload.mjs
