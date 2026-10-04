@@ -57,6 +57,21 @@ export function createSocialOAuth({store, adapters, key, now = Date.now}) {
       await store.putConnection(record);
       return {connected:true, provider, accountId:record.accountId, name:record.name};
     },
+    // Server-only: never return this method's result through an HTTP response.
+    async authorizedConnection({userId, provider, accountId}) {
+      required(userId); required(accountId);
+      const adapter=adapterFor(provider), record=await store.getConnection(userId,provider,accountId);
+      if(!record || record.userId!==userId || record.provider!==provider || record.accountId!==accountId) throw new Error('Account is not connected');
+      if(adapter.requiredScopes.some(scope=>!record.scopes.includes(scope))) throw new Error('Publishing permission is missing');
+      let tokens=unseal(record.credentials,context(record));
+      if(!Number.isFinite(tokens.expiresAt) || tokens.expiresAt<=now()+60000) {
+        if(!adapter.refresh) throw new Error('Account reconnection is required');
+        tokens=await adapter.refresh(tokens);
+        record.credentials=seal(tokens,context(record));
+        await store.putConnection(record);
+      }
+      return {tokens,accountId:record.accountId};
+    },
     async publish({userId, provider, accountId, requestId, content}) {
       required(userId); required(accountId); required(requestId);
       const adapter = adapterFor(provider), record = await store.getConnection(userId, provider, accountId);
