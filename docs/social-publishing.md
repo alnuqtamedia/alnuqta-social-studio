@@ -46,3 +46,7 @@ Meta developer registration is currently blocked at phone verification. No Meta 
 - https://www.rfc-editor.org/rfc/rfc7636.html
 
 This branch must not be represented as a complete or production-ready social publishing service.
+
+
+## YouTube upload deployment — 4 October 2026
+The independent studio backend now supports authenticated, owner-bound resumable uploads in 1 MiB chunks, up to 250 MiB. The public social-accounts.html page requires explicit file, title, privacy, child-audience and synthetic-content selections plus a confirmation click. It retains the request ID across failures, resumes the same upload, and queries actual YouTube processing/privacy before reporting public publication. Google credentials and resumable session URLs remain encrypted server-side. The private studio_youtube_uploads table has no browser grants and uses atomic, fenced leases. Browser-local resume metadata is not a backup of the video; reselect the same file after reload. Upload tests use mocked Google responses; no live video has been uploaded by the agent. A real end-to-end upload requires a user-selected video and final send action. Google may enforce private uploads for unaudited API projects.
