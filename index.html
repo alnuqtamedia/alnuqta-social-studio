@@ -1926,6 +1926,23 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
+        function exportSceneDurations(slides,activeVoice,total,audioDuration,aiDurations){
+            const hasAudio=activeVoice&&Number.isFinite(audioDuration)&&audioDuration>0;
+            const useAiTiming=hasAudio&&activeVoice.source==='gemini'&&Array.isArray(aiDurations)&&aiDurations.length===slides.length&&aiDurations.every(d=>Number.isFinite(Number(d))&&Number(d)>0);
+            const weights=slides.map(s=>String(s.voiceover||'').trim().split(/\s+/).filter(Boolean).length);
+            let raw=useAiTiming?aiDurations.map(Number):hasAudio?weights.map(w=>Math.max(1,w)):slides.map(s=>Math.max(.05,Number(s.duration)||4));
+            const sum=raw.reduce((a,b)=>a+b,0),spokenTotal=hasAudio?audioDuration:total;
+            const durations=raw.map(d=>d*spokenTotal/sum);
+            durations[durations.length-1]+=Math.max(0,total-spokenTotal);
+            return durations;
+        }
+
+        function exportTimelineElapsed(audioTime,audioEnded,wallElapsed,audioEndWall,total){
+            if(audioTime===null)return Math.min(total,wallElapsed);
+            if(!audioEnded)return Math.min(total,Math.max(0,audioTime));
+            return Math.min(total,Math.max(0,audioTime)+Math.max(0,wallElapsed-audioEndWall));
+        }
+
         async function exportVerticalVideo() {
             const btn=document.getElementById('export-video-btn'),status=document.getElementById('export-status'),statusText=document.getElementById('export-status-text');
             if(!window.MediaRecorder)return setAIStatus('متصفحك لا يدعم تصدير الفيديو. استخدم Chrome أو Edge حديث.','error');
@@ -1940,10 +1957,7 @@
             if(activeVoice&&(!audioCtx||!stream.getAudioTracks().length||!Number.isFinite(audioEl.duration)||audioEl.duration<=0)){stream.getTracks().forEach(t=>t.stop());if(audioCtx)await audioCtx.close();return setAIStatus('تعذر تحميل الصوت أو دمجه؛ أوقف التصدير لتجنب فيديو صامت.','error');}
             if(syncMode==='fit-audio'&&audioEl&&audioEl.duration>requestedTotal){stream.getTracks().forEach(t=>t.stop());if(audioCtx)await audioCtx.close();return setAIStatus('الصوت أطول من المدة المطلوبة. راجع النص وأعد توليده؛ لن تُقطع الكلمات.','error');}
             let total=syncMode==='fit-audio'?requestedTotal:(audioEl&&Number.isFinite(audioEl.duration)?audioEl.duration:requestedTotal);
-            const weights=slides.map(s=>String(s.voiceover||'').trim().split(/\s+/).filter(Boolean).length),weightTotal=weights.reduce((a,b)=>a+b,0);
-            let durations=Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length?window.aiSceneDurations.map(d=>Math.max(.05,Number(d)||.05)):slides.map(s=>Number(s.duration)>0?Number(s.duration):0);
-            if(!durations.every(Boolean)){durations=slides.map((s,i)=>weightTotal?Math.max(.3,total*weights[i]/weightTotal):total/slides.length)}
-            const durationSum=durations.reduce((a,b)=>a+b,0);if(audioEl&&Array.isArray(window.aiSceneDurations)&&window.aiSceneDurations.length===slides.length){durations=durations.map(d=>d*audioEl.duration/durationSum);durations[durations.length-1]+=Math.max(0,total-audioEl.duration);}else{durations=durations.map(d=>d*total/durationSum);}
+            const durations=exportSceneDurations(slides,activeVoice,total,audioEl?.duration,window.aiSceneDurations);
             const boundaries=[];durations.reduce((sum,d,i)=>(boundaries[i]=sum+d,sum+d),0);const totalInput=document.getElementById('video-total-duration');if(totalInput)totalInput.value=total.toFixed(1);
             const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:quality===720?5000000:9000000}),chunks=[];recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||e)});
             const original=activeTikTokSlide,sceneShots=[];if(btn)btn.disabled=true;if(status){status.classList.remove('hidden');statusText.innerText='جاري تجهيز مشاهد الفيديو...'}
@@ -1960,9 +1974,11 @@
             const phrases=text=>{const out=[];String(text||'').split(/(?<=[.!؟،؛:])\s+/).filter(Boolean).forEach(part=>{const words=part.trim().split(/\s+/);for(let i=0;i<words.length;i+=7)out.push(words.slice(i,i+7).join(' '))});return out};
             const drawImageCover=(source,zoom=1,ox=0,oy=0)=>{const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height,sr=sw/sh,tr=W/H;let sx=0,sy=0,cw=sw,ch=sh;if(sr>tr){cw=sh*tr;sx=(sw-cw)/2}else{ch=sw/tr;sy=(sh-ch)/2}const dw=W*zoom,dh=H*zoom;ctx.drawImage(source,sx,sy,cw,ch,(W-dw)/2+ox,(H-dh)/2+oy,dw,dh)};
             try{
-                if(document.fonts)await document.fonts.ready;if(audioCtx?.state==='suspended')await audioCtx.resume();recorder.start(1000);const masterStart=performance.now();if(audioEl){audioEl.currentTime=0;await audioEl.play()}let lastAssetKey='',activeVideos=[];
+                if(document.fonts)await document.fonts.ready;if(audioCtx?.state==='suspended')await audioCtx.resume();ctx.drawImage(sceneShots[0],0,0,W,H);recorder.start(1000);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await audioEl.play()}let lastAssetKey='',activeVideos=[];
                 while(true){
-                    const wallElapsed=(performance.now()-masterStart)/1000,elapsed=syncMode==='fit-audio'?Math.min(total,wallElapsed):(audioEl?(audioEl.ended?total:Math.min(total,audioEl.currentTime)):wallElapsed);
+                    const wallElapsed=(performance.now()-masterStart)/1000;
+                    if(audioEl?.ended&&audioEndWall===null)audioEndWall=wallElapsed;
+                    const elapsed=exportTimelineElapsed(audioEl?audioEl.currentTime:null,Boolean(audioEl?.ended),wallElapsed,audioEndWall??wallElapsed,total);
                     let i=boundaries.findIndex(end=>elapsed<end);if(i<0)i=slides.length-1;const start=i?boundaries[i-1]:0,duration=durations[i],local=Math.max(0,Math.min(duration,elapsed-start)),t=Math.min(1,local/Math.max(.001,duration));
                     const assets=sceneAssets[i]||[],grid=slides[i].mediaLayout==='grid',assetIndex=assets.length?Math.min(assets.length-1,Math.floor(t*assets.length)):0,asset=assets[assetIndex]||null,assetKey=grid?`${i}:grid`:`${i}:${assetIndex}`;
                     if(assetKey!==lastAssetKey){activeVideos.forEach(video=>video.pause());activeVideos=(grid?assets:[asset]).filter(item=>item?.kind==='video').map(item=>item.element);for(const video of activeVideos){video.currentTime=0;video.play().catch(()=>{})}lastAssetKey=assetKey;if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length} — مادة ${assetIndex+1} من ${Math.max(1,assets.length)}`}
