@@ -60,7 +60,7 @@ export async function handle(req:Request) {
   if (route==='/health' && req.method==='GET') {
     let oauthRuntimeReady=false;
     if(configured()) { try { oauth(); oauthRuntimeReady=true; } catch {} }
-    return json({service:'studio-social',deployed:true,oauthConfigured:configured(),oauthRuntimeReady,publishingAvailable:false,callback});
+    return json({service:'studio-social',deployed:true,oauthConfigured:configured(),oauthRuntimeReady,googleClientIdFormatValid:/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(Deno.env.get('GOOGLE_CLIENT_ID') || ''),googleClientIdHasOuterWhitespace:(Deno.env.get('GOOGLE_CLIENT_ID') || '').trim()!==(Deno.env.get('GOOGLE_CLIENT_ID') || ''),publishingAvailable:false,callback});
   }
   try {
     if (route==='/youtube/start' && req.method==='POST') {
