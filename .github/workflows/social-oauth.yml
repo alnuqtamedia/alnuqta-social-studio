@@ -14,3 +14,4 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/test-social-oauth.mjs
+      - run: node scripts/test-youtube-oauth.mjs
