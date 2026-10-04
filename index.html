@@ -306,6 +306,7 @@
                     <div id="social-platform-buttons" class="flex flex-wrap gap-2"></div>
                     <button type="button" onclick="copySocialText()" class="text-xs border rounded p-2">نسخ نص المنشور</button>
                     <button type="button" onclick="downloadSocialVideo()" class="text-xs border rounded p-2">تنزيل الفيديو المعاين</button>
+<a id="ready-video-file" class="hidden inline-block text-xs border rounded p-2" download>حفظ ملف الفيديو الناتج</a>
                     <button type="button" onclick="shareSocialVideo()" class="text-xs border rounded p-2">مشاركة الملف عبر الجهاز</button>
                     <button type="button" onclick="openStudioYouTube()" class="text-xs border rounded p-2">نشر مباشرة إلى يوتيوب</button>
 <dialog id="studio-youtube-dialog" style="width:min(700px,94vw);max-width:94vw;padding:12px;border:1px solid #304059;border-radius:12px;background:#0b1220;color:white">
@@ -1908,6 +1909,7 @@
         function retainSocialVideo(blob,ext,target){
             if(socialVideo)URL.revokeObjectURL(socialVideo.url);
             socialVideo={blob,url:URL.createObjectURL(blob),name:`alnuqta-video-${Date.now()}.${ext}`};
+            const fileLink=document.getElementById('ready-video-file');fileLink.href=socialVideo.url;fileLink.download=socialVideo.name;fileLink.classList.remove('hidden');document.getElementById('social-status').textContent='تم إنشاء الملف. يمكنك حفظه من رابط «حفظ ملف الفيديو الناتج». راجع المدة والصوت قبل النشر.';
             const preview=document.getElementById('social-video-preview');preview.src=socialVideo.url;preview.classList.remove('hidden');preview.load();
             document.getElementById('social-export-info').textContent=`المدة المخططة ${target.toFixed(2)} ثانية. راجع الصوت والصورة في الملف؛ التزامن الحالي تقديري.`;
             preview.onloadedmetadata=()=>{document.getElementById('social-export-info').textContent=`المطلوب ${target.toFixed(2)} ثانية — مدة الملف ${Number.isFinite(preview.duration)?preview.duration.toFixed(2)+' ثانية':'غير متاحة من المتصفح'}؛ راجع التزامن قبل المشاركة.`;};
@@ -2016,7 +2018,7 @@
                     const barW=W*.78,barH=Math.max(6,H*.004),x=(W-barW)/2,y=H*.92;ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y,barW,barH);ctx.fillStyle='#E31217';ctx.fillRect(x,y,barW*Math.min(1,elapsed/total),barH);
                     if(elapsed>=total-.01)break;await new Promise(requestAnimationFrame);
                 }
-                recorder.stop();await done;const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});const measured=await measureExportedVideo(blob);retainSocialVideo(blob,ext,total);const tolerance=total<=120?.5:total*.01;if(Math.abs(measured-total)>tolerance){setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`,'success');}
+                recorder.stop();await done;const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});const measured=await measureExportedVideo(blob);retainSocialVideo(blob,ext,total);const tolerance=total<=120?.5:total*.01;if(Math.abs(measured-total)>tolerance){document.getElementById('social-status').textContent=`الملف جاهز للحفظ، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية؛ لم يجتز فحص المدة. اضغط حفظ ملف الفيديو الناتج للمراجعة، وأعد التصدير إذا تحتاج المطابقة الدقيقة.`;setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`,'success');}
             }catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error')}
             finally{stream.getTracks().forEach(track=>track.stop());sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
         }
