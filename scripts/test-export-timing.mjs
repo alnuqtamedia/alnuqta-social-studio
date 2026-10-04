@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const from=html.indexOf('        function exportSceneDurations(');
+const to=html.indexOf('        async function exportVerticalVideo()',from);
+const context=vm.createContext({});vm.runInContext(html.slice(from,to),context);
+const durations=(...args)=>Array.from(context.exportSceneDurations(...args));
+const slides=[{voiceover:'one two',duration:2},{voiceover:'three four',duration:6}];
+assert.deepEqual(durations(slides,{source:'human'},10,8,[1,7]),[4,6],'human recording must not reuse Gemini boundaries');
+assert.deepEqual(durations(slides,{source:'gemini'},10,8,[1,7]),[1,9],'Gemini timing keeps its boundaries and adds tail to final scene');
+assert.deepEqual(durations(slides,{source:'gemini'},8,8,[NaN,7]),[4,4],'invalid boundaries fall back to narration weights');
+assert.deepEqual(durations(slides,null,8,undefined,[1,7]),[2,6],'silent export follows scene durations');
+assert.equal(context.exportTimelineElapsed(2,false,5,5,10),2,'scene clock follows audio even when wall time is ahead');
+assert.equal(context.exportTimelineElapsed(8,true,11,9,10),10,'silent tail continues after audio ends');
+assert.equal(context.exportTimelineElapsed(null,false,3,0,10),3);
+console.log('Export timing regression checks passed.');
