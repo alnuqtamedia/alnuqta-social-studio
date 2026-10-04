@@ -9,9 +9,10 @@ fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 fs.copyFileSync(path.join(root, 'index.html'), path.join(output, 'index.html'));
 fs.copyFileSync(path.join(root, 'social-accounts.html'), path.join(output, 'social-accounts.html'));
+fs.copyFileSync(path.join(root, 'project-backup.html'), path.join(output, 'project-backup.html'));
 fs.writeFileSync(path.join(output, '.nojekyll'), '');
 
 const files = fs.readdirSync(output, { withFileTypes: true }).map(entry => entry.name).sort();
-if (files.join(',') !== '.nojekyll,index.html,social-accounts.html') throw new Error(`Unexpected Pages bundle: ${files.join(', ')}`);
+if (files.join(',') !== '.nojekyll,index.html,project-backup.html,social-accounts.html') throw new Error(`Unexpected Pages bundle: ${files.join(', ')}`);
 console.log(`Pages bundle ready: ${files.length} files (${files.join(', ')})`);
 
