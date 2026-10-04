@@ -307,8 +307,12 @@
                     <button type="button" onclick="copySocialText()" class="text-xs border rounded p-2">نسخ نص المنشور</button>
                     <button type="button" onclick="downloadSocialVideo()" class="text-xs border rounded p-2">تنزيل الفيديو المعاين</button>
                     <button type="button" onclick="shareSocialVideo()" class="text-xs border rounded p-2">مشاركة الملف عبر الجهاز</button>
-                    <a href="social-accounts.html" class="btn">حسابات النقطة ورفع الفيديو إلى يوتيوب</a>
-<p id="social-status" role="status" class="text-xs text-gray-400">النشر المباشر غير مفعّل: حسابات المنصات غير مربوطة. مشاركة الجهاز لا تؤكد النشر.</p>
+                    <button type="button" onclick="openStudioYouTube()" class="text-xs border rounded p-2">نشر مباشرة إلى يوتيوب</button>
+<dialog id="studio-youtube-dialog" style="width:min(700px,94vw);max-width:94vw;padding:12px;border:1px solid #304059;border-radius:12px;background:#0b1220;color:white">
+<button type="button" onclick="document.getElementById('studio-youtube-dialog').close()" style="padding:8px 16px">إغلاق والعودة للتصميم</button>
+<iframe id="studio-youtube-frame" title="نشر الفيديو مباشرة إلى يوتيوب" style="width:100%;height:76vh;border:0"></iframe>
+</dialog>
+<p id="social-status" role="status" class="text-xs text-gray-400">يوتيوب: انشر الفيديو المعاين مباشرة بزر النشر. باقي المنصات متاحة عبر تنزيل الملف أو مشاركة الجهاز.</p>
                 </section>
 
                 <div class="border border-brandRed/30 rounded-lg p-3 bg-navy-card/50"><h4 class="font-cairo font-black text-xs text-white mb-2">المساعد البصري للمادة</h4><p class="text-[10px] text-gray-400 font-tajawal mb-2">يحلل المشاهد ويحدد احتياج الصورة وB-roll لكل مشهد.</p><button onclick="prepareVisualPlan()" class="w-full py-2 bg-navy border border-brandRed/60 hover:bg-brandRed rounded text-xs font-cairo font-bold">جهّز المادة بصرياً</button><div id="visual-plan-status" class="text-[10px] text-gray-400 mt-2"></div></div>
@@ -1880,6 +1884,27 @@
             if(!navigator.share||!navigator.canShare?.({files:[file]})){document.getElementById('social-status').textContent='مشاركة الملفات غير مدعومة هنا؛ نزّل الفيديو وانسخ النص. النشر المباشر غير مفعّل.';return;}
             try{await navigator.share(data);document.getElementById('social-status').textContent='تم تسليم الملف لمسار مشاركة الجهاز؛ لم تؤكد المنصة النشر.';}catch(error){document.getElementById('social-status').textContent=error.name==='AbortError'?'أُلغيت المشاركة.':'تعذرت المشاركة؛ نزّل الفيديو وانسخ النص.';}
         }
+
+        function studioYouTubePayload(){
+            if(!socialVideo)return null;
+            return {type:'alnuqta-studio-video',blob:socialVideo.blob,name:socialVideo.name,title:document.getElementById('social-title').value,description:[document.getElementById('social-caption').value,document.getElementById('social-hashtags').value].filter(Boolean).join('\n\n')};
+        }
+        function openStudioYouTube(){
+            const status=document.getElementById('social-status');
+            if(!socialVideo){status.textContent='صدّر الفيديو أولاً حتى نرسل نفس الملف المعاين.';return;}
+            if(socialVideo.blob.size>262144000){status.textContent='الفيديو يتجاوز حد الرفع الحالي 250 MiB.';return;}
+            const frame=document.getElementById('studio-youtube-frame'),dialog=document.getElementById('studio-youtube-dialog');
+            dialog.showModal();
+            if(!frame.getAttribute('src'))frame.src='social-accounts.html?embed=studio';
+            else frame.contentWindow.postMessage(studioYouTubePayload(),location.origin);
+        }
+        window.addEventListener('message',event=>{
+            const frame=document.getElementById('studio-youtube-frame');
+            if(event.origin!==location.origin || event.source!==frame?.contentWindow || event.data?.type!=='alnuqta-youtube-ready')return;
+            const payload=studioYouTubePayload();
+            if(payload)frame.contentWindow.postMessage(payload,location.origin);
+        });
+
         function retainSocialVideo(blob,ext,target){
             if(socialVideo)URL.revokeObjectURL(socialVideo.url);
             socialVideo={blob,url:URL.createObjectURL(blob),name:`alnuqta-video-${Date.now()}.${ext}`};
@@ -1889,7 +1914,7 @@
         }
         document.addEventListener('DOMContentLoaded',()=>{
             const holder=document.getElementById('social-platform-buttons');
-            for(const platform of ['Facebook','Instagram','TikTok','YouTube','LinkedIn','Threads','X']){const button=document.createElement('button');button.type='button';button.className='text-xs border border-navy-light rounded p-2';button.textContent=platform;button.onclick=()=>{document.getElementById('social-platform').value=platform;loadSocialDraft();document.getElementById('social-status').textContent=platform+': النشر المباشر يحتاج ربط حساب وخدمة نشر. يمكنك الآن تنزيل الفيديو ونسخ النص أو مشاركة الملف عبر الجهاز.';};holder.appendChild(button);}loadSocialDraft();
+            for(const platform of ['Facebook','Instagram','TikTok','YouTube','LinkedIn','Threads','X']){const button=document.createElement('button');button.type='button';button.className='text-xs border border-navy-light rounded p-2';button.textContent=platform;button.onclick=()=>{document.getElementById('social-platform').value=platform;loadSocialDraft();document.getElementById('social-status').textContent=platform==='YouTube'?'يوتيوب: اضغط نشر مباشرة إلى يوتيوب لإرسال الفيديو المعاين من داخل الاستوديو.':platform+': يمكنك تنزيل الفيديو ونسخ النص أو مشاركة الملف عبر الجهاز؛ الربط المباشر لهذه المنصة غير مفعّل.';};holder.appendChild(button);}loadSocialDraft();
         });
         async function loadExportMedia(item){
             const kind=item.kind==='video'?'video':'image',url=String(item.url||(kind==='image'?item.preview:'')||'');
@@ -2317,6 +2342,7 @@
     </script>
 </body>
 </html>
+
 
 
 
