@@ -293,10 +293,10 @@
                     <audio id="human-record-preview" controls class="hidden w-full"></audio>
                 </div>
                 <button id="export-video-btn" onclick="exportVerticalVideo()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-xs flex items-center justify-center gap-2 transition shadow-lg">
-                    <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو فعلي
+                    <i data-lucide="film" class="w-4 h-4"></i> تصدير فيديو MP4
                 </button>
                 <button type="button" onclick="copyExportDiagnostics()" class="w-full py-1.5 border border-navy-light text-gray-400 hover:text-white rounded font-tajawal text-[10px]">نسخ تقرير تشخيص التصدير</button>
-                <p class="text-[10px] text-gray-500 font-tajawal">يُصدّر الفيديو مباشرة من المتصفح. WebM مدعوم على Chrome/Edge؛ MP4 يظهر تلقائياً إذا كان المتصفح يدعم تسجيل H.264/MP4.</p>
+                <p class="text-[10px] text-gray-500 font-tajawal">تصدير الفيديو بصيغة MP4 مع الصوت. تنزيل التعليق من مشغّل الصوت يعطي ملف صوت فقط.</p>
                 <section class="border border-navy-light rounded-lg p-3 space-y-2" aria-label="معاينة ومشاركة الفيديو">
                     <h4 class="font-cairo font-bold text-xs">معاينة الفيديو والصوت والمشاركة</h4>
                     <video id="social-video-preview" controls playsinline class="hidden w-full rounded"></video>
@@ -1880,7 +1880,7 @@
         function loadSocialDraft(){let draft=socialDrafts[socialDraftKey()];if(!draft)try{draft=JSON.parse(localStorage.getItem(socialDraftKey())||'{}');}catch{draft={};}for(const field of ['title','caption','hashtags'])document.getElementById('social-'+field).value=typeof draft?.[field]==='string'?draft[field]:'';}
         function socialText(){return ['title','caption','hashtags'].map(field=>document.getElementById('social-'+field).value.trim()).filter(Boolean).join('\n\n');}
         async function copySocialText(){try{await navigator.clipboard.writeText(socialText());document.getElementById('social-status').textContent='تم نسخ النص؛ لم يتم نشره.';}catch{document.getElementById('social-status').textContent='تعذر النسخ التلقائي؛ انسخ النص من الحقول.';}}
-        function downloadSocialVideo(){if(!socialVideo)return setAIStatus('صدّر الفيديو أولاً.','error');const a=document.createElement('a');a.href=socialVideo.url;a.download=socialVideo.name;a.click();}
+        function downloadSocialVideo(){if(socialVideo&&!socialVideo.blob.type.startsWith('video/mp4'))return setAIStatus('هذا ملف من تصدير سابق؛ أعد تصديره بزر MP4.','error');if(!socialVideo)return setAIStatus('صدّر الفيديو أولاً.','error');const a=document.createElement('a');a.href=socialVideo.url;a.download=socialVideo.name;a.click();}
         async function shareSocialVideo(){
             if(!socialVideo)return setAIStatus('صدّر الفيديو وراجع معاينته أولاً.','error');
             const file=new File([socialVideo.blob],socialVideo.name,{type:socialVideo.blob.type}),data={files:[file],text:socialText()};
@@ -1956,7 +1956,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-04-r4.1';
+        const STUDIO_BUILD='2026-10-04-mp4-r5';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2022,8 +2022,8 @@
             const stage=label=>{diag.stage=label;diag.log.push(Math.round(performance.now()-t0)+'ms '+label);if(statusText)statusText.innerText=label};
             const bounded=(work,label,ms)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error(label+' تجاوز المهلة ('+Math.round(ms/1000)+' ث)')),ms);Promise.resolve(work).then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})});
             if(!window.MediaRecorder)return setAIStatus('متصفحك لا يدعم تصدير الفيديو. استخدم Chrome أو Edge حديث.','error');
-            const mimeCandidates=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm','video/mp4;codecs="avc1.42E01E,mp4a.40.2"','video/mp4'].filter(x=>MediaRecorder.isTypeSupported(x));let mimeType=mimeCandidates[0];diag.codecAttempts=[];
-            if(!mimeType)return setAIStatus('لا يوجد ترميز فيديو مدعوم في هذا المتصفح.','error');diag.mimeType=mimeType;
+            const mimeCandidates=['video/mp4;codecs="avc1.42E01E,mp4a.40.2"','video/mp4;codecs="avc1.42001f,mp4a.40.2"','video/mp4'].filter(x=>MediaRecorder.isTypeSupported(x));let mimeType=mimeCandidates[0];diag.codecAttempts=[];
+            if(!mimeType)return setAIStatus('المتصفح لا يدعم تسجيل MP4 هنا؛ لن يُنزّل ملف صوت أو WebM بدلاً منه.','error');diag.mimeType=mimeType;
             const slides=topics[activeTikTokTopic]?.slides||[];if(!slides.length)return setAIStatus('لا توجد مشاهد لتصديرها.','error');
             const quality=Number(document.getElementById('video-quality')?.value||1080),W=quality===720?720:1080,H=quality===720?1280:1920,fps=30;
             const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d'),stream=canvas.captureStream(fps);
@@ -2128,7 +2128,12 @@
                     const barW=W*.78,barH=Math.max(6,H*.004),x=(W-barW)/2,y=H*.92;ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y,barW,barH);ctx.fillStyle='#E31217';ctx.fillRect(x,y,barW*Math.min(1,elapsed/total),barH);
                     if(elapsed>=total-.01)break;await new Promise(resolve=>setTimeout(resolve,Math.max(0,1000/fps-((performance.now()-masterStart)% (1000/fps)))));
                 }
-                recorder.stop();stage('إنهاء الملف');await bounded(done,'إنهاء التسجيل',15000);const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});retainSocialVideo(blob,ext,total);diag.fileBytes=blob.size;diag.outcome='file-created';let measured;try{measured=await measureExportedVideo(blob)}catch(measureError){document.getElementById('social-status').textContent='الملف جاهز للحفظ لكن تعذر قياس مدته تلقائياً؛ راجع المعاينة.';setAIStatus('الفيديو محفوظ للمعاينة والتنزيل، لكن تعذر قياس مدته تلقائياً ('+measureError.message+'). راجع المدة يدوياً.','error');return}diag.requestedSeconds=total;diag.actualSeconds=measured;const tolerance=total<=120?.5:total*.01;diag.durationPassed=Math.abs(measured-total)<=tolerance;if(Math.abs(measured-total)>tolerance){document.getElementById('social-status').textContent=`الملف جاهز للحفظ، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية؛ لم يجتز فحص المدة. اضغط حفظ ملف الفيديو الناتج للمراجعة، وأعد التصدير إذا تحتاج المطابقة الدقيقة.`;setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`+(diag.fallbackScenes.length?' | استُخدم قالب نصي بديل للمشاهد '+diag.fallbackScenes.map(f=>f.scene).join('، ')+' لأن تصوير القالب الأصلي تعذّر.':''),'success');}
+                recorder.stop();stage('إنهاء الملف');await bounded(done,'إنهاء التسجيل',15000);const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});if(!mimeType.startsWith('video/mp4'))throw new Error('المسجّل لم ينتج MP4؛ لن يُغيّر امتداد الملف.');
+                const signature=new Uint8Array(await blob.slice(0,64).arrayBuffer());
+                const signatureText=String.fromCharCode(...signature);
+                if(!signatureText.includes('ftyp'))throw new Error('الملف الناتج ليس حاوية MP4 صحيحة؛ لم يُنزّل كفيديو.');
+                diag.mp4ContainerVerified=true;
+                retainSocialVideo(blob,'mp4',total);diag.fileBytes=blob.size;diag.outcome='file-created';let measured;try{measured=await measureExportedVideo(blob)}catch(measureError){document.getElementById('social-status').textContent='الملف جاهز للحفظ لكن تعذر قياس مدته تلقائياً؛ راجع المعاينة.';setAIStatus('الفيديو محفوظ للمعاينة والتنزيل، لكن تعذر قياس مدته تلقائياً ('+measureError.message+'). راجع المدة يدوياً.','error');return}diag.requestedSeconds=total;diag.actualSeconds=measured;const tolerance=total<=120?.5:total*.01;diag.durationPassed=Math.abs(measured-total)<=tolerance;if(Math.abs(measured-total)>tolerance){document.getElementById('social-status').textContent=`الملف جاهز للحفظ، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية؛ لم يجتز فحص المدة. اضغط حفظ ملف الفيديو الناتج للمراجعة، وأعد التصدير إذا تحتاج المطابقة الدقيقة.`;setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`+(diag.fallbackScenes.length?' | استُخدم قالب نصي بديل للمشاهد '+diag.fallbackScenes.map(f=>f.scene).join('، ')+' لأن تصوير القالب الأصلي تعذّر.':''),'success');}
             }catch(err){diag.error=String(err?.message||err);diag.outcome='failed';console.error(err);try{if(recorder&&recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err)+' [المرحلة: '+diag.stage+']','error')}
             finally{stream.getTracks().forEach(track=>track.stop());sceneAssets.flat().forEach(asset=>{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load()}});if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden')}
         }
