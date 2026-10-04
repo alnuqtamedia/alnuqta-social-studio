@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>ربط حسابات النقطة</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TgGUDPAU2LTEeqIVb0bnMti4uekFNMZz4xTGHjs+RH8='; style-src 'unsafe-inline'; connect-src https://jlqveqfybjknviqvebeo.supabase.co; media-src blob:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+KclMTKjFQ+4aFB1IAyC3WRuqvRKrNtSNQUZVKczowQ='; style-src 'unsafe-inline'; connect-src https://jlqveqfybjknviqvebeo.supabase.co; media-src blob:; base-uri 'none'; form-action 'none'">
 <style>body{margin:0;background:#0b1220;color:#edf2f8;font:17px system-ui;line-height:1.8}main{max-width:620px;margin:7vh auto;padding:24px}h1{font-size:30px}section{background:#151f30;border:1px solid #304059;padding:24px;border-radius:16px;margin:20px 0}label{display:block;margin-top:14px}input,textarea,select{box-sizing:border-box;width:100%;padding:12px;background:#0b1220;color:white;border:1px solid #52627a;border-radius:8px;font:inherit}button,a{font:inherit}button{cursor:pointer;border:0;border-radius:8px;padding:10px 18px;margin:14px 0 0 8px;background:#78d7cf;color:#0b1220}button:disabled{opacity:.5;cursor:wait}.secondary{background:#344257;color:white}a{color:#78d7cf}#status{white-space:pre-wrap}ul{padding-right:24px}small{color:#b8c5d5}[hidden]{display:none!important}</style></head>
 <body><main><a href="./">العودة إلى الاستوديو</a><h1>حسابات النقطة</h1><p>سجّل الدخول إلى حساب الاستوديو، ثم اختر قناة يوتيوب التي تريد ربطها.</p>
 <p id="status" role="status" aria-live="polite">جارٍ فحص الاتصال…</p>
@@ -11,8 +11,10 @@ const BASE='https://jlqveqfybjknviqvebeo.supabase.co', KEY='sb_publishable_d5NJS
 const $=id=>document.getElementById(id), say=text=>$('status').textContent=text;
 let session=null,ready=false,busy=false;
 const hash=new URLSearchParams(location.hash.slice(1)), returnedTokens=hash.has('access_token') ? {access_token:hash.get('access_token'),refresh_token:hash.get('refresh_token'),expires_at:Math.floor(Date.now()/1000)+Number(hash.get('expires_in')||0)} : null;
+const embedded=new URLSearchParams(location.search).get('embed')==='studio';
 const callbackResult=new URLSearchParams(location.search).get('youtube');
-history.replaceState(null,'',location.pathname);
+history.replaceState(null,'',location.pathname+(embedded?'?embed=studio':''));
+if(embedded){document.querySelector('main > a').hidden=true;document.querySelector('main > h1').hidden=true;document.querySelector('main > p').textContent='نشر الفيديو المعاين إلى يوتيوب من داخل الاستوديو';document.querySelector('main').style.margin='0 auto';$('signup').hidden=true;}
 function save(value){session=value;if(value)sessionStorage.setItem(STORAGE,JSON.stringify(value));else sessionStorage.removeItem(STORAGE);}
 async function request(url,options={}){
  const response=await fetch(url,{...options,headers:{apikey:KEY,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(110000)});
@@ -80,6 +82,24 @@ $('upload').onclick=()=>run(async()=>{
 $('resume').onclick=()=>run(async()=>{let record=job();if(!record)throw new Error('لا يوجد رفع محفوظ.');if(!record.id){const row=await api('init',{method:'POST',body:JSON.stringify(record.input)});record.id=row.id;remember(record);}await transfer(record);});
 $('check').onclick=()=>run(async()=>{const record=job();if(!record?.id)throw new Error('لا توجد جلسة رفع مؤكدة؛ استخدم الاستئناف إذا انقطع الاتصال.');result(await api('status?id='+encodeURIComponent(record.id)));});
 
+
+if(embedded && window.parent!==window){
+ window.addEventListener('message',event=>{
+  if(event.origin!==location.origin || event.source!==window.parent || event.data?.type!=='alnuqta-studio-video')return;
+  const payload=event.data;
+  if(!(payload.blob instanceof Blob)||!payload.blob.size||payload.blob.size>262144000){say('الفيديو غير صالح أو يتجاوز حد 250 MiB.');return;}
+  const type=payload.blob.type.split(';')[0];
+  if(!['video/mp4','video/webm','video/quicktime'].includes(type)){say('صيغة الفيديو غير مدعومة.');return;}
+  selected(new File([payload.blob],String(payload.name||'alnuqta-video.webm'),{type}));
+  $('video-title').value=String(payload.title||'').slice(0,100);
+  $('description').value=String(payload.description||'');
+  $('confirm').checked=false;
+  $('video-file').hidden=true;
+  document.querySelector('label[for="video-file"]').textContent='الفيديو المعاين من الاستوديو — '+selectedFile.name;
+ });
+ window.parent.postMessage({type:'alnuqta-youtube-ready'},location.origin);
+}
+
 (async()=>{try{
  const health=await request(API+'/health');ready=health.oauthConfigured;
  if(returnedTokens){await request(BASE+'/auth/v1/user',{headers:{Authorization:'Bearer '+returnedTokens.access_token}});save(returnedTokens);}
@@ -87,3 +107,4 @@ $('check').onclick=()=>run(async()=>{const record=job();if(!record?.id)throw new
  if(session)await list();else say(ready?'إعدادات Google موجودة. سجّل الدخول لبدء الربط.':'إعدادات Google غير مكتملة بعد.');
 }catch(error){save(null);say(error.message);}})();
 </script></body></html>
+
