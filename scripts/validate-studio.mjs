@@ -21,6 +21,10 @@ const required = [
   'exportAllTikTokSlides()',
   "target.style.height = presentationMode?'360px':'450px'",
   "H=quality===720?1280:1920",
+  'drawSceneFallback(',
+  'STUDIO_BUILD',
+  'copyExportDiagnostics()',
+  "stage('تجهيز قالب المشهد '",
 ];
 
 for (const marker of required) {
