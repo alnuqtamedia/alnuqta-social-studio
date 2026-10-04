@@ -1956,7 +1956,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-04-r3';
+        const STUDIO_BUILD='2026-10-04-r4';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2003,6 +2003,19 @@
             return Math.min(total,Math.max(0,audioTime)+Math.max(0,wallElapsed-audioEndWall));
         }
 
+        function createDecodedExportVoice(context,buffer,destination){
+            let source=null,start=0,position=0,finished=false;const listeners=[];
+            return {
+                duration:buffer.duration,
+                get currentTime(){return source?Math.min(buffer.duration,position+Math.max(0,context.currentTime-start)):position},
+                set currentTime(value){position=Math.max(0,Math.min(buffer.duration,Number(value)||0))},
+                get ended(){return finished||Boolean(source&&context.currentTime-start+position>=buffer.duration)},
+                addEventListener(name,callback){if(name==='ended')listeners.push(callback)},
+                play(){source=context.createBufferSource();source.buffer=buffer;source.connect(destination);source.connect(context.destination);start=context.currentTime;finished=false;source.onended=()=>{finished=true;position=buffer.duration;source=null;listeners.forEach(callback=>callback())};source.start(0,position);return Promise.resolve()},
+                pause(){if(source){position=this.currentTime;source.onended=null;try{source.stop()}catch{}source=null}}
+            };
+        }
+
         async function exportVerticalVideo() {
             const btn=document.getElementById('export-video-btn'),status=document.getElementById('export-status'),statusText=document.getElementById('export-status-text');
             const diag={build:STUDIO_BUILD,url:location.origin+location.pathname,userAgent:navigator.userAgent,started:new Date().toISOString(),stage:'بدء',log:[],fallbackScenes:[],mimeType:null,html2canvas:typeof html2canvas};const t0=performance.now();window.lastExportDiagnostics=diag;
@@ -2017,7 +2030,21 @@
             let audioEl=null,audioUrl=null,audioCtx=null;const activeVoice=getActiveVoiceover();
             if(btn)btn.disabled=true;if(status)status.classList.remove('hidden');stage('تحضير الصوت');
             const abortEarly=async message=>{diag.error=String(message);diag.outcome='failed';try{stream.getTracks().forEach(t=>t.stop())}catch{}if(audioEl)audioEl.pause();if(audioCtx)try{await audioCtx.close()}catch{}if(btn)btn.disabled=false;if(status)status.classList.add('hidden');return setAIStatus(message+' [المرحلة: '+diag.stage+']','error')};
-            if(activeVoice){audioUrl=activeVoice.url;audioEl=new Audio(audioUrl);audioEl.preload='auto';await new Promise(resolve=>{const wait=setTimeout(resolve,10000),done=()=>{clearTimeout(wait);resolve()};audioEl.onloadedmetadata=done;audioEl.onerror=done;audioEl.load()});audioEl.playbackRate=1;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaElementSource(audioEl),dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));}catch(e){console.warn('Web Audio mixing unavailable',e)}}
+            if(activeVoice){
+                audioUrl=activeVoice.url;
+                try{
+                    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+                    // Unlock the audio clock during the user's export gesture.
+                    const unlock=audioCtx.resume();unlock.catch(()=>{});
+                    const controller=new AbortController();
+                    let bytes;try{bytes=await bounded(fetch(audioUrl,{signal:controller.signal}).then(response=>{if(!response.ok)throw new Error('تعذر قراءة ملف الصوت');return response.arrayBuffer()}),'تحميل ملف الصوت',12000)}finally{controller.abort()}
+                    const buffer=await bounded(audioCtx.decodeAudioData(bytes),'فك ترميز الصوت',12000);
+                    const destination=audioCtx.createMediaStreamDestination();
+                    destination.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
+                    audioEl=createDecodedExportVoice(audioCtx,buffer,destination);
+                    diag.audioDuration=buffer.duration;diag.audioSource='decoded-buffer';
+                }catch(error){return abortEarly('تعذر تجهيز الصوت الكامل: '+(error?.message||error))}
+            }
             const syncMode=document.getElementById('video-sync-mode')?.value||'fit-audio';let requestedTotal;try{requestedTotal=requestedVideoSeconds();}catch(error){return abortEarly(error.message,'error');}
             if(activeVoice&&(!audioCtx||!stream.getAudioTracks().length||!Number.isFinite(audioEl.duration)||audioEl.duration<=0)){return abortEarly('تعذر تحميل الصوت أو دمجه؛ أوقف التصدير لتجنب فيديو صامت.','error');}
             if(syncMode==='fit-audio'&&audioEl&&audioEl.duration>requestedTotal){return abortEarly('الصوت أطول من المدة المطلوبة. راجع النص وأعد توليده؛ لن تُقطع الكلمات.','error');}
@@ -2080,11 +2107,13 @@
                     }catch(error){attempt.error=String(error?.message||error);if(candidateRecorder){candidateRecorder.ondataavailable=null;try{if(candidateRecorder.state!=='inactive')candidateRecorder.stop()}catch{}}}
                     finally{if(pump)clearInterval(pump)}
                 }
-                if(!recorder)throw new Error('تعذر تشغيل جميع ترميزات الفيديو المدعومة؛ انسخ تقرير التشخيص.');ctx.drawImage(sceneShots[0],0,0,W,H);const masterStart=performance.now();let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await bounded(audioEl.play(),'تشغيل الصوت',8000)}let lastAssetKey='',activeVideos=[];
+                if(!recorder)throw new Error('تعذر تشغيل جميع ترميزات الفيديو المدعومة؛ انسخ تقرير التشخيص.');ctx.drawImage(sceneShots[0],0,0,W,H);const masterStart=performance.now();const exportAudioClockStart=audioCtx?.currentTime;let audioEndWall=null;if(audioEl){audioEl.currentTime=0;audioEl.addEventListener('ended',()=>{audioEndWall=(performance.now()-masterStart)/1000},{once:true});await bounded(audioEl.play(),'تشغيل الصوت',8000)}let lastAssetKey='',activeVideos=[];
                 while(true){
                     const wallElapsed=(performance.now()-masterStart)/1000;
                     if(audioEl?.ended&&audioEndWall===null)audioEndWall=wallElapsed;
-                    const elapsed=exportTimelineElapsed(audioEl?audioEl.currentTime:null,Boolean(audioEl?.ended),wallElapsed,audioEndWall??wallElapsed,total);
+                    if(audioCtx&&audioCtx.state!=='running')throw new Error('توقف محرّك الصوت أثناء التسجيل؛ أبقِ الصفحة ظاهرة وأعد التصدير.');
+                    const elapsed=Math.min(total,audioCtx?Math.max(0,audioCtx.currentTime-exportAudioClockStart):wallElapsed);
+                    diag.recordingWallSeconds=wallElapsed;diag.timelineSeconds=elapsed;
                     let i=boundaries.findIndex(end=>elapsed<end);if(i<0)i=slides.length-1;const start=i?boundaries[i-1]:0,duration=durations[i],local=Math.max(0,Math.min(duration,elapsed-start)),t=Math.min(1,local/Math.max(.001,duration));
                     const assets=sceneAssets[i]||[],grid=slides[i].mediaLayout==='grid',assetIndex=assets.length?Math.min(assets.length-1,Math.floor(t*assets.length)):0,asset=assets[assetIndex]||null,assetKey=grid?`${i}:grid`:`${i}:${assetIndex}`;
                     if(assetKey!==lastAssetKey){activeVideos.forEach(video=>video.pause());activeVideos=(grid?assets:[asset]).filter(item=>item?.kind==='video').map(item=>item.element);for(const video of activeVideos){video.currentTime=0;video.play().catch(()=>{})}lastAssetKey=assetKey;if(statusText)statusText.innerText=`إنشاء الفيديو: مشهد ${i+1} من ${slides.length} — مادة ${assetIndex+1} من ${Math.max(1,assets.length)}`}
@@ -2094,7 +2123,7 @@
                     if(mix>0){ctx.save();if(transition==='slide')ctx.drawImage(sceneShots[i+1],W*(1-mix),0,W,H);else if(transition==='dip-black'){ctx.fillStyle=`rgba(0,0,0,${Math.sin(mix*Math.PI)*.92})`;ctx.fillRect(0,0,W,H);if(mix>.5){ctx.globalAlpha=(mix-.5)*2;ctx.drawImage(sceneShots[i+1],0,0,W,H)}}else{ctx.globalAlpha=mix;ctx.drawImage(sceneShots[i+1],0,0,W,H)}ctx.restore()}
                     if(slides[i].type!=='outro'){const list=phrases(slides[i].voiceover),lens=list.map(x=>x.length),sum=lens.reduce((a,b)=>a+b,0)||1,target=t*sum;let acc=0,p=0;for(;p<lens.length;p++){acc+=lens[p];if(target<=acc)break}const visible=list[Math.min(p,list.length-1)]||'';if(visible){ctx.direction='rtl';ctx.textAlign='center';ctx.font=`700 ${Math.round(H*.024)}px Tajawal, Arial`;const maxW=W*.76,lineH=H*.034,words=visible.split(' ');let lines=[],line='';for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxW&&line){lines.push(line);line=word}else line=test}if(line)lines.push(line);lines=lines.slice(0,2);const boxH=lines.length*lineH+H*.024,boxY=H*.845-boxH/2;ctx.fillStyle='rgba(3,10,20,.82)';ctx.fillRect(W*.10,boxY,W*.80,boxH);ctx.fillStyle='#fff';lines.forEach((ln,k)=>ctx.fillText(ln,W/2,boxY+H*.017+(k+1)*lineH-H*.006,maxW))}}
                     const barW=W*.78,barH=Math.max(6,H*.004),x=(W-barW)/2,y=H*.92;ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x,y,barW,barH);ctx.fillStyle='#E31217';ctx.fillRect(x,y,barW*Math.min(1,elapsed/total),barH);
-                    if(elapsed>=total-.01)break;await new Promise(requestAnimationFrame);
+                    if(elapsed>=total-.01)break;await new Promise(resolve=>setTimeout(resolve,Math.max(0,1000/fps-((performance.now()-masterStart)% (1000/fps)))));
                 }
                 recorder.stop();stage('إنهاء الملف');await bounded(done,'إنهاء التسجيل',15000);const ext=mimeType.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mimeType});retainSocialVideo(blob,ext,total);diag.fileBytes=blob.size;diag.outcome='file-created';let measured;try{measured=await measureExportedVideo(blob)}catch(measureError){document.getElementById('social-status').textContent='الملف جاهز للحفظ لكن تعذر قياس مدته تلقائياً؛ راجع المعاينة.';setAIStatus('الفيديو محفوظ للمعاينة والتنزيل، لكن تعذر قياس مدته تلقائياً ('+measureError.message+'). راجع المدة يدوياً.','error');return}diag.requestedSeconds=total;diag.actualSeconds=measured;const tolerance=total<=120?.5:total*.01;diag.durationPassed=Math.abs(measured-total)<=tolerance;if(Math.abs(measured-total)>tolerance){document.getElementById('social-status').textContent=`الملف جاهز للحفظ، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية؛ لم يجتز فحص المدة. اضغط حفظ ملف الفيديو الناتج للمراجعة، وأعد التصدير إذا تحتاج المطابقة الدقيقة.`;setAIStatus(`الفيديو محفوظ للمعاينة، لكن مدته ${measured.toFixed(2)} ثانية والمطلوب ${total.toFixed(2)} ثانية. لم يجتز فحص المدة؛ أعد التصدير مع إبقاء الصفحة مفتوحة.`,'error');}else{downloadSocialVideo();setAIStatus(`تم إنشاء الفيديو: المطلوب ${total.toFixed(2)} ثانية، الفعلي ${measured.toFixed(2)} ثانية. راجع الصوت والصورة قبل المشاركة.`+(diag.fallbackScenes.length?' | استُخدم قالب نصي بديل للمشاهد '+diag.fallbackScenes.map(f=>f.scene).join('، ')+' لأن تصوير القالب الأصلي تعذّر.':''),'success');}
             }catch(err){diag.error=String(err?.message||err);diag.outcome='failed';console.error(err);try{if(recorder&&recorder.state!=='inactive')recorder.stop()}catch{}setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err)+' [المرحلة: '+diag.stage+']','error')}
