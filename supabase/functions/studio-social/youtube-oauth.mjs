@@ -7,7 +7,11 @@ export function createYouTubeOAuth({clientId, clientSecret, redirectUri, fetchIm
   if (callback.protocol !== 'https:' || callback.hash || callback.username || callback.password) throw new Error('Invalid Google callback');
   async function request(url, options) {
     const response = await fetchImpl(url, {...options, signal:AbortSignal.timeout(20_000), redirect:'error'});
-    if (!response.ok) throw new Error(`Google request failed (${response.status})`);
+    if (!response.ok) {
+      let code='';
+      try { const failure=await response.json(); if(['invalid_client','invalid_grant','unauthorized_client','access_denied','invalid_request'].includes(failure.error)) code=failure.error; } catch {}
+      throw new Error(`Google request failed (${response.status})${code ? ': '+code : ''}`);
+    }
     return response.json();
   }
   function tokens(data, previous) {
