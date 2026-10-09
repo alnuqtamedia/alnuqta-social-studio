@@ -1,0 +1,160 @@
+import { randomBytes, createHash } from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import { createSocialOAuth } from './social-oauth.mjs';
+import { createYouTubeOAuth } from './youtube-oauth.mjs';
+import { createYouTubeUploads,CHUNK_BYTES,MAX_BYTES } from './youtube-upload.mjs';
+
+const base = Deno.env.get('SUPABASE_URL')!;
+const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const endpoint = `${base}/functions/v1/studio-social`;
+const callback = `${endpoint}/youtube/callback`;
+const origins = new Set(['https://alnuqtamedia.github.io','https://alnuqta-social-studio.vercel.app']);
+const cookieName = '__Host-alnuqta-studio-oauth';
+const hash = (s:string) => createHash('sha256').update(s).digest('base64url');
+const random = () => randomBytes(32).toString('base64url');
+const cookie = (value:string, age=600) => `${cookieName}=${value}; Path=/; Max-Age=${age}; Secure; HttpOnly; SameSite=Lax`;
+
+async function db(path:string, method='GET', body?:unknown, prefer='resolution=merge-duplicates,return=representation') {
+  const response = await fetch(`${base}/rest/v1/${path}`, {method, headers:{apikey:service, Authorization:`Bearer ${service}`, 'Content-Type':'application/json', Prefer:prefer}, ...(body !== undefined ? {body:JSON.stringify(body)} : {}), signal:AbortSignal.timeout(15000)});
+  if (!response.ok) throw new Error('Private storage unavailable');
+  const text = await response.text(); return text ? JSON.parse(text) : null;
+}
+const filter = (kind:string,key:string) => `studio_oauth_records?kind=eq.${encodeURIComponent(kind)}&key=eq.${encodeURIComponent(key)}`;
+async function put(kind:string,key:string,userId:string,payload:unknown,expiresAt?:number) {
+  await db('studio_oauth_records?on_conflict=kind,key','POST',{kind,key,user_id:userId,payload,expires_at:expiresAt ? new Date(expiresAt).toISOString() : null});
+}
+async function get(kind:string,key:string) { const rows=await db(filter(kind,key)); return rows?.[0] || null; }
+async function take(kind:string,key:string) { return db('rpc/studio_oauth_take','POST',{p_kind:kind,p_key:key}); }
+async function active(userId:string,sessionId:string) { return db('rpc/studio_oauth_session_active','POST',{p_user:userId,p_session:sessionId}); }
+function configured() { return ['GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','STUDIO_TOKEN_ENCRYPTION_KEY'].every(key=>Boolean(Deno.env.get(key))); }
+function oauth() {
+  const key = Buffer.from(Deno.env.get('STUDIO_TOKEN_ENCRYPTION_KEY') || '', 'base64');
+  const store = {
+    putState:(key:string,p:any)=>put('state',key,p.userId,p,p.expiresAt), takeState:(key:string)=>take('state',key),
+    putConnection:(p:any)=>put('connection',hash(JSON.stringify([p.userId,p.provider,p.accountId])),p.userId,p),
+    getConnection:async(userId:string,provider:string,accountId:string)=>(await get('connection',hash(JSON.stringify([userId,provider,accountId]))))?.payload || null, claimPublication:()=>{throw new Error('Publication unavailable');}, finishPublication:()=>{throw new Error('Publication unavailable');}
+  };
+  return createSocialOAuth({store,key,adapters:{youtube:createYouTubeOAuth({clientId:Deno.env.get('GOOGLE_CLIENT_ID'),clientSecret:Deno.env.get('GOOGLE_CLIENT_SECRET'),redirectUri:callback})}});
+}
+function uploads() {
+  const store={
+    async claim(input:any){
+      const rows=await db('studio_youtube_uploads?on_conflict=user_id,request_id','POST',input,'resolution=ignore-duplicates,return=representation');
+      if(rows?.length)return {row:rows[0],created:true};
+      const existing=await db(`studio_youtube_uploads?user_id=eq.${input.user_id}&request_id=eq.${input.request_id}`);
+      if(!existing?.[0])throw new Error('Private storage unavailable');
+      return {row:existing[0],created:false};
+    },
+    async get(userId:string,id:string){return (await db(`studio_youtube_uploads?user_id=eq.${userId}&id=eq.${id}`))?.[0] || null;},
+    async lease(userId:string,id:string,lease:string){return (await db('rpc/studio_youtube_lease','POST',{p_user:userId,p_id:id,p_lease:lease}))?.[0] || null;},
+    async patch(id:string,lease:string|null,patch:any){
+      const rows=await db(`studio_youtube_uploads?id=eq.${id}&lease_id=${lease ? 'eq.'+lease : 'is.null'}`,'PATCH',{...patch,updated_at:new Date().toISOString()});
+      if(!rows?.length)throw new Error('Upload lock expired');
+    },
+    async release(id:string,lease:string){await db(`studio_youtube_uploads?id=eq.${id}&lease_id=eq.${lease}`,'PATCH',{lease_id:null,lease_until:null});}
+  };
+  return createYouTubeUploads({store,key:Buffer.from(Deno.env.get('STUDIO_TOKEN_ENCRYPTION_KEY') || '', 'base64'),connection:(userId:string,accountId:string)=>oauth().authorizedConnection({userId,provider:'youtube',accountId})});
+}
+async function boundedBody(req:Request,max:number){
+  if(!req.body)throw new Error('Empty upload request');
+  const reader=req.body.getReader(),parts:Uint8Array[]= [];let size=0;
+  while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>max){await reader.cancel();throw new Error('Upload request too large');}parts.push(value);}
+  const bytes=new Uint8Array(size);let position=0;for(const part of parts){bytes.set(part,position);position+=part.length;}return bytes;
+}
+async function owner(req:Request) {
+  const token=req.headers.get('Authorization')?.match(/^Bearer (.+)$/)?.[1];
+  if (!token) throw new Error('Authentication required');
+  const response=await fetch(`${base}/auth/v1/user`,{headers:{apikey:service,Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});
+  if (!response.ok) throw new Error('Authentication required');
+  const user=await response.json();
+  const allowed=(Deno.env.get('STUDIO_OWNER_EMAILS') || 'alnuqtamedia@gmail.com').split(',').map(v=>v.trim().toLowerCase());
+  if (!user.email_confirmed_at || !allowed.includes(String(user.email).toLowerCase())) throw new Error('Studio access denied');
+  // Only decode AFTER server validation. This is a session lookup, not signature verification.
+  const claims=JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString());
+  if (!claims.session_id || !await active(user.id,claims.session_id)) throw new Error('Session is no longer active');
+  return {userId:user.id,authSession:claims.session_id};
+}
+export async function handle(req:Request) {
+  const url=new URL(req.url), route=url.pathname.split('/studio-social')[1] || '/';
+  const origin=req.headers.get('Origin');
+  const headers:Record<string,string>={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",'Vary':'Origin'};
+  if (origin && origins.has(origin)) { headers['Access-Control-Allow-Origin']=origin; headers['Access-Control-Allow-Headers']='authorization,apikey,content-type,x-upload-offset'; headers['Access-Control-Allow-Methods']='GET,POST,OPTIONS'; }
+  const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
+  const redirect=(location:string,extra:Record<string,string>={})=>new Response(null,{status:303,headers:{...headers,Location:location,...extra}});
+  if (req.method==='OPTIONS') return origin && origins.has(origin) ? new Response(null,{status:204,headers}) : json({error:'Origin denied'},403);
+  if (origin && !origins.has(origin)) return json({error:'Origin denied'},403);
+  if (route==='/health' && req.method==='GET') {
+    let oauthRuntimeReady=false;
+    if(configured()) { try { oauth(); oauthRuntimeReady=true; } catch {} }
+    return json({service:'studio-social',deployed:true,oauthConfigured:configured(),oauthRuntimeReady,googleClientIdFormatValid:/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(Deno.env.get('GOOGLE_CLIENT_ID') || ''),googleClientIdHasOuterWhitespace:(Deno.env.get('GOOGLE_CLIENT_ID') || '').trim()!==(Deno.env.get('GOOGLE_CLIENT_ID') || ''),googleClientSecretHasCopyFormatting:/[\s"{}]/.test(Deno.env.get('GOOGLE_CLIENT_SECRET') || ''),publishingAvailable:oauthRuntimeReady,maxVideoBytes:MAX_BYTES,chunkBytes:CHUNK_BYTES,callback});
+  }
+  try {
+    if (route==='/youtube/start' && req.method==='POST') {
+      const user=await owner(req);
+      if (!origin || !origins.has(origin)) return json({error:'Origin required'},403);
+      if (!configured()) return json({error:'Google OAuth configuration is incomplete'},503);
+      if (!await db('rpc/studio_oauth_rate','POST',{p_user:user.userId})) return json({error:'Too many linking attempts'},429);
+      const ticket=random(),sessionId=random();
+      // First-party handoff sets the HttpOnly cookie; avoids third-party cookie reliance.
+      await put('ticket',hash(ticket),user.userId,{...user,sessionId},Date.now()+60000);
+      return json({authorizationUrl:`${endpoint}/youtube/authorize?ticket=${encodeURIComponent(ticket)}`});
+    }
+    if (route==='/youtube/authorize' && req.method==='GET') {
+      const ticket=url.searchParams.get('ticket');
+      if (!ticket || ticket.length!==43) return json({error:'Invalid authorization handoff'},400);
+      const pending=await take('ticket',hash(ticket));
+      if (!pending || !await active(pending.userId,pending.authSession)) return json({error:'Authorization handoff expired'},400);
+      if (!configured()) return json({error:'Google OAuth configuration is incomplete'},503);
+      await put('session',hash(pending.sessionId),pending.userId,pending,Date.now()+600000);
+      const result=await oauth().begin({userId:pending.userId,sessionId:pending.sessionId,provider:'youtube'});
+      return redirect(result.authorizationUrl,{'Set-Cookie':cookie(pending.sessionId)});
+    }
+    if (route==='/youtube/callback' && req.method==='GET') {
+      const sessionId=req.headers.get('Cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(cookieName+'='))?.slice(cookieName.length+1);
+      const state=url.searchParams.get('state');
+      if (!sessionId || sessionId.length!==43 || !state || state.length!==43) return json({error:'Invalid or expired authorization'},400);
+      const record=await get('session',hash(sessionId));
+      if (!record || Date.parse(record.expires_at)<=Date.now() || !await active(record.user_id,record.payload.authSession)) return json({error:'Session expired; reconnect from the studio'},400);
+      if (!configured()) return json({error:'Google OAuth configuration is incomplete'},503);
+      const result=await oauth().complete({userId:record.user_id,sessionId,provider:'youtube',state,code:url.searchParams.get('code'),denied:Boolean(url.searchParams.get('error'))});
+      await db(filter('session',hash(sessionId)),'DELETE');
+      // Return only non-sensitive outcome. Studio must independently fetch account list.
+      return redirect(`https://alnuqtamedia.github.io/alnuqta-social-studio/social-accounts.html?youtube=${result.connected?'connected':'declined'}`,{'Set-Cookie':cookie('',0)});
+    }
+    if(route.startsWith('/youtube/uploads/')) {
+      const user=await owner(req);
+      if(req.method==='POST' && (!origin || !origins.has(origin)))return json({error:'Origin required'},403);
+      if(!configured())return json({error:'Google OAuth configuration is incomplete'},503);
+      if(route==='/youtube/uploads/init' && req.method==='POST') {
+        if(!await db('rpc/studio_oauth_rate','POST',{p_user:user.userId}))return json({error:'Too many upload attempts'},429);
+        const input=JSON.parse(new TextDecoder().decode(await boundedBody(req,16384)));
+        return json(await uploads().init({userId:user.userId,input}));
+      }
+      if(route==='/youtube/uploads/chunk' && req.method==='POST') {
+        const raw=req.headers.get('x-upload-offset');
+        if(!raw || !/^[0-9]+$/.test(raw))return json({error:'invalid_upload_chunk'},400);
+        const bytes=await boundedBody(req,CHUNK_BYTES);
+        return json(await uploads().chunk({userId:user.userId,id:url.searchParams.get('id'),offset:Number(raw),bytes}));
+      }
+      if(route==='/youtube/uploads/status' && req.method==='GET')return json(await uploads().status({userId:user.userId,id:url.searchParams.get('id')}));
+      if(route==='/youtube/uploads/history' && req.method==='GET') {
+        const rows=await db(`studio_youtube_uploads?user_id=eq.${user.userId}&select=id,channel_id,status,total_bytes,uploaded_bytes,video_id,actual_privacy,created_at,metadata&order=created_at.desc&limit=20`);
+        return json({uploads:rows.map((r:any)=>({id:r.id,channelId:r.channel_id,title:r.metadata.snippet.title,status:r.status,videoId:r.video_id,privacyStatus:r.actual_privacy,requestedPrivacy:r.metadata.status.privacyStatus,createdAt:r.created_at}))});
+      }
+    }
+    if (route==='/accounts' && req.method==='GET') {
+      const user=await owner(req);
+      const rows=await db(`studio_oauth_records?kind=eq.connection&user_id=eq.${encodeURIComponent(user.userId)}&select=payload`);
+      return json({accounts:rows.map((r:any)=>({provider:r.payload.provider,accountId:r.payload.accountId,name:r.payload.name,connectedAt:r.payload.connectedAt}))});
+    }
+    return json({error:'Route unavailable'},404);
+  } catch (error) {
+    const known = new Set(['Authentication required','Studio access denied','Session is no longer active','Private storage unavailable','Invalid or expired authorization','Offline authorization was not granted','Required YouTube permissions were not granted','A single YouTube channel must be selected','Invalid Google token response','A 32-byte encryption key is required','Account is not connected','Publishing permission is missing','Account reconnection is required','Upload lock expired','Upload request too large','Empty upload request']);
+    const message=error instanceof Error ? error.message : '';
+    const uploadCodes=new Set(['invalid_upload_session','invalid_encryption_key','invalid_upload_id','upload_not_found','upload_busy','invalid_upload_chunk','invalid_upload_progress','missing_video_confirmation','upload_initialization_incomplete','invalid_upload_request','video_too_large','unsupported_video_type','invalid_file_fingerprint','upload_request_conflict','invalid_video_title','invalid_video_description','invalid_video_settings','youtube_channel_mismatch','youtube_quota_exceeded','youtube_reconnect_required','youtube_permission_denied','upload_session_expired','youtube_request_failed']);
+    const reason=uploadCodes.has(message) || known.has(message) || /^Google request failed \(\d{3}\)(: (invalid_client|invalid_grant|unauthorized_client|access_denied|invalid_request))?$/.test(message) ? message : 'Internal account linking error';
+    console.warn(JSON.stringify({event:'studio_oauth_rejected',route,reason}));
+    return json({error:reason},400);
+  }
+}
+if (import.meta.main) Deno.serve(handle);
