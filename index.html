@@ -192,6 +192,9 @@
                     <button onclick="switchTab('yt-assets')" id="tab-btn-yt-assets" class="tab-btn py-2.5 px-3 rounded text-xs font-cairo font-bold bg-navy-card text-gray-300 hover:bg-navy-light transition flex items-center justify-center gap-1.5">
                         <i data-lucide="youtube" class="w-4 h-4"></i> غلاف وصورة القناة
                     </button>
+                    <button onclick="switchTab('news')" id="tab-btn-news" class="tab-btn col-span-2 py-2.5 px-3 rounded text-xs font-cairo font-bold bg-navy-card text-gray-300 hover:bg-navy-light transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="newspaper" class="w-4 h-4"></i> تصميم خبر للنشر (صورة + نص)
+                    </button>
                 </div>
             </div>
 
@@ -357,8 +360,55 @@
                 </button>
             </div>
 
+            <div id="controls-news" class="control-panel hidden flex flex-col gap-3">
+                <h3 class="font-cairo font-bold text-sm text-white flex items-center gap-2"><i data-lucide="newspaper" class="w-4 h-4 text-brandRed"></i> تصميم خبر للنشر</h3>
+                <p class="text-[10px] text-gray-400 font-tajawal leading-relaxed">أعطِ الصورة والخبر، فيصمم الاستوديو البوست بلوغو النقطة والإيميل والحسابات، ويجهز نص النشر. تنزّل الصورة وتنسخ النص وتنشر يدوياً.</p>
+                <label class="text-[11px] font-cairo font-bold text-gray-300">الخبر كاملاً (الصقه هنا)</label>
+                <textarea id="news-body" rows="5" oninput="newsInput()" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white font-tajawal" placeholder="الصق نص الخبر..."></textarea>
+                <button type="button" onclick="newsSuggest()" class="w-full py-1.5 border border-brandRed/60 text-brandRed rounded font-cairo font-bold text-[11px]">اقتراح العنوان والملخص من الخبر</button>
+                <label class="text-[11px] font-cairo font-bold text-gray-300">العنوان على الصورة</label>
+                <input id="news-headline" oninput="newsInput()" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white font-cairo font-bold" placeholder="عنوان قصير وقوي">
+                <label class="text-[11px] font-cairo font-bold text-gray-300">سطر تفصيلي تحت العنوان (اختياري)</label>
+                <textarea id="news-summary" rows="2" oninput="newsInput()" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white font-tajawal"></textarea>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-[11px] font-cairo font-bold text-gray-300">الشارة</label>
+                        <select id="news-badge" onchange="newsInput()" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white font-cairo"><option>خبر</option><option>عاجل</option><option>حصري</option><option>تحقيق</option><option>تقرير</option><option>بلا شارة</option></select></div>
+                    <div><label class="text-[11px] font-cairo font-bold text-gray-300">القياس</label>
+                        <select id="news-format" onchange="newsInput()" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white font-cairo"><option value="feed">منشور 4:5</option><option value="square">مربع 1:1</option><option value="story">ستوري 9:16</option></select></div>
+                </div>
+                <label class="text-[11px] font-cairo font-bold text-gray-300">الصورة</label>
+                <input id="news-file" type="file" accept="image/*" onchange="newsFile(this.files[0])" class="w-full text-[11px] text-gray-300">
+                <div class="flex gap-2"><input id="news-url" class="flex-1 bg-navy-card border border-navy-light rounded p-2 text-[11px] text-white" dir="ltr" placeholder="أو رابط صورة https://..."><button type="button" onclick="newsUrl()" class="px-3 bg-navy-light rounded text-[11px] font-cairo">تحميل</button></div>
+                <p class="text-[10px] text-gray-500 font-tajawal">يمكنك أيضاً لصق صورة بـ Ctrl+V وهذا التبويب مفتوح.</p>
+                <div class="grid grid-cols-3 gap-2 text-[10px] text-gray-400 font-cairo">
+                    <label>تكبير<input id="news-zoom" type="range" min="1" max="3" step="0.05" value="1" oninput="newsInput()" class="w-full"></label>
+                    <label>أفقي<input id="news-px" type="range" min="-1" max="1" step="0.05" value="0" oninput="newsInput()" class="w-full"></label>
+                    <label>عمودي<input id="news-py" type="range" min="-1" max="1" step="0.05" value="0" oninput="newsInput()" class="w-full"></label>
+                </div>
+                <label class="text-[11px] font-cairo font-bold text-gray-300">مصدر الصورة (اختياري)</label>
+                <input id="news-credit" oninput="newsInput()" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white font-tajawal" placeholder="مثال: عدسة فلان / وكالة ...">
+                <details class="border border-navy-light rounded p-2"><summary class="text-[11px] font-cairo font-bold text-gray-300 cursor-pointer">هوية النقطة (تُحفظ مرة واحدة)</summary>
+                    <div class="flex flex-col gap-2 mt-2">
+                        <input id="news-email" oninput="newsBrandSave()" dir="ltr" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white" placeholder="إيميل النقطة">
+                        <input id="news-handle" oninput="newsBrandSave()" dir="ltr" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white" placeholder="@ALNUQTAMEDIA">
+                        <input id="news-site" oninput="newsBrandSave()" dir="ltr" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white" placeholder="الموقع (اختياري)">
+                        <input id="news-hashtags" oninput="newsBrandSave()" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white" placeholder="#النقطة #العراق">
+                        <label class="text-[10px] text-gray-400 font-cairo">اللوجو الرسمي (PNG) — إن لم ترفعه يُرسم لوجو افتراضي</label>
+                        <input id="news-logo" type="file" accept="image/*" onchange="newsLogo(this.files[0])" class="w-full text-[11px] text-gray-300">
+                        <button type="button" onclick="newsLogoClear()" class="text-[10px] text-gray-400 underline text-right">إزالة اللوجو المرفوع</button>
+                    </div></details>
+                <label class="text-[11px] font-cairo font-bold text-gray-300">نص النشر (انسخه مع الصورة)</label>
+                <textarea id="news-caption" rows="7" oninput="newsCaptionDirty=true" class="w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white font-tajawal"></textarea>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="newsCopyCaption()" class="py-2 border border-navy-light rounded font-cairo font-bold text-[11px]">نسخ نص النشر</button>
+                    <button type="button" onclick="newsCaptionDirty=false;newsInput()" class="py-2 border border-navy-light rounded font-cairo font-bold text-[11px]">إعادة توليد النص</button>
+                </div>
+                <button type="button" onclick="newsDownload()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-sm shadow-lg">تنزيل صورة الخبر (PNG)</button>
+                <p id="news-status" class="text-[10px] text-gray-400 font-tajawal"></p>
+            </div>
+
             <!-- Single Export Button -->
-            <div class="mt-auto border-t border-navy-light pt-4">
+            <div id="single-export-wrap" class="mt-auto border-t border-navy-light pt-4">
                 <button onclick="exportSingleDesign()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-brandRed/20 transition duration-200">
                     <i data-lucide="download" class="w-4 h-4"></i> تصدير التصميم الحالي (PNG)
                 </button>
@@ -375,6 +425,7 @@
             </div>
 
             <!-- Dynamic Target Container -->
+            <div id="news-preview-wrap" class="hidden items-center justify-center"><canvas id="news-canvas" width="1080" height="1350" style="max-width:100%;max-height:78vh;width:auto;height:auto;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5)"></canvas></div>
             <div id="preview-wrapper" class="flex items-center justify-center shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300">
                 <!-- HTML Content populated dynamically by renderCanvas() -->
                 <div id="export-target" class="bg-navy text-white relative flex flex-col justify-between box-border overflow-hidden select-none">
@@ -1147,6 +1198,11 @@
             document.querySelectorAll('.control-panel').forEach(p => p.classList.add('hidden'));
             const ctrl = document.getElementById(`controls-${tab}`);
             if (ctrl) ctrl.classList.remove('hidden');
+            const isNews=tab==='news';
+            document.getElementById('preview-wrapper')?.classList.toggle('hidden',isNews);
+            const nw=document.getElementById('news-preview-wrap');if(nw){nw.classList.toggle('hidden',!isNews);nw.classList.toggle('flex',isNews)}
+            document.getElementById('single-export-wrap')?.classList.toggle('hidden',isNews);
+            if(isNews&&typeof newsInit==='function')newsInit();
 
             renderCanvas();
         }
@@ -1357,6 +1413,7 @@
         }
 
         function renderCanvas() {
+            if(activeTab==='news'){renderNewsPost();return;}
             const target = document.getElementById('export-target');
             const wrapper = document.getElementById('preview-wrapper');
             if (!target || !wrapper) return;
@@ -1870,7 +1927,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-07-formal-export-r6';
+        const STUDIO_BUILD='2026-10-09-news-post-r7';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2371,6 +2428,97 @@
             }
         }
     </script>
+<script>
+/* ===== تصميم خبر للنشر: يرسم البوست مباشرة على Canvas (بدون html2canvas) ===== */
+const NEWS_SIZES={feed:[1080,1350],square:[1080,1080],story:[1080,1920]};
+const NEWS_KEY='alnuqta-news-brand-v1';
+let newsImg=null,newsLogoImg=null,newsLogoData='',newsCaptionDirty=false,newsReady=false,newsFontsAsked=false;
+const $n=id=>document.getElementById(id);
+function newsStatus(t){const e=$n('news-status');if(e)e.textContent=t||''}
+function newsInit(){
+    if(!newsReady){newsReady=true;
+        try{const b=JSON.parse(localStorage.getItem(NEWS_KEY)||'{}');$n('news-email').value=b.email||'';$n('news-handle').value=b.handle||'@ALNUQTAMEDIA';$n('news-site').value=b.site||'';$n('news-hashtags').value=b.hashtags||'#النقطة #العراق';
+            if(b.logo){newsLogoData=b.logo;const im=new Image();im.onload=()=>{newsLogoImg=im;renderNewsPost()};im.src=b.logo}}
+        catch{$n('news-handle').value='@ALNUQTAMEDIA';$n('news-hashtags').value='#النقطة #العراق'}
+        document.addEventListener('paste',e=>{if(activeTab!=='news')return;const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith('image/'));if(f){e.preventDefault();newsFile(f)}});
+    }
+    if(!newsFontsAsked&&document.fonts){newsFontsAsked=true;Promise.race([Promise.all([document.fonts.load('900 40px Cairo'),document.fonts.load('700 30px Tajawal')]),new Promise(r=>setTimeout(r,4000))]).then(()=>renderNewsPost()).catch(()=>{})}
+}
+function newsBrandSave(){try{localStorage.setItem(NEWS_KEY,JSON.stringify({email:$n('news-email').value,handle:$n('news-handle').value,site:$n('news-site').value,hashtags:$n('news-hashtags').value,logo:newsLogoData}))}catch{newsStatus('تعذر حفظ الهوية دائمياً في هذا المتصفح.')}newsInput()}
+function newsInput(){if(!newsCaptionDirty)$n('news-caption').value=newsCaption();renderNewsPost()}
+function loadImgFromBlob(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{URL.revokeObjectURL(u);res(im)};im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('ملف الصورة غير صالح'))};im.src=u})}
+async function newsFile(file){if(!file)return;try{newsImg=await loadImgFromBlob(file);newsStatus('تم تحميل الصورة.');renderNewsPost()}catch(e){newsStatus(e.message)}}
+function newsUrl(){const url=$n('news-url').value.trim();if(!/^https?:\/\//i.test(url))return newsStatus('أدخل رابطاً يبدأ بـ https://');const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{newsImg=im;newsStatus('تم تحميل الصورة من الرابط.');renderNewsPost()};im.onerror=()=>newsStatus('الموقع يمنع استخدام الصورة مباشرة. نزّلها على جهازك ثم ارفعها بزر اختيار الملف.');im.src=url}
+async function newsLogo(file){if(!file)return;try{const im=await loadImgFromBlob(file),c=document.createElement('canvas'),k=Math.min(1,320/Math.max(im.width,im.height));c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);newsLogoData=c.toDataURL('image/png');newsLogoImg=im;newsBrandSave();newsStatus('تم حفظ اللوجو.')}catch(e){newsStatus(e.message)}}
+function newsLogoClear(){newsLogoImg=null;newsLogoData='';newsBrandSave()}
+function newsSuggest(){
+    const body=$n('news-body').value.trim();if(!body)return newsStatus('الصق نص الخبر أولاً.');
+    const sents=body.split(/(?<=[.!؟?])\s+|\n+/).map(x=>x.trim()).filter(Boolean),words=t=>t.split(/\s+/).filter(Boolean);
+    const stop=new Set(['في','من','إلى','الى','على','عن','و','أن','إن','بعد','قبل','مع','حتى','ثم','أو','التي','الذي','بين','عند','خلال']);
+    const clip=(t,max)=>{let w=words(t.replace(/[.؟!]+$/,''));if(w.length<=max)return w.join(' ');const comma=words(t).findIndex((x,i)=>/[،,:؛]$/.test(x)&&i>=5&&i<max);if(comma>0)w=w.slice(0,comma+1);else w=w.slice(0,max);while(w.length>4&&stop.has(w[w.length-1].replace(/[،,:؛]/g,'')))w.pop();return w.join(' ').replace(/[،,:؛]+$/,'')};
+    const head=clip(sents[0]||'',13);let sum=[],n=0;
+    for(const x of sents.slice(1)){const w=words(x).length;if(n+w>26)break;sum.push(x);n+=w}
+    if(!sum.length&&sents[1])sum=[clip(sents[1],24)];
+    $n('news-headline').value=head;$n('news-summary').value=sum.join(' ');newsCaptionDirty=false;newsInput();newsStatus('اقتراح تلقائي من نص الخبر، عدّله كما تريد.');
+}
+function newsCaption(){
+    const badge=$n('news-badge').value,head=$n('news-headline').value.trim(),sum=$n('news-summary').value.trim(),body=$n('news-body').value.trim(),credit=$n('news-credit').value.trim(),email=$n('news-email').value.trim(),site=$n('news-site').value.trim(),handle=$n('news-handle').value.trim(),tags=$n('news-hashtags').value.trim();
+    const text=body||sum;const parts=[];
+    parts.push((badge&&badge!=='بلا شارة'?badge+' | ':'')+head);
+    if(text)parts.push(text.length>600?text.slice(0,600).replace(/\s+\S*$/,'')+'…':text);
+    if(credit)parts.push('الصورة: '+credit);
+    const contact=[email&&'📩 '+email,site&&'🌐 '+site,handle&&handle].filter(Boolean).join('\n');if(contact)parts.push(contact);
+    if(tags)parts.push(tags);
+    return parts.filter(Boolean).join('\n\n');
+}
+async function newsCopyCaption(){try{await navigator.clipboard.writeText($n('news-caption').value);newsStatus('تم نسخ نص النشر.')}catch{$n('news-caption').select();newsStatus('انسخ النص يدوياً (Ctrl+C).')}}
+function newsWrap(x,text,maxW){const lines=[];let line='';for(const w of String(text||'').split(/\s+/).filter(Boolean)){const t=line?line+' '+w:w;if(x.measureText(t).width>maxW&&line){lines.push(line);line=w}else line=t}if(line)lines.push(line);return lines}
+function newsLimit(x,lines,max,maxW){if(lines.length<=max)return lines;const out=lines.slice(0,max);let l=out[max-1];while(l&&x.measureText(l+'…').width>maxW)l=l.replace(/\s*\S+$/,'');out[max-1]=l+'…';return out}
+function renderNewsPost(){
+    const cv=$n('news-canvas');if(!cv)return;const [W,H]=NEWS_SIZES[$n('news-format').value]||NEWS_SIZES.feed;
+    if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+    const x=cv.getContext('2d'),F='Cairo, Tajawal, Arial, sans-serif',story=H>1500,square=H===W;
+    x.clearRect(0,0,W,H);x.direction='rtl';x.textBaseline='alphabetic';
+    // الخلفية والصورة
+    const bg=x.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#071220');bg.addColorStop(.6,'#102a46');bg.addColorStop(1,'#050a10');x.fillStyle=bg;x.fillRect(0,0,W,H);
+    if(newsImg){const z=Number($n('news-zoom').value)||1,px=Number($n('news-px').value)||0,py=Number($n('news-py').value)||0,s=Math.max(W/newsImg.width,H/newsImg.height)*z,dw=newsImg.width*s,dh=newsImg.height*s;x.drawImage(newsImg,(W-dw)/2+px*(dw-W)/2,(H-dh)/2+py*(dh-H)/2,dw,dh)}
+    // مقاسات
+    const M=60,R=W-M,fh=story?150:128,top=x.createLinearGradient(0,0,0,H*.2);top.addColorStop(0,'rgba(0,0,0,.7)');top.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=top;x.fillRect(0,0,W,H*.2);
+    // تخطيط النص من الأسفل
+    const textMaxW=W-2*M-34,maxHead=story?6:(square?3:4),maxSum=story?5:(square?2:3);
+    const head=$n('news-headline').value.trim()||'اكتب عنوان الخبر هنا',sum=$n('news-summary').value.trim(),credit=$n('news-credit').value.trim(),badge=$n('news-badge').value;
+    let hs=Math.round(W*.085),hl;for(;hs>=42;hs-=3){x.font='900 '+hs+'px '+F;hl=newsWrap(x,head,textMaxW);if(hl.length<=maxHead)break}hl=newsLimit(x,hl,maxHead,textMaxW);
+    const ss=Math.round(W*.034);x.font='500 '+ss+'px '+F;const sl=sum?newsLimit(x,newsWrap(x,sum,textMaxW),maxSum,textMaxW):[];
+    const hLH=hs*1.32,sLH=ss*1.65,badgeH=badge&&badge!=='بلا شارة'?58:0,gap=sl.length?22:0,creditH=credit?44:0;
+    const blockH=badgeH+(badgeH?22:0)+hl.length*hLH+gap+sl.length*sLH,bottom=H-fh-34-creditH,blockTop=bottom-blockH;
+    const fade=x.createLinearGradient(0,blockTop-H*.16,0,H-fh);fade.addColorStop(0,'rgba(0,0,0,0)');fade.addColorStop(.45,'rgba(3,10,20,.82)');fade.addColorStop(1,'rgba(3,10,20,.97)');x.fillStyle=fade;x.fillRect(0,blockTop-H*.16,W,H-fh-(blockTop-H*.16));
+    let y=blockTop;
+    if(badgeH){x.font='900 30px '+F;const bw=x.measureText(badge).width+56;x.fillStyle='#E31217';x.beginPath();x.roundRect(R-bw,y,bw,badgeH,12);x.fill();x.fillStyle='#fff';x.textAlign='center';x.fillText(badge,R-bw/2,y+39);y+=badgeH+22}
+    // شريط أحمر جانبي + العنوان
+    x.fillStyle='#E31217';x.fillRect(R-10,y+8,10,hl.length*hLH-hs*.18+(sl.length?gap+sl.length*sLH:0));
+    x.textAlign='right';x.fillStyle='#fff';x.font='900 '+hs+'px '+F;x.shadowColor='rgba(0,0,0,.55)';x.shadowBlur=14;hl.forEach(l=>{y+=hLH;x.fillText(l,R-34,y-hs*.22)});x.shadowBlur=0;
+    if(sl.length){y+=gap;x.fillStyle='#e5e7eb';x.font='500 '+ss+'px '+F;sl.forEach(l=>{y+=sLH;x.fillText(l,R-34,y-ss*.3)})}
+    if(credit){x.fillStyle='rgba(255,255,255,.65)';x.font='500 24px '+F;x.textAlign='right';x.fillText('الصورة: '+credit,R,H-fh-18)}
+    // الترويسة: لوجو + تاريخ
+    if(newsLogoImg){const lh=84,lw=newsLogoImg.width/newsLogoImg.height*lh;x.drawImage(newsLogoImg,R-lw,M-10,lw,lh)}
+    else{x.fillStyle='#E31217';x.beginPath();x.arc(R-36,M+26,36,0,Math.PI*2);x.fill();x.fillStyle='#fff';x.font='900 56px '+F;x.textAlign='center';x.fillText('.',R-36,M+48);x.textAlign='right';x.font='900 40px '+F;x.fillStyle='#fff';const nw=x.measureText('النقطة ').width;x.fillText('النقطة',R-86,M+40);x.fillStyle='#E31217';x.fillText('Media',R-86-nw-6,M+40)}
+    x.textAlign='left';x.fillStyle='rgba(255,255,255,.85)';x.font='700 26px '+F;x.fillText(new Date().toLocaleDateString('ar-IQ',{day:'numeric',month:'long',year:'numeric'}),M,M+36);
+    // الشريط السفلي: إيميل + حسابات
+    const fy=H-fh;x.fillStyle='#071220';x.fillRect(0,fy,W,fh);x.fillStyle='#E31217';x.fillRect(0,fy,W,6);
+    const handle=$n('news-handle').value.trim(),email=$n('news-email').value.trim(),site=$n('news-site').value.trim();
+    x.direction='ltr';x.textAlign='right';x.fillStyle='#fff';x.font='700 30px '+F;const lines=[email&&'✉  '+email,site&&'🌐 '+site].filter(Boolean);
+    if(lines.length===1)x.fillText(lines[0],R,fy+fh/2+11);else lines.forEach((l,i)=>x.fillText(l,R,fy+fh/2-4+i*40));
+    const ic=['f','IG','X','▶','♪'],d=52;let cx=M+d/2;x.textAlign='center';
+    ic.forEach(g=>{x.fillStyle='#E31217';x.beginPath();x.arc(cx,fy+fh/2-(handle?14:0),d/2,0,Math.PI*2);x.fill();x.fillStyle='#fff';x.font='900 '+(g.length>1?20:26)+'px Arial, sans-serif';x.fillText(g,cx,fy+fh/2-(handle?14:0)+9);cx+=d+14});
+    if(handle){x.textAlign='left';x.fillStyle='#fff';x.font='800 28px '+F;x.fillText(handle,M,fy+fh/2+46)}
+    x.direction='rtl';
+}
+function newsDownload(){
+    renderNewsPost();const cv=$n('news-canvas');
+    try{cv.toBlob(b=>{if(!b)return newsStatus('تعذر إنشاء الصورة.');const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='alnuqta-news-'+Date.now()+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);newsStatus('تم تنزيل الصورة. انسخ نص النشر وانشرهما.')},'image/png')}
+    catch(e){newsStatus('الصورة المحمّلة من رابط خارجي تمنع التنزيل. نزّلها وارفعها من جهازك ثم أعد المحاولة.')}
+}
+</script>
 </body>
 </html>
 
