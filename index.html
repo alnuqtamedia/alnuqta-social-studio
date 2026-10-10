@@ -1807,16 +1807,24 @@
             }
         }
 
+        function narrationNumbers(text){
+            return (String(text).normalize('NFKC').replace(/[٠-٩۰-۹]/g,char=>{
+                const code=char.charCodeAt(0);return String(code>1775?code-1776:code-1632);
+            }).replace(/٫/g,'.').replace(/٬/g,',').match(/[0-9]+(?:[.,][0-9]+)*/g)||[]);
+        }
+
         async function prepareFormalNarration(slides){
             const current=slides.map((s,index)=>({index,voiceover:String(s.voiceover||'')}));
             setAIStatus('جاري تدقيق التعليق وصياغته بالفصحى قبل توليد الصوت…','busy');
-            const response=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:'حوّل التعليق الصوتي الحالي إلى العربية الفصحى فقط. أعد فيديو بنفس عدد المشاهد وترتيبها، واحتفظ بالمشاهد الصامتة. ضع النص في voiceover لكل مشهد. '+STUDIO_EDITORIAL_RULES,currentContent:{...getCurrentStudioContent(),narrationScenes:current}})});
+            const response=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:'حوّل التعليق الصوتي الحالي إلى العربية الفصحى فقط. أعد فيديو بنفس عدد المشاهد وترتيبها، واحتفظ بالمشاهد الصامتة. حافظ على كل رقم وقيمته وموقعه في المشهد نفسه، ولا تحوّل الأرقام إلى كلمات. ضع النص في voiceover لكل مشهد. '+STUDIO_EDITORIAL_RULES,currentContent:{...getCurrentStudioContent(),narrationScenes:current}})});
             const result=await response.json();if(!response.ok)throw new Error(result.error||'تعذر تدقيق التعليق');
             if(!Array.isArray(result.slides)||result.slides.length!==slides.length)throw new Error('عدد المشاهد لا يطابق الأصل؛ النص السابق محفوظ');
             const texts=result.slides.map(s=>String(s.voiceover||'').trim());
             if(texts.some((text,i)=>Boolean(text)!==Boolean(current[i].voiceover.trim())))throw new Error('تغيرت المشاهد الصامتة؛ النص السابق محفوظ');
-            const numbers=text=>String(text).match(/[0-9٠-٩]+(?:[.,٫][0-9٠-٩]+)*/g)||[];
-            if(JSON.stringify(numbers(texts.join(' ')))!==JSON.stringify(numbers(current.map(s=>s.voiceover).join(' '))))throw new Error('تغيّرت أرقام التعليق؛ راجع النص قبل توليد الصوت');
+            if(texts.some((text,i)=>JSON.stringify(narrationNumbers(text))!==JSON.stringify(narrationNumbers(current[i].voiceover)))){
+                setAIStatus('تدقيق الفصحى غيّر الأرقام؛ يجري توليد الصوت من النص الأصلي المحفوظ.','busy');
+                return;
+            }
             texts.forEach((text,i)=>{slides[i].voiceover=text});updateTikTokInputs();
         }
 
