@@ -13,8 +13,8 @@ async function loadSource(input){const file=input.files?.[0];if(!file)return;if(
  let text='';if(/\.pdf$/i.test(file.name)||file.type==='application/pdf'){
   // Pinned local PDF.js assets; worker and extraction stay on this device.
   const pdfjs=await import('./pdfjs/pdf.mjs');pdfjs.GlobalWorkerOptions.workerSrc=new URL('./pdfjs/pdf.worker.mjs',new URL('public/studio-production.js',document.baseURI)).href;
-  const doc=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
-  try{if(doc.numPages>80)throw Error('حد PDF هو 80 صفحة.');for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i),v=await p.getTextContent();text+=`\n\n[صفحة ${i}]\n`+v.items.map(x=>String(x.str||'')+(x.hasEOL?'\n':' ')).join('');if(text.length>40000)throw Error('حد النص 40 ألف حرف.');}}finally{await doc.destroy();}
+  const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});const doc=await task.promise;
+  try{if(doc.numPages>80)throw Error('حد PDF هو 80 صفحة.');for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i),v=await p.getTextContent();text+=`\n\n[صفحة ${i}]\n`+v.items.map(x=>String(x.str||'')+(x.hasEOL?'\n':' ')).join('');if(text.length>40000)throw Error('حد النص 40 ألف حرف.');}}finally{await task.destroy();}
  }else if(/\.(txt|md)$/i.test(file.name))text=await file.text();else throw Error('استخدم PDF نصّي أو TXT أو Markdown.');
  if(!text.replace(/\[صفحة \d+\]/g,'').trim())throw Error('PDF بلا نص قابل للقراءة؛ OCR غير متاح.');if(text.length>40000)throw Error('حد النص 40 ألف حرف.');
  studioSourceText=text;studioSourceName=file.name;$('studio-source-text').value=text;$('studio-source-status').textContent=`استُخرج النص من ${file.name}؛ راجعه قبل إرسال النص إلى Gemini.`;
