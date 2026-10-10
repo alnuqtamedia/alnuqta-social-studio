@@ -49,8 +49,12 @@ const forbiddenBrowserPatterns = [
 ];
 for (const [pattern, label] of forbiddenBrowserPatterns) if (pattern.test(html)) throw new Error(`${label} must not appear in the browser application.`);
 
-for (const obsolete of ['wrangler.json', 'netlify.toml', 'netlify', 'api', 'src/cloudflare-worker.js']) {
+for (const obsolete of ['wrangler.json', 'netlify', 'api', 'src/cloudflare-worker.js']) {
   if (fs.existsSync(path.join(root, obsolete))) throw new Error(`Obsolete deployment path still exists: ${obsolete}`);
+}
+if(fs.existsSync(path.join(root,'netlify.toml'))){
+  const config=fs.readFileSync(path.join(root,'netlify.toml'),'utf8');
+  if(!/command\s*=\s*"npm run build"/.test(config)||!/publish\s*=\s*"dist"/.test(config)||/\[functions\]|GEMINI_API_KEY|command\s*=\s*"\."/.test(config))throw new Error('Netlify must build and publish only the static dist bundle without legacy API functions.');
 }
 
 const trackedTextFiles = ['index.html', 'README.md', 'docs/security-status.md', 'package.json', 'package-lock.json'];
