@@ -78,3 +78,19 @@ python3 -m http.server 8000 --directory dist
 كل مشهد المعرّف والعنوان والتعليق والترجمة والأصل البصري والمصدر والنوع والمدة
 والحركة والانتقال وملاحظات المحرر. تبقى `edge-tts` مؤجلة لأنها تحتاج خدمة Node
 مستمرة ولا تعمل كجزء من GitHub Pages أو Cloudflare Worker بسيط.
+
+
+## Production preview — 2026-10-10
+
+Development branch: `dev/studio-production-20261010`. Rollback baseline: `backup/studio-before-production-20261010` at `c41e6d0`. Main and the live Pages release are not replaced by this preview.
+
+- Text PDF extraction uses pinned, local PDF.js (15MB / 80 pages / 40,000 characters); scanned PDFs require a text copy. Only extracted text is sent to the existing Gemini provider when executing.
+- Microphone recording is opt-in, capped at 90 seconds / 4MB, sent inline to Gemini for transcription. The resulting command must be reviewed and executed separately.
+- Pexels assets retain author, source and license links. Selection is heuristic, not a guarantee of editorial suitability or release rights. Generic stock is marked illustrative; no Google Images scraping.
+- Narration groups neighbouring scenes into paragraphs; paragraph boundaries are measured, scene boundaries within paragraphs are estimates. Overlong speech is rejected, never clipped or accelerated. Existing human narration is retained.
+- Rendering runs on the device, with real video when available, cuts/fades, portrait/landscape and existing logo/contact fields. Keep the tab visible. Default is 720p; 1080p and long projects use more memory. Tested-duration scope is 5–600 seconds, not unlimited. MP4 is browser-dependent; otherwise the output is correctly labelled WebM.
+- Saved projects remain in the existing local database. New project requires confirmation and does not erase saved snapshots. No automatic permanent media/report storage is added.
+- Preview functions are separate from live functions, JWT checked and share existing per-hour rate limits. Gemini/Pexels quotas may prevent generation; no billing is enabled and no unlimited free generation is promised.
+
+### Release gate
+Run `npm ci && npm test`, then verify in a real browser: PDF → command → assets → paragraph audio → 45-second vertical export and 120-second landscape export; listen through, inspect media provenance and logo, measure exported duration, cancel during generation/export, and save/restore/new-project. Passing static tests does not prove browser audio/render quality. Release only after these checks and owner review of the preview.
