@@ -1417,7 +1417,12 @@
                 const slide = slides[currentSlideIndex];
                 const totalSlides = slides.length;
 
+                const photo=getSceneMedia(slide).find(item=>item.kind!=='video');
+                const photoUrl=photo?.preview||photo?.url||'';
+                target.style.backgroundImage=photoUrl?`linear-gradient(rgba(7,18,32,.78),rgba(7,18,32,.9)), url(${JSON.stringify(photoUrl)})`:'';
+                target.style.backgroundSize='cover';target.style.backgroundPosition='center';
                 target.innerHTML = buildSlideHTML(slide, currentSlideIndex + 1, totalSlides);
+                if(photo){const credit=document.createElement('div');credit.className='text-[8px] text-gray-300 font-tajawal text-center mt-1';credit.textContent=(photo.illustrative?'صورة توضيحية · ':'')+(photo.credit||photo.author||'');target.appendChild(credit);}
             } 
             else if (activeTab === 'tiktok') {
                 wrapper.className = 'preview-carousel shadow-2xl rounded-xl overflow-hidden border border-navy-light/60 transition-all duration-300';
