@@ -1572,6 +1572,10 @@
         }
 
         function buildSlideHTML(slide, slideNum, totalSlides) {
+            if(slide.type==='content'||slide.type==='verdict'){
+                const points=(slide.points||[]).filter(p=>String(p||'').trim());
+                slide={...slide,header:slide.header||slide.title||'',points:points.length?points:[slide.subtitle||slide.voiceover||''].filter(Boolean)};
+            }
             const headerHTML = `
                 <div class="flex items-center justify-between border-b border-navy-light/50 pb-3 w-full">
                     <div class="flex items-center gap-2">
