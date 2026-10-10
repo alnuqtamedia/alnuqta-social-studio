@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-pages.mjs",
-    "test": "node scripts/validate-studio.mjs && node scripts/test-export-timing.mjs && node scripts/test-production-core.mjs && npm run build && node scripts/inspect-pages-bundle.mjs"
+    "test": "node scripts/validate-studio.mjs && node scripts/test-export-timing.mjs && node scripts/test-production-core.mjs && node scripts/test-production-controller.mjs && npm run build && node scripts/inspect-pages-bundle.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.4.299"
