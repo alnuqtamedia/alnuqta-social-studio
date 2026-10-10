@@ -1405,6 +1405,7 @@
             const target = document.getElementById('export-target');
             const wrapper = document.getElementById('preview-wrapper');
             if (!target || !wrapper) return;
+            target.style.backgroundImage='';
 
             if (activeTab === 'carousel') {
                 const presentationMode=activeTopic==='customScript'&&activeGeneratedOutputType==='slides';
