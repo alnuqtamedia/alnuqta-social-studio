@@ -1,3 +1,4 @@
+import {extractText} from '../backend/_shared/gemini-output.mjs';
 import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
 const ctx=vm.createContext({URL});vm.runInContext(fs.readFileSync('public/production-core.js','utf8'),ctx);const C=ctx.StudioProductionCore;
 const slides=Array.from({length:8},(_,i)=>({voiceover:`فقرة رقم ${i} من مادة اختبار طويلة للتأكد من توزيع الصوت على المشاهد بشكل طبيعي`}));
@@ -8,3 +9,5 @@ const good={id:1,type:'video',mediaUrl:'https://videos.pexels.com/a.mp4',pageUrl
 for(const name of ['public/studio-production.js','public/production-core.js'])new vm.Script(fs.readFileSync(name,'utf8'));
 const js=fs.readFileSync('public/studio-production.js','utf8');assert(!/https?:[^\s]+(?:run\.app|pollinations)|API\+[^;]*studio-render/i.test(js));assert(js.includes('state.abort?.abort()'));assert(js.includes('لن تُحذف'));assert(js.includes('await doc.destroy()'));assert(!js.includes('playbackRate='));assert(js.includes('store=>')===false);
 console.log('Production checks passed: paragraph grouping, exact timeline totals, no speech clipping, approved media provenance, no duplicate media, orientations, syntax, cancellation and local-only render.');
+
+const json='{}';assert.equal(extractText({outputs:[{text:json}],steps:[{type:'model_output',content:[{text:json}]}]}),json);assert.equal(extractText({steps:[{type:'model_output',content:[{text:'old'}]},{type:'model_output',content:[{text:json}]}]}),json);

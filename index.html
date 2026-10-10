@@ -281,7 +281,7 @@
                 </div>
                 <button id="ai-tts-btn" onclick="generateAIVoiceover()" class="w-full py-2.5 bg-navy border border-brandRed/60 hover:bg-brandRed text-white rounded font-cairo font-bold text-xs">مطابقة المدة وتوليد التعليق الصوتي</button>
                 <audio id="ai-tts-preview" controls controlslist="nodownload" aria-label="معاينة التعليق الصوتي فقط" class="hidden w-full"></audio>
-                <p class="text-[10px] text-gray-400 font-tajawal">المشغّل أعلاه للصوت فقط. تنزيل الفيديو يكون من زر «تحميل الفيديو MP4»؛ ينزل الملف تلقائياً بعد تكوينه.</p>
+                <p class="text-[10px] text-gray-400 font-tajawal">المشغّل أعلاه للصوت فقط. تنزيل الفيديو يكون من زر «تصدير الفيديو (MP4 أو WebM)»؛ ينزل الملف تلقائياً بعد تكوينه.</p>
                 <div class="border border-navy-light rounded-lg p-3 bg-navy-card/50 space-y-2">
                     <div class="flex items-center justify-between gap-2">
                         <div><h4 class="font-cairo font-black text-xs text-white">تسجيل صوت بشري — اختياري</h4><p class="text-[10px] text-gray-400 font-tajawal">Gemini هو المصدر الأساسي. يمكنك تسجيل تعليق واحد متصل بالمايك واختياره بدلاً منه.</p></div>
@@ -297,10 +297,10 @@
                     <audio id="human-record-preview" controls class="hidden w-full"></audio>
                 </div>
                 <button id="export-video-btn" onclick="exportVerticalVideo()" class="w-full py-3 bg-brandRed hover:bg-brandRed-hover text-white rounded font-cairo font-black text-xs flex items-center justify-center gap-2 transition shadow-lg">
-                    <i data-lucide="film" class="w-4 h-4"></i> تحميل الفيديو MP4
+                    <i data-lucide="film" class="w-4 h-4"></i> تصدير الفيديو (MP4 أو WebM)
                 </button>
                 <button type="button" onclick="copyExportDiagnostics()" class="w-full py-1.5 border border-navy-light text-gray-400 hover:text-white rounded font-tajawal text-[10px]">نسخ تقرير تشخيص التصدير</button>
-                <p class="text-[10px] text-gray-500 font-tajawal">تصدير الفيديو بصيغة MP4 مع الصوت. تنزيل التعليق من مشغّل الصوت يعطي ملف صوت فقط.</p>
+                <p class="text-[10px] text-gray-500 font-tajawal">صيغة الفيديو تعتمد على دعم المتصفح؛ افحص الملف المصدّر مع الصوت قبل النشر.</p>
                 <p id="social-status" role="status" class="hidden" data-studio-version="20261007-r7"></p>
 
                 <div class="border border-brandRed/30 rounded-lg p-3 bg-navy-card/50"><h4 class="font-cairo font-black text-xs text-white mb-2">المساعد البصري للمادة</h4><p class="text-[10px] text-gray-400 font-tajawal mb-2">يحلل المشاهد ويحدد احتياج الصورة وB-roll لكل مشهد.</p><button onclick="prepareVisualPlan()" class="w-full py-2 bg-navy border border-brandRed/60 hover:bg-brandRed rounded text-xs font-cairo font-bold">جهّز المادة بصرياً</button><div id="visual-plan-status" class="text-[10px] text-gray-400 mt-2"></div></div>
@@ -421,7 +421,7 @@
             
             <div class="mb-4 text-xs font-cairo font-semibold text-gray-400 flex items-center gap-2 bg-navy/80 border border-navy-light px-4 py-1.5 rounded-full">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>المعاينة المباشرة دقيقة 100% ومطابقة للتصدير النهائية</span>
+                <span>معاينة التصميم؛ راجع الفيديو النهائي بعد التصدير.</span>
             </div>
 
             <!-- Dynamic Target Container -->
@@ -2172,7 +2172,7 @@
                 }
                 if(audioEl && !audioEl.ended){await new Promise(resolve=>{const remain=Math.max(0,(audioEl.duration-audioEl.currentTime)*1000);const timer=setTimeout(resolve,remain+250);audioEl.addEventListener('ended',()=>{clearTimeout(timer);resolve()},{once:true});});}
                 recorder.stop(); await done; const ext=mimeType.startsWith('video/mp4')?'mp4':'webm'; const blob=new Blob(chunks,{type:mimeType}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`alnuqta-video-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
-                setAIStatus(ext==='mp4'?'تم تحميل الفيديو MP4 فعلي.':'تم تصدير فيديو WebM فعلي لأن متصفحك لا يدعم تسجيل MP4 مباشرة.','success');
+                setAIStatus(ext==='mp4'?'تم تصدير الفيديو (MP4 أو WebM) فعلي.':'تم تصدير فيديو WebM فعلي لأن متصفحك لا يدعم تسجيل MP4 مباشرة.','success');
             } catch(err){console.error(err);try{if(recorder.state!=='inactive')recorder.stop()}catch{} setAIStatus('تعذر تصدير الفيديو: '+(err?.message||err),'error');}
             finally {if(audioEl){audioEl.pause();}if(audioCtx)try{await audioCtx.close()}catch{}activeTikTokSlide=original;renderCanvas();if(btn)btn.disabled=false;if(status)status.classList.add('hidden');}
         }
