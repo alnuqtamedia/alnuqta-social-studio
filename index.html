@@ -577,8 +577,6 @@
             })) : [];
             if (!out.length) out = [{ id: 1, type: 'cover', badge: 'تحقيق استقصائي', title: title || 'تحقيق جديد', subtitle: subtitle || '' }];
             if (out[0].type !== 'cover') out[0].type = 'cover';
-            const last = out[out.length - 1];
-            if (last.type !== 'outro') out.push({ id: out.length + 1, type: 'outro', header: 'النقطة Media', tagline: 'نحقق . نكشف . نوصل', cta: 'اشترك الآن وتابع تحقيقاتنا الحصرية', handle: '@alnuqtamedia' });
             return out.map((x, i) => ({ ...x, id: i + 1 }));
         }
 
