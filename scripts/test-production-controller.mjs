@@ -69,3 +69,13 @@ assert.deepEqual(Array.from(ctx.StudioProduction.correctionTargets('المشاه
 // A failed second fit cannot pair revised text with the previous audio.
 ctx.detectNarrationSceneDurations=async(blob,texts,duration)=>texts.map(()=>duration/texts.length);ctx.topics.customScript.slides=[{voiceover:'النص القديم'}];
 console.log('Correction range and timeout compatibility checked.');
+
+// Duration expansion is bounded and must preserve every numeric fact.
+const fitted=[{voiceover:'احفظ 3 نسخ من الملفات'}];
+ctx.fetch=async()=>({ok:true,json:async()=>({slides:[{voiceover:'احفظ 4 نسخ من الملفات الأصلية في مجلد منظم'}]})});
+await assert.rejects(ctx.StudioProduction.fitScript(fitted,10,2),/الأرقام/);
+assert.equal(fitted[0].voiceover,'احفظ 3 نسخ من الملفات');
+ctx.fetch=async()=>({ok:true,json:async()=>({slides:[{voiceover:'احفظ 3 نسخ من الملفات الأصلية في مجلد واضح'}]})});
+assert.equal(await ctx.StudioProduction.fitScript(fitted,10,2),true);
+assert.equal(fitted[0].voiceover,'احفظ 3 نسخ من الملفات الأصلية في مجلد واضح');
+console.log('Measured duration fitting preserves numeric facts and bounded word budgets.');
