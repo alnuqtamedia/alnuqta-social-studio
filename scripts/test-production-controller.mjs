@@ -25,7 +25,7 @@ assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:
 assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],10,15),0);
 console.log('Pipeline checks passed: correction targets, numeric cards, clip cycling.');
 // Data scenes must request real media, not silently count an empty background as complete.
-let searches=0;ctx.URL=URL;ctx.STUDIO_PREVIEW_PUBLIC={anonKey:'test'};ctx.fetch=async()=>{searches++;return {ok:true,json:async()=>({items:[{id:91,type:'video',mediaUrl:'https://videos.pexels.com/finance.mp4',pageUrl:'https://www.pexels.com/video/finance-91/',creator:'Test',duration:30}]})};};ctx.addSceneMedia=(s,m)=>{s.mediaItems=[...(s.mediaItems||[]),m];};
+let searches=0;ctx.URL=URL;ctx.STUDIO_PREVIEW_PUBLIC={anonKey:'test'};ctx.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(body.action==='review-media')return {ok:true,json:async()=>({reviews:[{scene:1,candidates:[{id:'91:video',safe:true,score:.9,reason:'ملائم'}]}]})};searches++;return {ok:true,json:async()=>({items:[{id:91,type:'video',mediaUrl:'https://videos.pexels.com/finance.mp4',preview:'https://images.pexels.com/videos/91/free-photo.jpg',pageUrl:'https://www.pexels.com/video/finance-91/',creator:'Test',duration:30}]})};};ctx.addSceneMedia=(s,m)=>{s.mediaItems=[...(s.mediaItems||[]),m];};
 const numericScene={title:'تكلفة القرض',visualType:'data',visualQuery:'finance calculator infographic',voiceover:'القرض 20 مليون دينار',duration:12};
 await ctx.StudioProduction.mediaFor([numericScene],true);assert.equal(searches,1);assert.equal(numericScene.mediaItems[0].kind,'video');ctx.topics.customScript.slides=[numericScene];assert(ctx.StudioProduction.productionReport().join('\n').includes('أرقام فوق وسائط'));
 numericScene.mediaItems=[];assert(ctx.StudioProduction.productionReport().join('\n').includes('تحتاج استكمال'));
@@ -96,3 +96,15 @@ const timedText=Array.from({length:3},()=>({voiceover:new Array(30).fill('ملف
 const beforeTimed=timedText.map(s=>s.voiceover);await ctx.StudioProduction.narration(timedText,12);
 assert.equal(prematureFits,0);assert.deepEqual(timedText.map(s=>s.voiceover),beforeTimed);
 console.log('Narration fitting uses actual audio duration, never a speculative pre-shortening.');
+
+// Measured feedback can recover from an overshooting rewrite without speeding speech.
+ctx.StudioProduction.state.audioCache.clear();let fitPasses=0;const durations=[132,110,120];
+ctx.AudioContext=class {async decodeAudioData(){return {duration:durations.shift()};}async close(){}};
+ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration'){fitPasses++;return {ok:true,json:async()=>({slides:[{voiceover:new Array(fitPasses===1?218:238).fill('ملف').join(' ')}]})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
+const measured=[{voiceover:new Array(240).fill('ملف').join(' ')}];await ctx.StudioProduction.narration(measured,120);assert.equal(fitPasses,2);assert.equal(ctx.aiVoiceoverDuration,120);assert.equal(measured[0].voiceover.split(' ').length,238);
+console.log('Measured feedback converges after overshoot while keeping one continuous performance.');
+// A high-ranked but unrelated thumbnail must never be selected over the relevant one.
+ctx.StudioProduction.state.reviewCache.clear();ctx.fetch=async()=>({ok:true,json:async()=>({reviews:[{scene:1,candidates:[{id:'1:video',safe:false,score:.99,reason:'عملة أجنبية'},{id:'2:video',safe:true,score:.85,reason:'حساب محايد'}]}]})});
+const reviewed=await ctx.StudioProduction.reviewCandidates([{i:0,s:{title:'حاسبة'},query:'calculator',items:[{id:1,type:'video',preview:'https://images.pexels.com/videos/1/a.jpg'},{id:2,type:'video',preview:'https://images.pexels.com/videos/2/a.jpg'}]}]);assert.equal(reviewed.get(0).length,1);assert.equal(reviewed.get(0)[0].id,2);
+ctx.StudioProduction.state.reviewCache.clear();ctx.fetch=async()=>({ok:true,json:async()=>({reviews:[]})});await assert.rejects(ctx.StudioProduction.reviewCandidates([{i:0,s:{title:'حاسبة'},query:'calculator',items:[{id:2,type:'video',preview:'https://images.pexels.com/videos/2/a.jpg'}]}]),/جميع المشاهد/);
+console.log('Visual review rejects misleading candidates and incomplete reviews.');
