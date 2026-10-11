@@ -32,3 +32,5 @@ numericScene.mediaItems=[];assert(ctx.StudioProduction.productionReport().join('
 console.log('Visual completeness regression passed: numeric scenes fetch media and missing visuals are reported.');
 
 assert.equal(ctx.StudioProduction.visualSearchQuery(numericScene),'person reviewing loan contract calculator financial paperwork desk');
+
+assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:30},meta:{}},{kind:'video',element:{duration:30},meta:{}}],7,18),1);
