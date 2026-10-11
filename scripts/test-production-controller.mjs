@@ -37,7 +37,7 @@ assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:
 
 // A multi-scene report is one performance, not separately generated paragraphs.
 let ttsCalls=0,spoken='';ctx.Blob=Blob;ctx.URL={createObjectURL:()=> 'blob:continuous',revokeObjectURL(){}};
-ctx.narrationStyle=()=> 'consistent';ctx.requestNarrationTts=async text=>{ttsCalls++;spoken=text;return {audio:'AA==',mimeType:'audio/wav'};};ctx.atob=atob;
+ctx.requestedVideoSeconds=()=>12;ctx.narrationStyle=()=> 'consistent';ctx.requestNarrationTts=async text=>{ttsCalls++;spoken=text;return {audio:'AA==',mimeType:'audio/wav'};};ctx.atob=atob;
 ctx.AudioContext=class {async decodeAudioData(){return {duration:12};}async close(){}};
 ctx.detectNarrationSceneDurations=async(blob,texts,duration)=>texts.map(()=>duration/texts.length);
 const narrationScenes=Array.from({length:6},(_,i)=>({voiceover:'فقرة '+i}));
