@@ -24,3 +24,9 @@ const dataScene={voiceover:'القرض 20 مليون دينار. الفوائد 
 assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],5,15),1);
 assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],10,15),0);
 console.log('Pipeline checks passed: correction targets, numeric cards, clip cycling.');
+// Data scenes must request real media, not silently count an empty background as complete.
+let searches=0;ctx.URL=URL;ctx.STUDIO_PREVIEW_PUBLIC={anonKey:'test'};ctx.fetch=async()=>{searches++;return {ok:true,json:async()=>({items:[{id:91,type:'video',mediaUrl:'https://videos.pexels.com/finance.mp4',pageUrl:'https://www.pexels.com/video/finance-91/',creator:'Test',duration:30}]})};};ctx.addSceneMedia=(s,m)=>{s.mediaItems=[...(s.mediaItems||[]),m];};
+const numericScene={title:'تكلفة القرض',visualType:'data',visualQuery:'finance calculator infographic',voiceover:'القرض 20 مليون دينار',duration:12};
+await ctx.StudioProduction.mediaFor([numericScene],true);assert.equal(searches,1);assert.equal(numericScene.mediaItems[0].kind,'video');ctx.topics.customScript.slides=[numericScene];assert(ctx.StudioProduction.productionReport().join('\n').includes('أرقام فوق وسائط'));
+numericScene.mediaItems=[];assert(ctx.StudioProduction.productionReport().join('\n').includes('تحتاج استكمال'));
+console.log('Visual completeness regression passed: numeric scenes fetch media and missing visuals are reported.');
