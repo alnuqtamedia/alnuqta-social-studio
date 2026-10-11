@@ -26,6 +26,7 @@ function safePexels(item){
  try {const u=new URL(item.mediaUrl),p=new URL(item.pageUrl);return u.protocol==='https:'&&['images.pexels.com','videos.pexels.com'].includes(u.hostname)&&p.protocol==='https:'&&(p.hostname==='www.pexels.com'||p.hostname==='pexels.com')&&Boolean(item.creator);}catch{return false;}
 }
 function choose(items,used,seconds){return items.filter(safePexels).filter(x=>!used.has(String(x.id)+':'+x.type)).map((x,i)=>({x,score:10-i+(x.type==='video'?4:0)+(Number(x.duration)>=seconds?2:0)})).sort((a,b)=>b.score-a.score)[0]?.x||null;}
+function requestedDuration(command){const text=String(command||'').replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c)));let seconds=null;const match=text.match(/(\d+(?:\.\d+)?)\s*(ثانية|ثواني|ثوان|seconds?\b|دقيقة|دقائق|minutes?\b)/i);if(match)seconds=Number(match[1])*(/دقيق|minute/i.test(match[2])?60:1);else if(/دقيقتين|دقيقتان/.test(text))seconds=120;else if(/دقيقة\s*ونصف/.test(text))seconds=90;else if(/دقيقة/.test(text))seconds=60;const clock=text.match(/(?:مدة|بطول)\s*(\d+):(\d{1,2})/);if(clock&&Number(clock[2])<60)seconds=Number(clock[1])*60+Number(clock[2]);if(seconds!==null&&(seconds<5||seconds>600))throw Error('المدة المدعومة من 5 إلى 600 ثانية.');return seconds;}
 function output(command){return /تلفزيون|يوتيوب|youtube|أفقي|افقي|16\s*:\s*9/i.test(command)?'landscape':'portrait';}
-root.StudioProductionCore={words,numbers,groups,timing,alignedDurations,safePexels,choose,output};
+root.StudioProductionCore={words,numbers,groups,timing,alignedDurations,safePexels,choose,output,requestedDuration};
 })(typeof window==='undefined'?globalThis:window);
