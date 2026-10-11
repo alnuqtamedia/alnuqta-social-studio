@@ -18,7 +18,7 @@ function allowedOrigins(): Set<string> {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  return new Set([DEFAULT_STUDIO_ORIGIN, "https://alnuqta-social-studio.vercel.app", "https://alnuqta-social-studio-git-studio-preview-so-75eddb-alnuqtamedia.vercel.app", "https://alnuqta-social-studio-o5h6qoqub-alnuqtamedia.vercel.app", "https://alnuqta-social-studio-git-dev-studio-produc-9e3d0d-alnuqtamedia.vercel.app", ...configured]);
+  return new Set([DEFAULT_STUDIO_ORIGIN, "https://alnuqta-social-studio.vercel.app", "https://alnuqta-social-studio-git-studio-preview-so-75eddb-alnuqtamedia.vercel.app", "https://alnuqta-social-studio-o5h6qoqub-alnuqtamedia.vercel.app", "https://alnuqta-social-studio-git-dev-studio-produc-9e3d0d-alnuqtamedia.vercel.app", "https://dev-studio-production-20261010-alnuqta-social-studio.alnuqtamedia.workers.dev", "https://8d67a876-alnuqta-social-studio.alnuqtamedia.workers.dev", ...configured]);
 }
 
 export function authorizeStudioOrigin(req: Request): StudioSecurity | Response {
