@@ -18,3 +18,9 @@ for(const t of ['20 مليون دينار','5 ملايين فوائد','25 مل�
 const signature=ctx.StudioProduction.projectSignature();el('news-handle').value='@changed';assert.notEqual(ctx.StudioProduction.projectSignature(),signature);
 await assert.rejects(ctx.StudioProduction.narration([{voiceover:''}],60),/فارغ/);
 console.log('Quality checks passed: numeric details rendered, brand edits invalidate preview, missing narration rejected.');
+
+assert.deepEqual(Array.from(ctx.StudioProduction.correctionTargets('بدّل اللقطة الثانية وأكمل المشاهد 3 و4 و6',new Array(6).fill({}))).sort(),[1,2,3,5]);
+const dataScene={voiceover:'القرض 20 مليون دينار. الفوائد 5 ملايين. الإجمالي 25 مليوناً.'};ctx.StudioProduction.prepareDataScene(dataScene);assert.equal(dataScene.points.length,3);assert(dataScene.productionVisual.ready);
+assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],5,15),1);
+assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],10,15),0);
+console.log('Pipeline checks passed: correction targets, numeric cards, clip cycling.');
