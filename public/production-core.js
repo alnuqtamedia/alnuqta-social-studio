@@ -17,10 +17,15 @@ function timing(slides,groups,durations,target,pause=.18){
  groups.forEach((g,k)=>{const total=g.indexes.reduce((n,i)=>n+Math.max(1,words(slides[i].voiceover)),0);g.start=cursor;g.duration=durations[k];g.indexes.forEach(i=>out[i]=durations[k]*Math.max(1,words(slides[i].voiceover))/total);if(k<groups.length-1)out[g.indexes.at(-1)]+=pause;cursor+=durations[k]+(k<groups.length-1?pause:0);});
  out[out.length-1]+=Math.max(0,target-spent);return out;
 }
+function alignedDurations(segments,count,total){
+ if(!Number.isFinite(total)||total<=0||!Array.isArray(segments)||segments.length!==count)throw Error('توقيت الفقرات غير مكتمل');
+ const starts=segments.map((x,i)=>{if(x.scene!==i+1||!Number.isFinite(x.start)||x.start<0||x.start>=total||(i&&x.start<=segments[i-1].start))throw Error('ترتيب توقيت الفقرات غير صالح');return i?x.start:0;});
+ const out=starts.map((t,i)=>(starts[i+1]??total)-t);if(out.some(d=>d<.25))throw Error('أحد المشاهد أقصر من الحد الآمن');return out;
+}
 function safePexels(item){
  try {const u=new URL(item.mediaUrl),p=new URL(item.pageUrl);return u.protocol==='https:'&&['images.pexels.com','videos.pexels.com'].includes(u.hostname)&&p.protocol==='https:'&&(p.hostname==='www.pexels.com'||p.hostname==='pexels.com')&&Boolean(item.creator);}catch{return false;}
 }
 function choose(items,used,seconds){return items.filter(safePexels).filter(x=>!used.has(String(x.id)+':'+x.type)).map((x,i)=>({x,score:10-i+(x.type==='video'?4:0)+(Number(x.duration)>=seconds?2:0)})).sort((a,b)=>b.score-a.score)[0]?.x||null;}
 function output(command){return /تلفزيون|يوتيوب|youtube|أفقي|افقي|16\s*:\s*9/i.test(command)?'landscape':'portrait';}
-root.StudioProductionCore={words,numbers,groups,timing,safePexels,choose,output};
+root.StudioProductionCore={words,numbers,groups,timing,alignedDurations,safePexels,choose,output};
 })(typeof window==='undefined'?globalThis:window);

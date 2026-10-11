@@ -281,7 +281,7 @@
                 </div>
                 <button id="ai-tts-btn" onclick="generateAIVoiceover()" class="w-full py-2.5 bg-navy border border-brandRed/60 hover:bg-brandRed text-white rounded font-cairo font-bold text-xs">مطابقة المدة وتوليد التعليق الصوتي</button>
                 <audio id="ai-tts-preview" controls controlslist="nodownload" aria-label="معاينة التعليق الصوتي فقط" class="hidden w-full"></audio>
-                <p class="text-[10px] text-gray-400 font-tajawal">المشغّل أعلاه للصوت فقط. أنشئ معاينة الفيديو أولاً، راجعها، ثم نزّل نفس الملف من زر التنزيل.</p>
+                <p class="text-[10px] text-gray-400 font-tajawal">المشغّل أعلاه للصوت فقط. أنشئ معاينة الفيديو، راجعها ثم نزّل النسخة نفسها بزر التنزيل المستقل.</p>
                 <div class="border border-navy-light rounded-lg p-3 bg-navy-card/50 space-y-2">
                     <div class="flex items-center justify-between gap-2">
                         <div><h4 class="font-cairo font-black text-xs text-white">تسجيل صوت بشري — اختياري</h4><p class="text-[10px] text-gray-400 font-tajawal">Gemini هو المصدر الأساسي. يمكنك تسجيل تعليق واحد متصل بالمايك واختياره بدلاً منه.</p></div>
@@ -421,7 +421,7 @@
             
             <div class="mb-4 text-xs font-cairo font-semibold text-gray-400 flex items-center gap-2 bg-navy/80 border border-navy-light px-4 py-1.5 rounded-full">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>معاينة التصميم؛ راجع الفيديو النهائي بعد التصدير.</span>
+                <span>معاينة التصميم؛ أنشئ معاينة الفيديو وراجعها قبل التنزيل.</span>
             </div>
 
             <!-- Dynamic Target Container -->
@@ -1314,7 +1314,7 @@
         function invalidateGeneratedVoiceover(){
             if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);
             (window.aiSceneVoiceovers||[]).forEach(item=>{if(item?.url)URL.revokeObjectURL(item.url)});
-            window.aiVoiceoverBlob=null;window.aiVoiceoverUrl='';window.aiVoiceoverDuration=0;window.aiSceneVoiceovers=[];window.aiSceneDurations=[];
+            window.aiVoiceoverBlob=null;window.aiVoiceoverUrl='';window.aiVoiceoverDuration=0;window.aiSceneVoiceovers=[];window.aiSceneDurations=[];window.aiNarrationText='';window.aiAlignmentMethod='';
             const preview=document.getElementById('ai-tts-preview');if(preview){preview.pause();preview.removeAttribute('src');preview.classList.add('hidden')}
         }
 
@@ -1865,9 +1865,19 @@
             if(value&&typeof value==='object'){const result={};for(const [key,item] of Object.entries(value))result[key]=unpackProjectValue(item,urls);return result;}return value;
         }
         async function refreshSavedProjects(){try{const list=await projectStore('readonly',store=>store.getAll());const select=document.getElementById('saved-studio-projects');select.replaceChildren();for(const item of list.sort((a,b)=>b.savedAt-a.savedAt)){const option=document.createElement('option');option.value=item.id;option.textContent=item.title+' — '+new Date(item.savedAt).toLocaleString('ar-IQ');select.appendChild(option);}}catch(error){document.getElementById('project-save-status').textContent='الحفظ المحلي غير متاح: '+error.message;}}
+        const POST_FIELDS=['news-body','news-headline','news-summary','news-badge','news-format','news-zoom','news-px','news-py','news-credit','news-caption','news-email','news-handle','news-site','news-hashtags'];
+        async function captureNewsProject(){
+            const fields={};for(const id of POST_FIELDS)fields[id]=document.getElementById(id)?.value;
+            let image=null;if(newsImg){const c=document.createElement('canvas');const k=Math.min(1,4096/Math.max(newsImg.naturalWidth||newsImg.width,newsImg.naturalHeight||newsImg.height));c.width=Math.round((newsImg.naturalWidth||newsImg.width)*k);c.height=Math.round((newsImg.naturalHeight||newsImg.height)*k);c.getContext('2d').drawImage(newsImg,0,0,c.width,c.height);image=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!image)throw Error('تعذر حفظ صورة البوست.');}
+            return {fields,image,logo:newsLogoData,captionDirty:newsCaptionDirty};
+        }
+        async function restoreNewsProject(saved){
+            if(!saved)return;newsInit();for(const [id,value] of Object.entries(saved.fields||{})){const e=document.getElementById(id);if(e&&value!==undefined)e.value=value;}
+            newsImg=saved.image instanceof Blob?await loadImgFromBlob(saved.image):null;newsLogoData=saved.logo||'';newsLogoImg=null;if(newsLogoData){newsLogoImg=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('تعذر استرجاع اللوغو'));im.src=newsLogoData;});}newsCaptionDirty=Boolean(saved.captionDirty);renderNewsPost();
+        }
         async function saveStudioProject(){const status=document.getElementById('project-save-status');status.textContent='جاري حفظ النص والوسائط والصوت…';try{
-            const topic=await packProjectValue(topics[activeTikTokTopic]);const controls={};for(const id of ['video-total-duration','video-sync-mode','ai-tts-voice','ai-tts-style','video-quality'])controls[id]=document.getElementById(id)?.value;
-            await projectStore('readwrite',store=>store.put({id:crypto.randomUUID(),version:1,savedAt:Date.now(),title:String(topic.title||topic.label||'مشروع الاستوديو'),topicKey:activeTikTokTopic,topic,controls,social:JSON.parse(JSON.stringify(socialDrafts)),voice:{source:window.activeVoiceSource,ai:window.aiVoiceoverBlob,human:window.humanVoiceoverBlob,aiDuration:window.aiVoiceoverDuration,humanDuration:window.humanVoiceoverDuration,sceneDurations:window.aiSceneDurations}}));
+            const topic=await packProjectValue(topics[activeTikTokTopic]);const news=await captureNewsProject();const controls={};for(const id of ['video-total-duration','video-sync-mode','ai-tts-voice','ai-tts-style','video-quality'])controls[id]=document.getElementById(id)?.value;
+            await projectStore('readwrite',store=>store.put({id:crypto.randomUUID(),version:1,savedAt:Date.now(),title:String(topic.title||topic.label||'مشروع الاستوديو'),topicKey:activeTikTokTopic,topic,controls,news,social:JSON.parse(JSON.stringify(socialDrafts)),voice:{source:window.activeVoiceSource,ai:window.aiVoiceoverBlob,human:window.humanVoiceoverBlob,aiDuration:window.aiVoiceoverDuration,humanDuration:window.humanVoiceoverDuration,sceneDurations:window.aiSceneDurations,approximate:window.aiTimelineApproximate,narrationText:window.aiNarrationText,alignmentMethod:window.aiAlignmentMethod}}));
             status.textContent='حُفظت نسخة محلية جديدة بالنص والوسائط والصوت. الروابط الخارجية محفوظة كرابط؛ الحفظ على هذا الجهاز والمتصفح فقط.';await refreshSavedProjects();
         }catch(error){status.textContent='لم يكتمل الحفظ؛ العمل الحالي باقٍ: '+error.message;}}
         async function restoreStudioProject(){const status=document.getElementById('project-save-status'),id=document.getElementById('saved-studio-projects').value;if(!id){status.textContent='لا توجد نسخة محفوظة.';return;}try{
@@ -1877,7 +1887,7 @@
             for(const [id,value] of Object.entries(snapshot.controls||{})){const element=document.getElementById(id);if(element&&value!==undefined)element.value=value;}
             for(const [key,draft] of Object.entries(snapshot.social||{})){const restoredKey=key.replace('alnuqta-social-draft:'+snapshot.topicKey+':','alnuqta-social-draft:customScript:');socialDrafts[restoredKey]=draft;}const voice=snapshot.voice||{};
             for(const [kind,blob] of [['ai',voice.ai],['human',voice.human]])if(blob instanceof Blob){window[kind+'VoiceoverBlob']=blob;window[kind+'VoiceoverUrl']=URL.createObjectURL(blob);window[kind+'VoiceoverDuration']=Number(voice[kind+'Duration'])||0;const audio=document.getElementById(kind==='ai'?'ai-tts-preview':'human-record-preview');audio.src=window[kind+'VoiceoverUrl'];audio.classList.remove('hidden');audio.load();if(kind==='human')document.getElementById('human-record-delete').disabled=false;}
-            window.activeVoiceSource=voice.source;window.aiSceneDurations=voice.sceneDurations||[];document.getElementById('active-voice-source').textContent='المصدر: '+(voice.source==='human'?'التسجيل البشري':voice.source==='gemini'?'Gemini':'لا يوجد');
+            window.activeVoiceSource=voice.source;window.aiSceneDurations=voice.sceneDurations||[];window.aiTimelineApproximate=voice.approximate!==false;window.aiNarrationText=voice.narrationText||'';window.aiAlignmentMethod=voice.alignmentMethod||'estimated';await restoreNewsProject(snapshot.news);document.getElementById('active-voice-source').textContent='المصدر: '+(voice.source==='human'?'التسجيل البشري':voice.source==='gemini'?'Gemini':'لا يوجد');
             initTikTokSlideButtons();updateTikTokInputs();switchTab('tiktok');renderCanvas();status.textContent='استُعيد المشروع والصوت والوسائط؛ لم يُنشر شيء.';
         }catch(error){status.textContent='تعذر الاسترجاع: '+error.message;}}
         document.addEventListener('DOMContentLoaded',()=>{const panel=document.createElement('div');panel.className='border border-navy-light rounded p-3 space-y-2';panel.innerHTML='<button type="button" onclick="saveStudioProject()" class="w-full bg-brandRed rounded p-2 text-xs">حفظ نسخة داخل هذا المتصفح</button><a href="project-backup.html" target="_blank" rel="noopener" class="block w-full border rounded p-2 text-xs text-center">تنزيل نسخة المشروع كملف ZIP</a><select id="saved-studio-projects" class="w-full bg-navy rounded p-2 text-xs"></select><button type="button" onclick="restoreStudioProject()" class="w-full border rounded p-2 text-xs">استرجاع النسخة المحددة</button><p id="project-save-status" class="text-[10px] text-gray-400">يحفظ الوسائط المحلية والصوت؛ لا يغني عن نسخة احتياطية مستقلة.</p>';document.getElementById('video-total-duration').parentElement.parentElement.before(panel);refreshSavedProjects();});
@@ -1934,7 +1944,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-10-production-preview-r1';
+        const STUDIO_BUILD='2026-10-11-workflow-r2';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);

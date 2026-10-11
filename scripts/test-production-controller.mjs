@@ -1,7 +1,7 @@
 import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
-const elements=new Map();const el=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:'',disabled:false,after(){},removeAttribute(){},classList:{add(){},remove(){}}});return elements.get(id);};
+const elements=new Map();const el=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:'',disabled:false,after(){},replaceChildren(){},appendChild(){},removeAttribute(){},classList:{add(){},remove(){}}});return elements.get(id);};
 const saved=[{title:'Saved original',source:'preserved'}],revoked=[];let consent=false,savedCalls=0;
-const ctx=vm.createContext({console,URL:{revokeObjectURL:url=>revoked.push(url)},document:{readyState:'complete',getElementById:el,createElement:()=>({}),addEventListener(){}},confirm:()=>consent,getCurrentStudioContent:()=>({title:'old'}),runGeminiStudioCommand:async()=>{},saveStudioProject:async()=>{savedCalls++;},restoreStudioProject:async()=>{},setAIStatus:()=>{},topics:{customScript:{title:'Open work',slides:[{mediaItems:[{local:true,url:'blob:open'}]}]}},activeTikTokTopic:'customScript',activeTopic:'customScript',currentSlideIndex:0,activeTikTokSlide:0,getSceneMedia:s=>s.mediaItems||[],invalidateGeneratedVoiceover(){},deleteHumanVoiceRecording(){},socialVideo:null,newsImg:null,newsCaptionDirty:false,socialDrafts:{x:'draft'},restoredProjectUrls:[],newsInput(){},initSlideButtons(){},initTikTokSlideButtons(){},updateTikTokInputs(){},renderCanvas(){}});ctx.window=ctx;
+const ctx=vm.createContext({console,URL:{revokeObjectURL:url=>revoked.push(url)},document:{readyState:'complete',getElementById:el,createElement:()=>({appendChild(){}}),addEventListener(){}},confirm:()=>consent,getCurrentStudioContent:()=>({title:'old'}),runGeminiStudioCommand:async()=>{},saveStudioProject:async()=>{savedCalls++;},restoreStudioProject:async()=>{},setAIStatus:()=>{},topics:{customScript:{title:'Open work',slides:[{mediaItems:[{local:true,url:'blob:open'}]}]}},activeTikTokTopic:'customScript',activeTopic:'customScript',currentSlideIndex:0,activeTikTokSlide:0,getSceneMedia:s=>s.mediaItems||[],invalidateGeneratedVoiceover(){},deleteHumanVoiceRecording(){},socialVideo:null,newsImg:null,newsCaptionDirty:false,socialDrafts:{x:'draft'},restoredProjectUrls:[],newsInput(){},initSlideButtons(){},initTikTokSlideButtons(){},updateTikTokInputs(){},renderCanvas(){}});ctx.window=ctx;ctx.AbortController=AbortController;ctx.setTimeout=setTimeout;ctx.clearTimeout=clearTimeout;
 vm.runInContext(fs.readFileSync('public/production-core.js','utf8'),ctx);vm.runInContext(fs.readFileSync('public/studio-production.js','utf8'),ctx);
 el('studio-source-text').value='Source material';el('production-orientation').value='landscape';el('news-handle').value='@brand';
 assert.equal(ctx.getCurrentStudioContent().sourceMaterial,'Source material');ctx.StudioProduction.state.replaceFromSource=true;assert.equal(ctx.getCurrentStudioContent().title,undefined);assert.equal(ctx.getCurrentStudioContent().mode,'new-from-source');ctx.StudioProduction.state.replaceFromSource=false;await ctx.saveStudioProject();assert.equal(savedCalls,1);assert.equal(ctx.topics.customScript.productionSource.orientation,'landscape');
@@ -55,3 +55,17 @@ ctx.newsLogoImg=null;ctx.StudioProduction.paint(brandCtx,{title:'اختبار ا
 assert(brandMarks.some(m=>m.text==='النقطة'&&m.color==='#fff'));assert(brandMarks.some(m=>m.text==='Media'&&m.color==='#E31217'));
 assert(!brandMarks.some(m=>m.text==='لقطات توضيحية'));
 console.log('Brand regression passed: white Arabic wordmark, red Media, original dot and no illustrative caption in video.');
+
+ctx.newsLogoData='logo-old';const oldBrandSignature=ctx.StudioProduction.projectSignature();ctx.newsLogoData='logo-new';assert.notEqual(ctx.StudioProduction.projectSignature(),oldBrandSignature);
+assert.deepEqual(Array.from(ctx.StudioProductionCore.alignedDurations([{scene:1,start:.2},{scene:2,start:4},{scene:3,start:8}],3,12)),[4,4,4]);
+assert.throws(()=>ctx.StudioProductionCore.alignedDurations([{scene:1,start:0},{scene:2,start:0}],2,12),/توقيت/);
+// Failed visual replacement must leave original media and narration intact.
+ctx.topics.customScript.slides=[{title:'أصل',voiceover:'النص الأصلي',visualType:'broll',mediaItems:[{url:'old',providerId:'original'}]}];el('production-correction').value='بدل اللقطة 1 بصورة توقيع عقد';
+ctx.fetch=async()=>({ok:true,json:async()=>({slides:[{visualQuery:'person signing contract'}]})});ctx.StudioProduction.state.mediaCache.clear();
+await assert.rejects(ctx.StudioProduction.correctCurrent(),/وسائط/);assert.equal(ctx.topics.customScript.slides[0].mediaItems[0].url,'old');assert.equal(ctx.topics.customScript.slides[0].voiceover,'النص الأصلي');
+console.log('Release regressions passed: logo invalidation, ordered audio boundaries, transactional corrections.');
+
+assert.deepEqual(Array.from(ctx.StudioProduction.correctionTargets('المشاهد من 2 إلى 4',new Array(6).fill({}))).sort(),[1,2,3]);
+// A failed second fit cannot pair revised text with the previous audio.
+ctx.detectNarrationSceneDurations=async(blob,texts,duration)=>texts.map(()=>duration/texts.length);ctx.topics.customScript.slides=[{voiceover:'النص القديم'}];
+console.log('Correction range and timeout compatibility checked.');
