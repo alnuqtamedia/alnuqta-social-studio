@@ -10,3 +10,11 @@ ctx.StudioProduction.reset();assert.equal(ctx.topics.customScript.title,'Open wo
 consent=true;ctx.StudioProduction.state.busy=true;ctx.StudioProduction.reset();assert.equal(ctx.topics.customScript.title,'Open work');ctx.StudioProduction.state.busy=false;
 ctx.StudioProduction.reset();assert.equal(ctx.topics.customScript.title,'مشروع جديد');assert.equal(el('news-handle').value,'@brand');assert.deepEqual(saved,[{title:'Saved original',source:'preserved'}]);assert(revoked.includes('blob:open'));assert.equal(Object.keys(ctx.socialDrafts).length,0);
 console.log('Controller checks passed: source clearing, snapshot metadata, confirmation, busy guard, active-media cleanup and brand preservation.');
+
+// Final renderer must show numeric details rather than a title-only data scene.
+const painted=[];const canvasCtx={fillRect(){},createLinearGradient(){return {addColorStop(){}};},measureText(t){return {width:String(t).length*10};},fillText(t){painted.push(t);},drawImage(){}};ctx.newsLogoImg=null;ctx.getActiveVoiceover=()=>null;
+ctx.StudioProduction.paint(canvasCtx,{title:'الحساب',subtitle:'20 مليون دينار',points:['5 ملايين فوائد','25 مليون إجمالي','416,667 شهرياً']},null,720,1280);
+for(const t of ['20 مليون دينار','5 ملايين فوائد','25 مليون إجمالي','416,667 شهرياً'])assert(painted.includes(t));
+const signature=ctx.StudioProduction.projectSignature();el('news-handle').value='@changed';assert.notEqual(ctx.StudioProduction.projectSignature(),signature);
+await assert.rejects(ctx.StudioProduction.narration([{voiceover:''}],60),/فارغ/);
+console.log('Quality checks passed: numeric details rendered, brand edits invalidate preview, missing narration rejected.');
