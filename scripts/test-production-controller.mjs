@@ -79,3 +79,12 @@ ctx.fetch=async()=>({ok:true,json:async()=>({slides:[{voiceover:'احفظ 3 نس
 assert.equal(await ctx.StudioProduction.fitScript(fitted,10,2),true);
 assert.equal(fitted[0].voiceover,'احفظ 3 نسخ من الملفات الأصلية في مجلد واضح');
 console.log('Measured duration fitting preserves numeric facts and bounded word budgets.');
+
+// Explicit incomplete-audio results cannot silently fall back to timing estimates.
+ctx.OfflineAudioContext=class {createBufferSource(){return {connect(){},start(){}};}async startRendering(){return {length:1,sampleRate:8000,getChannelData:()=>new Float32Array(1)};}};
+ctx.pcmWav=()=>new Blob([new Uint8Array([0,0])]);ctx.btoa=btoa;
+ctx.fetch=async()=>({ok:false,json:async()=>({error:'alignment_incomplete'})});
+const intactVoice=ctx.aiVoiceoverUrl;
+await assert.rejects(ctx.StudioProduction.narration(narrationScenes,12),/جميع فقرات التعليق/);
+assert.equal(ctx.aiVoiceoverUrl,intactVoice);
+console.log('Incomplete narration preserves prior audio and cannot be labeled ready.');

@@ -42,6 +42,8 @@ Deno.serve(async (req: Request) => {
       data = {};
     }
     if (!Object.keys(data).length || data?.error) return reply({ error: lastError || "جميع نماذج الصوت مشغولة حالياً." }, 429);
+    const finish = data?.candidates?.[0]?.finishReason;
+    if (finish && finish !== "STOP") return reply({ error: "لم تؤكد خدمة الصوت اكتمال التوليد؛ النص محفوظ. أعد المحاولة.", finishReason: finish }, 422);
     const part = data?.candidates?.[0]?.content?.parts?.find((item: any) => item?.inlineData?.data);
     if (!part) return reply({ error: "Gemini لم يُرجع ملفاً صوتياً." }, 502);
     return reply({ audio: part.inlineData.data, mimeType: part.inlineData.mimeType || "audio/L16;rate=24000", voice, model });
