@@ -88,3 +88,11 @@ const intactVoice=ctx.aiVoiceoverUrl;
 await assert.rejects(ctx.StudioProduction.narration(narrationScenes,12),/جميع فقرات التعليق/);
 assert.equal(ctx.aiVoiceoverUrl,intactVoice);
 console.log('Incomplete narration preserves prior audio and cannot be labeled ready.');
+
+// Word estimates must not rewrite narration whose actual audio already matches.
+let prematureFits=0;el('video-sync-mode').value='fit-audio';
+ctx.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(body.action==='fit-narration'){prematureFits++;return {ok:false,json:async()=>({error:'unexpected fitting'})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0},{scene:2,start:4},{scene:3,start:8}]})};};
+const timedText=Array.from({length:3},()=>({voiceover:new Array(30).fill('ملف').join(' ')}));
+const beforeTimed=timedText.map(s=>s.voiceover);await ctx.StudioProduction.narration(timedText,12);
+assert.equal(prematureFits,0);assert.deepEqual(timedText.map(s=>s.voiceover),beforeTimed);
+console.log('Narration fitting uses actual audio duration, never a speculative pre-shortening.');
