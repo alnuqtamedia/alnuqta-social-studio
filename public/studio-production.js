@@ -7,7 +7,7 @@ let studioSourceText='',studioSourceName='',mic=null,micStream=null,micChunks=[]
 const originalContent=getCurrentStudioContent,originalCommand=runGeminiStudioCommand,originalSave=saveStudioProject,originalRestore=restoreStudioProject;
 function status(t,type='busy'){setAIStatus(t,type);if($('production-progress'))$('production-progress').textContent=t;}
 function projectSignature(){return JSON.stringify({slides:topics[activeTikTokTopic]?.slides,voice:getActiveVoiceover()?.url,orientation:$('production-orientation')?.value,quality:$('video-quality')?.value,brand:[$('news-handle')?.value,$('news-email')?.value,$('news-site')?.value]});}
-function invalidatePreview(){state.previewSignature=null;if($('production-download'))$('production-download').disabled=true;}
+function invalidatePreview(){state.previewSignature=null;state.lastReport={};if($('production-download'))$('production-download').disabled=true;}
 function check(){if(state.abort?.signal.aborted)throw Error('أُلغي الإنتاج؛ النص والمواد المجهزة محفوظة.');}
 async function json(endpoint,body){check();const r=await fetch(API+endpoint,{method:'POST',headers:{'Content-Type':'application/json',...(endpoint.endsWith('-preview')?{apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey}:{})},body:JSON.stringify(body),signal:state.abort?.signal});const d=await r.json();if(!r.ok)throw Error(d.error||`الخدمة ${r.status}`);return d;}
 function clearSource(){studioSourceText='';studioSourceName='';$('studio-source-file').value='';$('studio-source-text').value='';$('studio-source-status').textContent='المادة تبقى محلياً حتى تنفيذ الأمر عبر Gemini.';}
