@@ -1314,7 +1314,7 @@
         function invalidateGeneratedVoiceover(){
             if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);
             (window.aiSceneVoiceovers||[]).forEach(item=>{if(item?.url)URL.revokeObjectURL(item.url)});
-            window.aiVoiceoverBlob=null;window.aiVoiceoverUrl='';window.aiVoiceoverDuration=0;window.aiSceneVoiceovers=[];window.aiSceneDurations=[];window.aiNarrationText='';window.aiAlignmentMethod='';
+            window.aiVoiceoverBlob=null;window.aiVoiceoverUrl='';window.aiVoiceoverDuration=0;window.aiSceneVoiceovers=[];window.aiSceneDurations=[];window.aiNarrationText='';window.aiAlignmentMethod='';window.aiScriptFitNote='';
             const preview=document.getElementById('ai-tts-preview');if(preview){preview.pause();preview.removeAttribute('src');preview.classList.add('hidden')}
         }
 
@@ -1622,7 +1622,7 @@
                     ${headerHTML}
                     <div class="my-auto flex flex-col gap-3 w-full">
                         <div class="inline-block bg-brandRed text-white text-[10px] font-cairo font-black px-2.5 py-1 rounded w-max">
-                            ${slide.type === 'verdict' ? 'النتيجة والاستنتاج' : 'محور التحقيق'}
+                            ${escapeHtml(slide.badge || (slide.type === 'verdict' ? 'النتيجة والاستنتاج' : 'تفاصيل المادة'))}
                         </div>
                         <h2 class="font-cairo font-bold text-sm text-white text-right">${escapeHtml(slide.header)}</h2>
                         <div class="flex flex-col gap-2 mt-1 w-full">
@@ -1944,7 +1944,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-11-workflow-r3';
+        const STUDIO_BUILD='2026-10-11-workflow-r4';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
