@@ -638,7 +638,7 @@
         }
 
         const STUDIO_EDITORIAL_RULES='اكتب جميع النصوص والعناوين والتعليق الصوتي بالعربية الفصحى المهنية فقط، دون اللهجة العراقية أو المصرية أو أي لهجة محلية. حافظ على الأسماء والأرقام والحقائق، ولا تضف معلومات أو مصادر أو استنتاجات غير موثقة.';
-        function narrationStyle(){return 'انطق بالعربية الفصحى حصراً، دون لهجة عراقية أو مصرية أو محلية، بنطق واضح ورصين ووقفات طبيعية. '+(document.getElementById('ai-tts-style')?.value||'');}
+        function narrationStyle(){return 'انطق بالعربية الفصحى حصراً، دون لهجة عراقية أو مصرية أو محلية، بنطق واضح ورصين ووقفات طبيعية. حافظ على شخصية صوتية واحدة ونبرة وإيقاع متسقين طوال النص. اقرأ الفقرات كتعليق إخباري متصل، ولا تبدأ أداءً جديداً عند الانتقال بين الفقرات، ولا تقرأ تعليمات الأداء. '+(document.getElementById('ai-tts-style')?.value||'');}
 
         async function runGeminiStudioCommand() {
             const input = document.getElementById('ai-command-input');

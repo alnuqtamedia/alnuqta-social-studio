@@ -34,3 +34,17 @@ console.log('Visual completeness regression passed: numeric scenes fetch media a
 assert.equal(ctx.StudioProduction.visualSearchQuery(numericScene),'person reviewing loan contract calculator financial paperwork desk');
 
 assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:30},meta:{}},{kind:'video',element:{duration:30},meta:{}}],7,18),1);
+
+// A multi-scene report is one performance, not separately generated paragraphs.
+let ttsCalls=0,spoken='';ctx.Blob=Blob;ctx.URL={createObjectURL:()=> 'blob:continuous',revokeObjectURL(){}};
+ctx.narrationStyle=()=> 'consistent';ctx.requestNarrationTts=async text=>{ttsCalls++;spoken=text;return {audio:'AA==',mimeType:'audio/wav'};};ctx.atob=atob;
+ctx.AudioContext=class {async decodeAudioData(){return {duration:12};}async close(){}};
+ctx.detectNarrationSceneDurations=async(blob,texts,duration)=>texts.map(()=>duration/texts.length);
+const narrationScenes=Array.from({length:6},(_,i)=>({voiceover:'فقرة '+i}));
+await ctx.StudioProduction.narration(narrationScenes,12);
+assert.equal(ttsCalls,1);assert.equal(spoken,narrationScenes.map(s=>s.voiceover).join('\n\n'));
+assert.equal(ctx.aiVoiceoverDuration,12);assert.equal(ctx.aiSceneDurations.reduce((a,b)=>a+b,0),12);assert.equal(ctx.aiTimelineApproximate,true);
+await ctx.StudioProduction.narration(narrationScenes,12);assert.equal(ttsCalls,1);
+ctx.detectNarrationSceneDurations=async()=>[0];const previousVoice=ctx.aiVoiceoverUrl;
+await assert.rejects(ctx.StudioProduction.narration(narrationScenes,12),/توزيع/);assert.equal(ctx.aiVoiceoverUrl,previousVoice);
+console.log('Continuous narration regression passed: one request for six scenes, cache reuse, full timeline and previous voice preserved on alignment failure.');
