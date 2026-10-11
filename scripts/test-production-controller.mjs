@@ -12,7 +12,7 @@ ctx.StudioProduction.reset();assert.equal(ctx.topics.customScript.title,'مشر�
 console.log('Controller checks passed: source clearing, snapshot metadata, confirmation, busy guard, active-media cleanup and brand preservation.');
 
 // Final renderer must show numeric details rather than a title-only data scene.
-const painted=[];const canvasCtx={fillRect(){},createLinearGradient(){return {addColorStop(){}};},measureText(t){return {width:String(t).length*10};},fillText(t){painted.push(t);},drawImage(){}};ctx.newsLogoImg=null;ctx.getActiveVoiceover=()=>null;
+const painted=[];const canvasCtx={beginPath(){},arc(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}};},measureText(t){return {width:String(t).length*10};},fillText(t){painted.push(t);},drawImage(){}};ctx.newsLogoImg=null;ctx.getActiveVoiceover=()=>null;
 ctx.StudioProduction.paint(canvasCtx,{title:'الحساب',subtitle:'20 مليون دينار',points:['5 ملايين فوائد','25 مليون إجمالي','416,667 شهرياً']},null,720,1280);
 for(const t of ['20 مليون دينار','5 ملايين فوائد','25 مليون إجمالي','416,667 شهرياً'])assert(painted.includes(t));
 const signature=ctx.StudioProduction.projectSignature();el('news-handle').value='@changed';assert.notEqual(ctx.StudioProduction.projectSignature(),signature);
@@ -48,3 +48,10 @@ await ctx.StudioProduction.narration(narrationScenes,12);assert.equal(ttsCalls,1
 ctx.detectNarrationSceneDurations=async()=>[0];const previousVoice=ctx.aiVoiceoverUrl;
 await assert.rejects(ctx.StudioProduction.narration(narrationScenes,12),/توزيع/);assert.equal(ctx.aiVoiceoverUrl,previousVoice);
 console.log('Continuous narration regression passed: one request for six scenes, cache reuse, full timeline and previous voice preserved on alignment failure.');
+
+// Brand follows the existing studio identity; stock attribution is not burned in.
+const brandMarks=[];const brandCtx={...canvasCtx,fillText(text){brandMarks.push({text,color:this.fillStyle});}};
+ctx.newsLogoImg=null;ctx.StudioProduction.paint(brandCtx,{title:'اختبار الهوية'}, {element:{width:720,height:1280},meta:{illustrative:true}},720,1280);
+assert(brandMarks.some(m=>m.text==='النقطة'&&m.color==='#fff'));assert(brandMarks.some(m=>m.text==='Media'&&m.color==='#E31217'));
+assert(!brandMarks.some(m=>m.text==='لقطات توضيحية'));
+console.log('Brand regression passed: white Arabic wordmark, red Media, original dot and no illustrative caption in video.');
