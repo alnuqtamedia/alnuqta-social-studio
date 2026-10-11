@@ -265,7 +265,7 @@
                 <label class="text-[10px] text-gray-400 font-cairo">مدة الفيديو المطلوبة (ثوانٍ أو دقائق:ثواني)<input id="video-total-duration" type="text" inputmode="decimal" value="30" placeholder="47 أو 3:17" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"></label>
                 <label class="text-[10px] text-gray-400 font-cairo">طريقة المطابقة
                     <select id="video-sync-mode" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white">
-                        <option value="fit-audio">اختصار التعليق ليلائم مدة المحتوى (موصى به)</option>
+                        <option value="fit-audio">مدة مستهدفة — النسخة التجريبية تحفظ النص</option>
                         <option value="extend-visuals">الحفاظ على النص وتمديد المحتوى الصوري</option>
                     </select>
                 </label>
@@ -281,7 +281,7 @@
                 </div>
                 <button id="ai-tts-btn" onclick="generateAIVoiceover()" class="w-full py-2.5 bg-navy border border-brandRed/60 hover:bg-brandRed text-white rounded font-cairo font-bold text-xs">مطابقة المدة وتوليد التعليق الصوتي</button>
                 <audio id="ai-tts-preview" controls controlslist="nodownload" aria-label="معاينة التعليق الصوتي فقط" class="hidden w-full"></audio>
-                <p class="text-[10px] text-gray-400 font-tajawal">المشغّل أعلاه للصوت فقط. تنزيل الفيديو يكون من زر «تصدير الفيديو (MP4 أو WebM)»؛ ينزل الملف تلقائياً بعد تكوينه.</p>
+                <p class="text-[10px] text-gray-400 font-tajawal">المشغّل أعلاه للصوت فقط. أنشئ معاينة الفيديو أولاً، راجعها، ثم نزّل نفس الملف من زر التنزيل.</p>
                 <div class="border border-navy-light rounded-lg p-3 bg-navy-card/50 space-y-2">
                     <div class="flex items-center justify-between gap-2">
                         <div><h4 class="font-cairo font-black text-xs text-white">تسجيل صوت بشري — اختياري</h4><p class="text-[10px] text-gray-400 font-tajawal">Gemini هو المصدر الأساسي. يمكنك تسجيل تعليق واحد متصل بالمايك واختياره بدلاً منه.</p></div>
