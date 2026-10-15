@@ -3,7 +3,7 @@
 'use strict';
 function create({capture,restore,status,onCandidates=()=>{}}){
  const store=root.StudioJobStore.createStore(),api=root.StudioAPI.createClient();let job=null,storageFailed=false;
- const version='resilience-a1';
+ const version='resilience-a1';const retryPolicyVersion='model-waits-v2';
  async function storage(fn,fallback=null){try{return await fn();}catch(e){storageFailed=true;status('لم يكتمل الحفظ المحلي: '+e.message+'؛ احفظ نسخة مستقلة قبل إغلاق الصفحة.','error');return fallback;}}
  async function persist(){if(job)await storage(()=>store.saveJob(job));}
  async function checkpoint(stage,stageStatus='done'){if(!job)return;job.stages[stage]={...(job.stages[stage]||{}),status:stageStatus,updatedAt:Date.now()};if(stageStatus==='done')for(const op of Object.values(job.operations||{}))if(op.stage===stage)op.status='done';job.snapshot=await capture();await persist();onCandidates();}
@@ -11,12 +11,12 @@ function create({capture,restore,status,onCandidates=()=>{}}){
  async function request(endpoint,body,{signal,headers}={}){
   const key=await root.StudioJobStore.hash({version,endpoint,body}),tts=/gemini-tts/.test(endpoint),research=/pexels-search/.test(endpoint)||body.action==='search-editorial-media';
   if(!tts){const cached=await storage(()=>store.cacheGet(key));if(cached)return cached;}
-  const operation=job?(job.operations[key]||={}):{};
+  const operation=job?(job.operations[key]||={}):{};if(job)operation.modelCooldowns={...(job.modelCooldowns||{}),...(operation.modelCooldowns||{})};
   const stage=tts?'voice':research?'research':body.action==='review-media'?'review':body.action==='align'?'timeline':body.action==='fit-narration'?'voice':body.action==='transcribe'?'command':'plan';
   operation.stage=stage;if(job){job.stages[stage]={status:'running',inputHash:key};await persist();}
   try{
    const result=await api.request(endpoint,body,{signal,headers,operation,deadlineMs:tts?110000:150000,requestMs:tts?85000:60000,maxRequests:tts?1:3,
-    persist:async()=>{if(job){job.stages[stage]={...operation,inputHash:key};await persist();}},
+    persist:async()=>{if(job){job.modelCooldowns={...(job.modelCooldowns||{}),...(operation.modelCooldowns||{})};job.stages[stage]={...operation,inputHash:key};await persist();}},
     onProgress:p=>status(p.waitMs?`الخدمة مشغولة؛ انتظار ${Math.ceil(p.waitMs/1000)} ثانية قبل المحاولة التالية…`:`${stage==='voice'?'توليد الصوت':'معالجة '+stage} — محاولة ${p.attempt}/${p.maxRequests}`)});
    if(!tts)await storage(()=>store.cachePut(key,result,research?7*86400000:86400000));
    if(job){job.stages[stage]={status:'done',inputHash:key};await persist();}return result;
@@ -26,7 +26,10 @@ function create({capture,restore,status,onCandidates=()=>{}}){
  async function resume(candidate,{manual=true}={}){
   job=candidate;await restore(job.snapshot);const now=Date.now();
   for(const op of Object.values(job.operations||{}))if(op.status!=='done'){
-   if(op.nextRetryAt>now)throw Error('لم يحن موعد المحاولة التالية؛ المتبقي '+Math.ceil((op.nextRetryAt-now)/1000)+' ثانية.');
+   // Migrate the known v1 aggregation bug only: a primary model daily wait
+   // was attached to a fallback timeout/overload. Preserve the primary wait.
+   if(manual&&['plan','review','timeline','command'].includes(op.stage)&&!op.retryPolicyVersion&&['upstream_timeout','temporary_overload'].includes(op.lastError?.code)&&op.nextRetryAt-now>300000){job.modelCooldowns={...(job.modelCooldowns||{}),'gemini-3.6-flash':op.nextRetryAt};op.modelCooldowns={...(op.modelCooldowns||{}),...job.modelCooldowns};op.nextRetryAt=0;op.retryPolicyVersion=retryPolicyVersion;}
+   if(op.nextRetryAt>now)continue;
    if(manual){op.attempts=0;op.deadline=0;op.nextRetryAt=0;op.status='pending';}else if(op.attempts>=3||op.deadline<=now)throw Error('انتهت ميزانية المحاولات؛ اضغط استئناف عندما تريد.');
   }
   await persist();return job;

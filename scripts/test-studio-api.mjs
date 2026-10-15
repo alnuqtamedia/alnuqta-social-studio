@@ -11,3 +11,9 @@ calls=0;time=0;const bounded={};api=createClient({now:()=>time,random:()=>.5,wai
 const abort=new AbortController();let started;const entered=new Promise(r=>started=r);api=createClient({fetcher:async()=>reply(503,{error:'busy'}),wait:async(ms,signal)=>{started();await context.StudioAPI.sleep(ms,signal);}});const waiting=api.request('cancel',{}, {signal:abort.signal});await entered;abort.abort();await assert.rejects(waiting,e=>e.name==='AbortError');
 let running=0,maximum=0,releases=[];api=createClient({maxConcurrent:2,fetcher:()=>new Promise(resolve=>{running++;maximum=Math.max(maximum,running);releases.push(()=>{running--;resolve(reply(200,{}));});})});const jobs=[1,2,3].map(i=>api.request('queue'+i,{}));await new Promise(r=>setTimeout(r,0));assert.equal(maximum,2);releases.shift()();await new Promise(r=>setTimeout(r,0));while(releases.length)releases.shift()();await Promise.all(jobs);assert.equal(maximum,2);
 console.log('API: bounded retries/deadline, quota zero, Retry-After, persisted operation, breaker, cancellation and queue passed.');
+
+// A long primary-model wait is sent back as a model hint, never a global delay.
+let sent=[];let routedCalls=0;
+api=createClient({now:()=>0,wait:async()=>{},fetcher:async(url,options)=>{sent.push(JSON.parse(options.body));routedCalls++;return routedCalls===1?reply(503,{error:'high demand',code:'temporary_overload',retryAfterSeconds:0,retryPolicyVersion:'model-waits-v2',retryScope:'model',modelCooldowns:{primary:40000000},attempts:[{model:'primary',retryAfterSeconds:40000}]}):reply(200,{ok:true});}});
+assert((await api.request('per-model',{})).ok);assert.equal(sent[1].modelCooldowns.primary,40000000);
+console.log('Client forwards model waits without locking the fallback.');

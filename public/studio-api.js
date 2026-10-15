@@ -15,7 +15,7 @@ function classify(status=0,data={},header='',now=Date.now()){
  const retryHeader=Number.isFinite(Number(header))?Number(header):Math.max(0,(Date.parse(header)-now)/1000);
  const retryAfterSeconds=Math.max(0,Number(data.retryAfterSeconds)||0,Number(retryHeader)||0);
  const text=code==='studio_rate_limit'?'وصل الاستوديو إلى حد الطلبات لهذه الساعة؛ انتظر الموعد ثم اضغط استئناف.':code==='quota_exhausted'?'حصة المزود غير متاحة؛ لن نكرر الطلب تلقائياً. العمل الحالي باقٍ.':message;
- return Object.assign(new Error(text),{code,retryable:transient.has(code),retryAfterSeconds,upstreamAttempts:Number(data.upstreamAttempts)||0});
+ return Object.assign(new Error(text),{code,retryable:transient.has(code),retryAfterSeconds,upstreamAttempts:Number(data.upstreamAttempts)||0,retryPolicyVersion:data.retryPolicyVersion||null,retryScope:data.retryScope||null,modelCooldowns:data.modelCooldowns||{},providerAttempts:data.attempts||[]});
 }
 function aborted(){return Object.assign(new Error('أُلغي الطلب؛ ما اكتمل من العمل باقٍ.'),{name:'AbortError',code:'cancelled'});}
 function sleep(ms,signal){return new Promise((resolve,reject)=>{if(signal?.aborted)return reject(aborted());const cancel=()=>{clearTimeout(timer);reject(aborted());};const timer=setTimeout(()=>{signal?.removeEventListener('abort',cancel);resolve();},ms);signal?.addEventListener('abort',cancel,{once:true});});}
@@ -41,7 +41,7 @@ function createClient({fetcher=(...args)=>fetch(...args),now=()=>Date.now(),wait
     signal?.addEventListener('abort',cancel,{once:true});const timer=setTimeout(cancel,Math.min(requestMs,remaining));
     operation.attempts++;operation.status='running';operation.nextRetryAt=0;await persist(operation);onProgress({attempt:operation.attempts,maxRequests});
     try{
-     const response=await fetcher(url,{method:'POST',headers,signal:controller.signal,body:JSON.stringify({...body,budgetMs:Math.min(requestMs-2000,remaining-2000)})});
+     const response=await fetcher(url,{method:'POST',headers,signal:controller.signal,body:JSON.stringify({...body,modelCooldowns:operation.modelCooldowns||{},budgetMs:Math.min(requestMs-2000,remaining-2000)})});
      let data;try{data=await response.json();}catch{throw classify(502,{error:'الخدمة أعادت بيانات غير مكتملة.'});}
      if(!response.ok)throw classify(response.status,data,response.headers?.get?.('Retry-After')||'',now());
      if(signal?.aborted)throw aborted();
@@ -49,7 +49,7 @@ function createClient({fetcher=(...args)=>fetch(...args),now=()=>Date.now(),wait
     }catch(error){
      if(signal?.aborted)throw aborted();
      last=error.code?error:classify(0,{error:controller.signal.aborted?'انتهت مهلة الاتصال.':String(error.message||error)});
-     operation.lastError={code:last.code,message:last.message};
+     operation.lastError={code:last.code,message:last.message};operation.retryPolicyVersion=last.retryPolicyVersion;operation.retryScope=last.retryScope;operation.providerAttempts=last.providerAttempts;operation.modelCooldowns={...(operation.modelCooldowns||{}),...last.modelCooldowns};
      if(!last.retryable){operation.status=last.code==='invalid_request'?'failed':'blocked_user';operation.nextRetryAt=now()+last.retryAfterSeconds*1000;await persist(operation);throw last;}
      circuit.failures++;if(circuit.failures>=2)circuit.until=now()+90000;
     }finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel);}

@@ -43,3 +43,11 @@ Do not start geographic policy expansion, new numeric overlays, CapCut packages,
 - Netlify preview built but team protection requires login; Vercel preview opens without this obstacle. No protection was disabled.
 
 Remaining acceptance: owner tries a new 30–45s report when provider capacity/quota permits, checks narration/scene completeness and confirms before any merge or production promotion. This implementation cannot create extra free provider quota.
+
+## Follow-up: model-specific waits (a2)
+
+Live diagnosis showed a 3.6 Flash 429 with an explicit 20 requests/day Free Tier quota and a ~10h Retry-After. The previous backend carried the maximum wait into a 3.8 fallback timeout/overload, incorrectly locking the whole logical operation. The new dev-only router records each model's status, scope and cooldown, skips a held model, and returns the earliest eligible model wait. A project-wide/unknown-scope 429 still blocks all alternatives; its Retry-After is not shortened. Model-specific scope requires quota dimensions or an explicit provider message naming that model.
+
+Planner fallback is now 3.5 Flash-Lite; media review fallback remains 3.8 Flash. A live probe of 2.5 Flash returned 404 (unavailable to new users), so that model was removed rather than shipped as a working fallback. No paid model, new provider, or key rotation was introduced.
+
+The a2 browser migrates only legacy plan/review/alignment/transcription timeout/overload waits from the known aggregation bug: the original 3.6 deadline remains a model cooldown while the alternative can be checked. It does not clear studio hourly limits or confirmed quota errors. Restore no longer checks every unrelated saved stage before returning access to the material; the individual API operation enforces its own wait.
