@@ -16,7 +16,7 @@ export type StudioSecurity = {
 function allowedOrigins(): Set<string> {
   // Exact origins are injected into this dev-only bundle after preview creation.
   // Never use project-global secrets to change production origin policy.
-  return new Set<string>([]); // DEV_ORIGINS
+  return new Set<string>(["https://alnuqta-social-studio-git-dev-studio-resili-2b56ca-alnuqtamedia.vercel.app", "https://alnuqta-social-studio-gje0hwwuc-alnuqtamedia.vercel.app", "https://deploy-preview-6--fabulous-baklava-2daaff.netlify.app"]); // DEV_ORIGINS
 }
 
 export function authorizeStudioOrigin(req: Request): StudioSecurity | Response {

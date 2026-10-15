@@ -12,7 +12,7 @@ function create({capture,restore,status,onCandidates=()=>{}}){
   const key=await root.StudioJobStore.hash({version,endpoint,body}),tts=/gemini-tts/.test(endpoint),research=/pexels-search/.test(endpoint)||body.action==='search-editorial-media';
   if(!tts){const cached=await storage(()=>store.cacheGet(key));if(cached)return cached;}
   const operation=job?(job.operations[key]||={}):{};
-  const stage=tts?'voice':research?'research':body.action==='review-media'?'review':body.action==='align'?'timeline':'plan';
+  const stage=tts?'voice':research?'research':body.action==='review-media'?'review':body.action==='align'?'timeline':body.action==='fit-narration'?'voice':body.action==='transcribe'?'command':'plan';
   operation.stage=stage;if(job){job.stages[stage]={status:'running',inputHash:key};await persist();}
   try{
    const result=await api.request(endpoint,body,{signal,headers,operation,deadlineMs:tts?110000:150000,requestMs:tts?85000:60000,maxRequests:tts?1:3,
@@ -24,12 +24,12 @@ function create({capture,restore,status,onCandidates=()=>{}}){
  }
  async function latest(){const rows=await storage(()=>store.listJobs(),[]);return rows.filter(x=>x.status!=='done'&&x.snapshot).sort((a,b)=>b.updatedAt-a.updatedAt)[0]||null;}
  async function resume(candidate,{manual=true}={}){
-  job=candidate;const now=Date.now();
+  job=candidate;await restore(job.snapshot);const now=Date.now();
   for(const op of Object.values(job.operations||{}))if(op.status!=='done'){
    if(op.nextRetryAt>now)throw Error('لم يحن موعد المحاولة التالية؛ المتبقي '+Math.ceil((op.nextRetryAt-now)/1000)+' ثانية.');
    if(manual){op.attempts=0;op.deadline=0;op.nextRetryAt=0;op.status='pending';}else if(op.attempts>=3||op.deadline<=now)throw Error('انتهت ميزانية المحاولات؛ اضغط استئناف عندما تريد.');
   }
-  await restore(job.snapshot);await persist();return job;
+  await persist();return job;
  }
  async function finish(){if(!job)return;job.snapshot=await capture();const blocked=Object.values(job.stages).some(x=>['blocked_user','waiting_auto','failed','pending'].includes(x.status));job.status=blocked?'incomplete':'done';await persist();}
  async function saveBlob(key,blob,meta={}){await storage(()=>store.cachePut('voice:'+key,{blob,meta}));}

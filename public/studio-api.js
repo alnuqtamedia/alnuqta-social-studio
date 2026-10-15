@@ -24,14 +24,14 @@ function createClient({fetcher=(...args)=>fetch(...args),now=()=>Date.now(),wait
  function drain(){while(active<maxConcurrent&&queue.length){const entry=queue.shift();entry.signal?.removeEventListener('abort',entry.cancel);if(entry.signal?.aborted){entry.reject(aborted());continue;}active++;entry.resolve(()=>{active--;drain();});}}
  function acquire(signal){return new Promise((resolve,reject)=>{if(signal?.aborted)return reject(aborted());const entry={resolve,reject,signal,cancel(){const i=queue.indexOf(entry);if(i>=0)queue.splice(i,1);reject(aborted());}};signal?.addEventListener('abort',entry.cancel,{once:true});queue.push(entry);drain();});}
  async function request(url,body,{signal,headers={},operation={},onProgress=()=>{},persist=async()=>{},deadlineMs=150000,requestMs=60000,maxRequests=3}={}){
-  operation.attempts=Number(operation.attempts)||0;
+  operation.attempts=Number(operation.attempts)||0;operation.maxRequests=maxRequests;
   if(!operation.deadline)operation.deadline=now()+deadlineMs;
   if(signal?.aborted)throw aborted();
   if(['blocked_user','failed'].includes(operation.status))throw classify(operation.status==='failed'?400:429,{error:operation.lastError?.message||'تحتاج هذه المرحلة إلى استئناف يدوي.',code:operation.lastError?.code||'quota_exhausted',retryAfterSeconds:Math.max(0,((operation.nextRetryAt||0)-now())/1000)});
   if(operation.nextRetryAt>now())throw Object.assign(classify(503,{code:'rate_limited',error:'موعد المحاولة التالية لم يحن بعد.',retryAfterSeconds:(operation.nextRetryAt-now())/1000}),{nextRetryAt:operation.nextRetryAt});
   const release=await acquire(signal);let probe=false,circuit;
   try{
-   circuit=circuits.get(url)||{failures:0,until:0,probe:false};circuits.set(url,circuit);
+   const circuitKey=url+'#'+(body.action||'plan');circuit=circuits.get(circuitKey)||{failures:0,until:0,probe:false};circuits.set(circuitKey,circuit);
    if(circuit.until>now()||circuit.probe)throw Object.assign(classify(503,{code:'temporary_overload',error:'الخدمة تتعافى؛ انتظر قبل المحاولة.',retryAfterSeconds:Math.max(1,(circuit.until-now())/1000)}),{nextRetryAt:Math.max(now()+1000,circuit.until)});
    if(circuit.until){circuit.probe=true;probe=true;}
    let last=classify(503,{error:'انتهت ميزانية المحاولات. اضغط استئناف لبدء محاولة جديدة.'});
