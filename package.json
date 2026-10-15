@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-pages.mjs",
-    "test": "node scripts/validate-studio.mjs && node scripts/test-export-timing.mjs && node scripts/test-production-core.mjs && node scripts/test-production-controller.mjs && node scripts/test-media-review.mjs && node scripts/test-flash-speech.mjs && node scripts/test-editorial-geography.mjs && npm run build && node scripts/inspect-pages-bundle.mjs"
+    "test": "node scripts/validate-studio.mjs && node scripts/test-export-timing.mjs && node scripts/test-production-core.mjs && node scripts/test-production-controller.mjs && node scripts/test-media-review.mjs && node scripts/test-flash-speech.mjs && node scripts/test-editorial-geography.mjs && node scripts/test-studio-api.mjs && node scripts/test-job-store.mjs && node scripts/test-resilience.mjs && node scripts/test-controller-recovery.mjs && node scripts/test-isolation.mjs && npm run build && node scripts/inspect-pages-bundle.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.4.299"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.4"
   }
 }
