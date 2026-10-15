@@ -29,3 +29,17 @@ Leave main and original functions unchanged; close the PR and stop using this de
 ## Follow-up outside A
 
 Do not start geographic policy expansion, new numeric overlays, CapCut packages, local TTS installs, paid services, or production promotion until owner tests this preview. Image synthesis controls in the isolated preview explicitly remain outside this phase; licensed media/user uploads remain available. No image-provider fallback is silently invoked.
+
+## Live verification (2026-10-15)
+
+- Preview (Vercel, READY): https://alnuqta-social-studio-git-dev-studio-resili-2b56ca-alnuqtamedia.vercel.app/
+- Draft PR: https://github.com/alnuqtamedia/alnuqta-social-studio/pull/6
+- Isolated dev functions deployed as v1, JWT verification on. Original versions verified unchanged: studio-preview 17, tts-preview 7, pexels-preview 4. Main remains baseline.
+- GitHub Actions Validate Studio run 120 passed. The first CI run failed because a shallow PR checkout lacked origin/main; isolation now verifies a protected-file digest manifest instead of assuming Git refs exist.
+- Browser: new report command encountered real Google high-demand/timeout errors. Bounded attempts stopped and a saved resume action remained after reload. Full AI-generated 30s video is NOT verified.
+- Browser: local test script plus Commons search returned six candidates across two scenes despite Gemini review being unavailable. Source, creator, CC BY/public-domain license, attribution requirement and archive date were visible. Manual adoption populated both scenes, explicitly reported manual review and retained required CC BY publishing attribution. No new narration was requested by those manual choices.
+- Local-script test intentionally has no narration; it is not a completed video and must remain incomplete until narration exists.
+- Fix: restore checkpoint contents before rejecting an early retry, so a provider wait never blocks access to the saved material itself. Recovery and original-project compatibility are also tested with fake IndexedDB.
+- Netlify preview built but team protection requires login; Vercel preview opens without this obstacle. No protection was disabled.
+
+Remaining acceptance: owner tries a new 30–45s report when provider capacity/quota permits, checks narration/scene completeness and confirms before any merge or production promotion. This implementation cannot create extra free provider quota.

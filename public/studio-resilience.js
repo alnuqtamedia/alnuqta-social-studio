@@ -31,7 +31,7 @@ function create({capture,restore,status,onCandidates=()=>{}}){
   }
   await persist();return job;
  }
- async function finish(){if(!job)return;job.snapshot=await capture();const blocked=Object.values(job.stages).some(x=>['blocked_user','waiting_auto','failed','pending'].includes(x.status));job.status=blocked?'incomplete':'done';await persist();}
+ async function finish(){if(!job)return;job.snapshot=await capture();if(['video','reel','story','tiktok'].includes(job.snapshot.output)&&!job.snapshot.voice?.blob&&!job.snapshot.voice?.human)job.stages.voice={...(job.stages.voice||{}),status:job.stages.voice?.status==='blocked_user'?'blocked_user':'pending'};const blocked=Object.values(job.stages).some(x=>['blocked_user','waiting_auto','failed','pending'].includes(x.status));job.status=blocked?'incomplete':'done';await persist();}
  async function saveBlob(key,blob,meta={}){await storage(()=>store.cachePut('voice:'+key,{blob,meta}));}
  async function getBlob(key){return storage(()=>store.cacheGet('voice:'+key));}
  async function abandon(){if(job){job.status='done';await persist();job=null;}}
