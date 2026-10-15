@@ -13,13 +13,13 @@ function create({capture,restore,status,onCandidates=()=>{}}){
   if(!tts){const cached=await storage(()=>store.cacheGet(key));if(cached)return cached;}
   const operation=job?(job.operations[key]||={}):{};if(job)operation.modelCooldowns={...(job.modelCooldowns||{}),...(operation.modelCooldowns||{})};
   const stage=tts?'voice':research?'research':body.action==='review-media'?'review':body.action==='align'?'timeline':body.action==='fit-narration'?'voice':body.action==='transcribe'?'command':'plan';
-  operation.stage=stage;if(job){job.stages[stage]={status:'running',inputHash:key};await persist();}
+  const stageLabel={plan:'خطة المشاهد',research:'البحث عن الوسائط',review:'مراجعة اللقطات',voice:'التعليق الصوتي',timeline:'توقيت المشاهد',command:'تفريغ الأمر'}[stage]||stage;operation.stage=stage;if(job){job.stages[stage]={status:'running',inputHash:key};await persist();}
   try{
    const result=await api.request(endpoint,body,{signal,headers,operation,deadlineMs:tts?110000:150000,requestMs:tts?85000:60000,maxRequests:tts?1:3,
     persist:async()=>{if(job){job.modelCooldowns={...(job.modelCooldowns||{}),...(operation.modelCooldowns||{})};job.stages[stage]={...operation,inputHash:key};await persist();}},
-    onProgress:p=>status(p.waitMs?`الخدمة مشغولة؛ انتظار ${Math.ceil(p.waitMs/1000)} ثانية قبل المحاولة التالية…`:`${stage==='voice'?'توليد الصوت':'معالجة '+stage} — محاولة ${p.attempt}/${p.maxRequests}`)});
+    onProgress:p=>status(p.waitMs?`الخدمة مشغولة؛ انتظار ${Math.ceil(p.waitMs/1000)} ثانية قبل المحاولة التالية…`:`${stageLabel} — محاولة ${p.attempt}/${p.maxRequests}`)});
    if(!tts)await storage(()=>store.cachePut(key,result,research?7*86400000:86400000));
-   if(job){job.stages[stage]={status:'done',inputHash:key};await persist();}return result;
+   if(job){job.stages[stage]={status:'done',inputHash:key};await persist();}status('اكتملت '+stageLabel+'.','success');return result;
   }catch(e){if(job){job.stages[stage]={...operation,status:e.code==='cancelled'?'pending':operation.status||'blocked_user',lastError:{code:e.code||'network',message:e.message},nextRetryAt:e.nextRetryAt||operation.nextRetryAt||0,inputHash:key};await persist();}throw e;}
  }
  async function latest(){const rows=await storage(()=>store.listJobs(),[]);return rows.filter(x=>x.status!=='done'&&x.snapshot).sort((a,b)=>b.updatedAt-a.updatedAt)[0]||null;}
