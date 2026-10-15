@@ -2,3 +2,5 @@ window.STUDIO_PREVIEW_PUBLIC = {"url":"https://zsqvmuqlmtnhndwuqlfy.supabase.co"
 window.STUDIO_PREVIEW_PUBLIC.endpoints={studio:'gemini-studio-dev',tts:'gemini-tts-dev',pexels:'pexels-search-dev'};
 window.STUDIO_PREVIEW_PUBLIC.isolatedDev=true;
 window.STUDIO_PREVIEW_PUBLIC.ttsPolicy='flash-2.5+3.1-resilience-a1';
+
+window.STUDIO_PREVIEW_PUBLIC.simplifiedMode=true;
