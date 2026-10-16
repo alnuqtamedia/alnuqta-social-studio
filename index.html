@@ -649,12 +649,12 @@
             setAIStatus('Gemini يحلل الأمر والمحتوى الحالي ويجهز التصميم…', 'busy');
             try {
                 const explicitDuration=commandVideoDuration(command);if(explicitDuration!==null&&explicitDuration<=0)throw new Error('مدة الفيديو يجب أن تكون أكبر من صفر');
-                const currentContent=getCurrentStudioContent();if(explicitDuration!==null)currentContent.durationTarget=explicitDuration;
+                const currentContent=getCurrentStudioContent();if(explicitDuration!==null){currentContent.durationTarget=explicitDuration;currentContent.narrationWordBudget=Math.floor(explicitDuration*1.9);}
                 let result;
                 for(let attempt=0;attempt<5;attempt++){
                     const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio-preview', {
                         method: 'POST', headers: { 'Content-Type': 'application/json', apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey, Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey }, signal:window.StudioProduction?.state.abort?.signal,
-                        body: JSON.stringify({ command: command+"\n"+STUDIO_EDITORIAL_RULES, currentContent, schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
+                        body: JSON.stringify({ command: command+"\n"+STUDIO_EDITORIAL_RULES+(explicitDuration!==null?`\nللفيديو: مدة ${explicitDuration} ثانية. اكتب مجموع تعليق يقارب ${Math.floor(explicitDuration*1.9)} كلمة لكل المشاهد معاً، وليس لكل مشهد. اختر visualQuery إنجليزية محددة لفكرة كل مشهد، ولقطات فيديو مناسبة عند توفرها. لا تضع اسم بلد على لقطة عامة إلا إذا ثبت مكانها.`:""), currentContent, schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
                     });
                     const contentType = response.headers.get('content-type') || '';
                     if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
@@ -1945,7 +1945,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-11-workflow-r5';
+        const STUDIO_BUILD='2026-10-16-production-recovery-r1';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);

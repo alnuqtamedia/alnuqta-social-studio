@@ -12,3 +12,8 @@ x=await run([[200,{candidates:[{finishReason:'OTHER'}]}],[200,{candidates:[{fini
 x=await run([[403,{error:{message:'denied'}}]]);assert.equal(x.calls.length,1);
 x=await run([[200,good]]);assert.equal(x.calls.length,1);assert.equal(x.result.body.audio,'UklGRg==');
 console.log('Flash speech: incomplete fallback, no Pro, quota diagnostics, access denial and complete audio passed.');
+x=await run([[400,{error:{message:'Invalid request test API key AIzaabcdef'}}],[503,{error:{message:'temporarily unavailable'}}]]);
+assert.equal(x.result.status,502);assert(x.result.body.attempts[0].message.includes('Invalid request'));
+assert(!x.result.body.error.includes('AIzaabcdef'));assert(!x.result.body.attempts[0].message.includes('test'));
+assert(x.calls.every(c=>!c.url.includes('pro')));
+console.log('TTS diagnostics preserve request errors and redact credentials without switching to paid models.');
