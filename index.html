@@ -572,7 +572,7 @@
                 cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia',
                 duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || '',
                 caption: slide.caption || slide.subtitle || '', visualAsset: slide.visualAsset || { id: '', url: '' }, source: slide.source || slide.mediaCredit || '', editorNotes: slide.editorNotes || '',
-                visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || slide.visualAsset?.url || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || slide.source || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || '',
+                graphics:Array.isArray(slide.graphics)?slide.graphics.slice(0,4):[], visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || slide.visualAsset?.url || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || slide.source || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || '',
                 mediaItems: Array.isArray(slide.mediaItems) && slide.mediaItems.length ? slide.mediaItems : (slide.mediaUrl || slide.mediaVideoUrl ? [{ url: slide.mediaVideoUrl || slide.mediaUrl, preview: slide.mediaUrl || slide.mediaVideoUrl, kind: slide.mediaVideoUrl ? 'video' : 'image', credit: slide.mediaCredit || '', sourceUrl: slide.mediaSourceUrl || '', generated: Boolean(slide.mediaGenerated) }] : [])
             })) : [];
             if (!out.length) out = [{ id: 1, type: 'cover', badge: 'مادة صحفية', title: title || 'مادة جديدة', subtitle: subtitle || '' }];
@@ -1796,11 +1796,11 @@
             return Math.max(3,Math.ceil(seconds));
         }
 
-        async function requestNarrationTts(text){
+        async function requestNarrationTts(text,performanceHint=''){
             let data;
             for(let attempt=0;attempt<3;attempt++){
                 const parent=window.StudioProduction?.state.abort?.signal,controller=new AbortController(),cancel=()=>controller.abort();parent?.addEventListener('abort',cancel,{once:true});if(parent?.aborted)controller.abort();const timer=setTimeout(cancel,130000);let r;
-                try{r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts-preview',{method:'POST',headers:{'Content-Type':'application/json',apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey},signal:controller.signal,body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:narrationStyle()})});data=await r.json();}catch(error){if(controller.signal.aborted)throw new Error(parent?.aborted?'أُلغي الطلب.':'تأخرت خدمة الصوت؛ النص محفوظ. أعد تجهيز الإنتاج.');throw error;}finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}if(r.ok)return data;
+                try{r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts-preview',{method:'POST',headers:{'Content-Type':'application/json',apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey},signal:controller.signal,body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:narrationStyle()+performanceHint})});data=await r.json();}catch(error){if(controller.signal.aborted)throw new Error(parent?.aborted?'أُلغي الطلب.':'تأخرت خدمة الصوت؛ النص محفوظ. أعد تجهيز الإنتاج.');throw error;}finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}if(r.ok)return data;
                 const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),limited=r.status===429||/quota|rate.?limit|high demand/i.test(message);const waitSeconds=generationRetryDelay(r.status,message,attempt);if(waitSeconds===null)throw new Error(message);
                 for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة الصوت ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));if(window.StudioProduction?.state.abort?.signal.aborted)throw new Error('أُلغي الطلب.');}
             }
@@ -1944,7 +1944,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-13-restored-20261016';
+        const STUDIO_BUILD='2026-10-16-motion-r1';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2538,6 +2538,7 @@ function newsDownload(){
 </script>
 <script src="public/preview-config.js"></script>
 <script src="public/production-core.js"></script>
+<script src="public/motion-graphics.js"></script>
 <script src="public/studio-production.js"></script>
 </body>
 </html>

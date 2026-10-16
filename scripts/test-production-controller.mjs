@@ -93,7 +93,7 @@ console.log('Incomplete narration preserves prior audio and cannot be labeled re
 // Word estimates must not rewrite narration whose actual audio already matches.
 let prematureFits=0;el('video-sync-mode').value='fit-audio';
 ctx.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(body.action==='fit-narration'){prematureFits++;return {ok:false,json:async()=>({error:'unexpected fitting'})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0},{scene:2,start:4},{scene:3,start:8}]})};};
-const timedText=Array.from({length:3},()=>({voiceover:new Array(30).fill('ملف').join(' ')}));
+const timedText=Array.from({length:3},()=>({voiceover:new Array(6).fill('ملف').join(' ')}));
 const beforeTimed=timedText.map(s=>s.voiceover);await ctx.StudioProduction.narration(timedText,12);
 assert.equal(prematureFits,0);assert.deepEqual(timedText.map(s=>s.voiceover),beforeTimed);
 console.log('Narration fitting uses actual audio duration, never a speculative pre-shortening.');
@@ -109,3 +109,21 @@ ctx.StudioProduction.state.reviewCache.clear();ctx.fetch=async()=>({ok:true,json
 const reviewed=await ctx.StudioProduction.reviewCandidates([{i:0,s:{title:'حاسبة'},query:'calculator',items:[{id:1,type:'video',preview:'https://images.pexels.com/videos/1/a.jpg'},{id:2,type:'video',preview:'https://images.pexels.com/videos/2/a.jpg'}]}]);assert.equal(reviewed.get(0).length,1);assert.equal(reviewed.get(0)[0].id,2);
 ctx.StudioProduction.state.reviewCache.clear();ctx.fetch=async()=>({ok:true,json:async()=>({reviews:[]})});await assert.rejects(ctx.StudioProduction.reviewCandidates([{i:0,s:{title:'حاسبة'},query:'calculator',items:[{id:2,type:'video',preview:'https://images.pexels.com/videos/2/a.jpg'}]}]),/جميع المشاهد/);
 console.log('Visual review rejects misleading candidates and incomplete reviews.');
+
+// Duration is a separate acceptance criterion from matching the audio stream.
+assert.equal(ctx.StudioProduction.durationResult(115.23,115.29,60,true).syncPassed,true);
+assert.equal(ctx.StudioProduction.durationResult(115.23,115.29,60,true).passed,false);
+for(const target of [30,45,60,120])assert.equal(ctx.StudioProduction.durationResult(target+.1,target,target,true).passed,true);
+assert.equal(ctx.StudioProduction.durationResult(60,115,60,true).passed,false);
+assert.equal(ctx.StudioProduction.durationResult(NaN,60,60,true).passed,false);
+console.log('Duration acceptance distinguishes the requested length from audio/video synchronization.');
+
+// Oversized planning is rewritten before any speech request; source text remains intact.
+ctx.StudioProduction.state.audioCache.clear();const ordered=[];el('video-sync-mode').value='fit-audio';el('studio-source-text').value='المصدر الكامل يبقى محفوظاً';
+ctx.requestNarrationTts=async text=>{ordered.push('tts');return {audio:'AA==',mimeType:'audio/wav'};};
+ctx.AudioContext=class {async decodeAudioData(){return {duration:40};}async close(){}};
+ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration'){ordered.push('fit');assert.equal(b.wordBudget,80);return {ok:true,json:async()=>({slides:[{voiceover:Array(80).fill('كلمة').join(' ')}]})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
+const overlong=[{voiceover:Array(120).fill('كلمة').join(' ')}];await ctx.StudioProduction.narration(overlong,40);assert.deepEqual(ordered,['fit','tts']);assert.equal(overlong[0].voiceover.split(' ').length,80);assert.equal(el('studio-source-text').value,'المصدر الكامل يبقى محفوظاً');
+// An explicit duration cannot silently inherit the previous preserve-text mode.
+el('ai-command-input').value='حوّل إلى ريلز 45 ثانية';el('video-sync-mode').value='extend-visuals';await ctx.runGeminiStudioCommand();assert.equal(el('video-total-duration').value,'45');assert.equal(el('video-sync-mode').value,'fit-audio');assert.equal(el('ai-command-input').value,'حوّل إلى ريلز 45 ثانية');
+console.log('Pre-speech budget and explicit command duration preserve source material and reset fitting mode.');
