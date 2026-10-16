@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+import {stripTypeScriptTypes} from 'node:module';
+const source=fs.readFileSync(new URL('../supabase/functions/gemini-studio-preview/index.ts',import.meta.url),'utf8').replace(/^import .*;\s*$/gm,'');
+let handler, calls=[], mode='valid';
+const slide={title:'الزراعة',voiceover:'الزراعة غذاء ورزق.',duration:10,visualType:'broll',visualQuery:'wheat field'};
+const context={Request,Response,AbortSignal,JSON,console,authorizeStudioOrigin:()=>({cors:{'Content-Type':'application/json'}}),enforceStudioRateLimit:async()=>null,extractText:d=>d.text,Deno:{env:{get:()=> 'test-model'},serve:f=>handler=f},fetch:async(url,opts)=>{
+ const body=JSON.parse(opts.body);calls.push(body);
+ if(calls.length===1)return new Response(JSON.stringify({error:{message:'Request contains an invalid argument.',code:'invalid_request'}}),{status:400});
+ return new Response(JSON.stringify({text:JSON.stringify(mode==='invalid'?{slides:[{}]}:{outputType:'reel',title:'الزراعة',subtitle:'العراق',slides:[slide]})}));
+}};
+vm.runInNewContext(stripTypeScriptTypes(source),context);
+const request=()=>new Request('https://test',{method:'POST',body:JSON.stringify({command:'ريلز',currentContent:{sourceMaterial:'الزراعة غذاء ورزق.'}})});
+let result=await handler(request());
+assert.equal(result.status,200);assert.equal(calls.length,2);
+assert.ok(calls[0].response_format.schema);assert.equal(calls[1].response_format,undefined);
+assert.equal(calls[1].store,false);assert.match(calls[1].input,/visualQuery/);
+calls=[];mode='invalid';result=await handler(request());assert.equal(result.status,422);
+console.log('Planner request: one bounded schema fallback, stateless privacy and invalid output rejection passed.');
