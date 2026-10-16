@@ -45,12 +45,26 @@ Deno.serve(async (req: Request) => {
     let raw = "";
     let lastError = "";
     for (const model of models) {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+      let response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({model,input,store:false,...(mediaReview?{response_format:{type:"text",mime_type:"application/json",schema:reviewSchema}}:align?{response_format:alignmentSchema}:!transcribe ? {response_format:{type:"text",mime_type:"application/json",schema:fit?fitSchema:RESPONSE_SCHEMA}} : {})}),
+        body: JSON.stringify({model,input,store:false,...(mediaReview?{response_format:{type:"text",mime_type:"application/json",schema:reviewSchema}}:align?{response_format:{type:"text",mime_type:"application/json",schema:alignmentSchema}}:!transcribe ? {response_format:{type:"text",mime_type:"application/json",schema:fit?fitSchema:RESPONSE_SCHEMA}} : {})}),
         signal:AbortSignal.timeout(60000),
       });
+      // Some Interactions models reject schema-constrained requests with a generic 400.
+      // Retry once without response_format, keeping store:false and enforcing JSON locally.
+      if(response.status===400&&!transcribe){
+        const rejected=await response.text();
+        if(/invalid.argument|invalid_request|schema|response.format/i.test(rejected)){
+          const schema=mediaReview?reviewSchema:align?alignmentSchema:fit?fitSchema:RESPONSE_SCHEMA;
+          const instruction={type:"text",text:"أرجع JSON فقط مطابقاً لهذا المخطط، بلا markdown: "+JSON.stringify(schema)};
+          const fallbackInput=typeof input==="string"?input+"\n"+instruction.text:[...input,instruction];
+          response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
+            method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+            body:JSON.stringify({model,input:fallbackInput,store:false}),signal:AbortSignal.timeout(60000),
+          });
+        }else return reply({error:"Gemini rejected the request",details:rejected.slice(0,300)},502);
+      }
       raw = await response.text();
       try { data = raw ? JSON.parse(raw) : {}; } catch { return reply({ error: "Gemini أعاد استجابة غير قابلة للقراءة." }, 502); }
       if (response.ok) break;
@@ -63,7 +77,7 @@ Deno.serve(async (req: Request) => {
     const output = extractText(data).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     if (!output) return reply({ error: "Gemini لم يُرجع محتوى. أعد المحاولة." }, 502);
     if(transcribe)return reply({text:output.slice(0,6000)});
-    try { const parsed=JSON.parse(output);if(mediaReview){try{return reply(validateVerdicts(parsed,body.reviews));}catch{return reply({error:"الفحص البصري لم يرجع تقييمات المشاهد بشكل كامل؛ لم تُعتمد وسائط غير مفحوصة.",details:output.slice(0,250)},422);}}if(align){if(!parsed.complete||!Array.isArray(parsed.segments)||parsed.segments.length!==body.scenes.length)return reply({error:"alignment_incomplete"},422);let previous=-1;for(let i=0;i<parsed.segments.length;i++){const x=parsed.segments[i];if(x.scene!==i+1||typeof x.start!=="number"||x.start<0||x.start>=body.duration||x.start<=previous||typeof x.text!=="string"||!x.text.trim())return reply({error:"alignment_invalid"},422);previous=x.start;}}return reply(parsed); } catch { return reply({ error: "Gemini أعاد JSON غير مكتمل. أعد المحاولة.", details: output.slice(0, 250) }, 502); }
+    try { const parsed=JSON.parse(output);if(!mediaReview&&!align){if(!Array.isArray(parsed.slides)||!parsed.slides.length||parsed.slides.length>20||parsed.slides.some((s:any)=>typeof s.voiceover!=="string"))return reply({error:"خطة Gemini غير مكتملة؛ النص السابق محفوظ."},422);if(!fit&&(!RESPONSE_SCHEMA.properties.outputType.enum.includes(parsed.outputType)||typeof parsed.title!=="string"||typeof parsed.subtitle!=="string"||parsed.slides.some((s:any)=>typeof s.title!=="string"||!Number.isFinite(s.duration)||s.duration<1||s.duration>30||!RESPONSE_SCHEMA.properties.slides.items.properties.visualType.enum.includes(s.visualType)||typeof s.visualQuery!=="string")))return reply({error:"حقول خطة Gemini غير صالحة؛ النص السابق محفوظ."},422);if(fit&&parsed.slides.length!==body.currentContent?.slides?.length)return reply({error:"تغيّر عدد مشاهد التعليق؛ النص السابق محفوظ."},422);}if(mediaReview){try{return reply(validateVerdicts(parsed,body.reviews));}catch{return reply({error:"الفحص البصري لم يرجع تقييمات المشاهد بشكل كامل؛ لم تُعتمد وسائط غير مفحوصة.",details:output.slice(0,250)},422);}}if(align){if(!parsed.complete||!Array.isArray(parsed.segments)||parsed.segments.length!==body.scenes.length)return reply({error:"alignment_incomplete"},422);let previous=-1;for(let i=0;i<parsed.segments.length;i++){const x=parsed.segments[i];if(x.scene!==i+1||typeof x.start!=="number"||x.start<0||x.start>=body.duration||x.start<=previous||typeof x.text!=="string"||!x.text.trim())return reply({error:"alignment_invalid"},422);previous=x.start;}}return reply(parsed); } catch { return reply({ error: "Gemini أعاد JSON غير مكتمل. أعد المحاولة.", details: output.slice(0, 250) }, 502); }
   } catch (error) {
     return reply({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
