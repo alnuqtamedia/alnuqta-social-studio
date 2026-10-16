@@ -4,3 +4,6 @@ window.STUDIO_PREVIEW_PUBLIC.isolatedDev=true;
 window.STUDIO_PREVIEW_PUBLIC.ttsPolicy='flash-2.5+3.1-resilience-a1';
 
 window.STUDIO_PREVIEW_PUBLIC.simplifiedMode=true;
+
+// User-driven requests use the original direct path, not persisted client retry locks.
+window.STUDIO_PREVIEW_PUBLIC.directRequests=true;

@@ -8,3 +8,10 @@ await c.StudioProduction.mediaFor([scene],true);assert.equal(searches,1);assert.
 c.StudioProduction.adoptCandidate(scene,scene.productionCandidates[0],true);assert.equal(scene.productionCandidates[0].decision.status,'manual_approved');assert.equal(scene.mediaItems[0].attributionRequired,true);assert.equal(scene.mediaItems[0].editorialReview.scope,'manual');assert.equal(scene.voiceover,'هذا نص محفوظ');assert.equal(tts,0);await c.StudioProduction.resilience.checkpoint('review');
 c.aiNarrationText=scene.voiceover;c.aiVoiceSettingsSignature=c.StudioProduction.voiceSettings();c.aiVoiceStale=false;await c.StudioProduction.narration([scene],30);assert.equal(tts,0);const signature=c.StudioProduction.projectSignature();el('ai-tts-style').value='أسلوب جديد';assert.notEqual(c.StudioProduction.projectSignature(),signature);
 console.log('Controller recovery: pending candidates retained, manual CC BY attribution, blocked review not retried, unchanged audio/timing preserved and style invalidates preview.');
+
+// Explicit user request can bypass persisted client locks without changing server endpoints.
+c.STUDIO_PREVIEW_PUBLIC.directRequests=true;
+c.StudioProduction.resilience.request=async()=>{throw Error('saved client lock must not run');};
+const direct=await c.StudioProduction.json('gemini-studio-preview',{action:'search-editorial-media',context:{query:'new'}});
+assert.equal(direct.items.length,1);assert.equal(searches,2);assert.equal(tts,0);
+console.log('Direct request mode reaches the authenticated endpoint without persisted client locks.');
