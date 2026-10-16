@@ -37,3 +37,8 @@ No guarantee of unlimited free quota, exact-duration speech for every text, curr
 - Fresh browser command generated three scenes with continuous Gemini voice, aligned boundaries, and automatically selected actual Pexels video clips in all three scenes. No scene lacked media.
 - In this fresh test, voice was 34.25 seconds against 40 requested; fitting failed due to provider timeout. This was recorded before the latest fallback validation change. Do not report exact duration as verified.
 - Local browser video preview verification is in progress. Post/carousel exporters pass automated regression checks; a fresh browser export of every format has not yet been verified in this session.
+
+- First exported preview: WebM VP8 + Opus, 720x1280, actual 34.27s versus complete voice 34.25s. Contact sheet at 5-second intervals verified footage in all three scenes. Audio silence analysis found two natural pauses under 0.9s, no long internal gaps.
+- R2 main 4d77344: natural pacing fallback for a modest measured gap and 130s original speech request timeout. Automated test verifies unchanged text and acceptance of closer measured duration. This is not proof of exact duration in live generation.
+- R2 project restore succeeded with saved voice and clips. Latest production retry returned free TTS quota unavailable from Google, so live duration verification is BLOCKED; stop repeated provider calls. One-image post test generated text but visual review returned provider high-demand; full live image/post/carousel readiness is NOT verified.
+- Preserve post text and route it into its template before optional media review; preparing a static design must not trigger video narration. No new providers or billing.
