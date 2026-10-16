@@ -1,3 +1,4 @@
+import { acceptsNarrationFit } from "../_shared/narration-fit.mjs";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { authorizeStudioOrigin, enforceStudioRateLimit } from "../_shared/studio-security.ts";
 
@@ -58,7 +59,10 @@ Deno.serve(async (req: Request) => {
       }); } catch { lastError="تعذر الوصول إلى نموذج Gemini؛ جُرّب البديل ضمن مهلة محدودة."; data={}; continue; }
       raw = await response.text();
       try { data = raw ? JSON.parse(raw) : {}; } catch { return reply({ error: "Gemini أعاد استجابة غير قابلة للقراءة." }, 502); }
-      if (response.ok) break;
+      if (response.ok) {
+        if(fit){try{const candidate=JSON.parse(extractText(data).replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,"").trim());if(!acceptsNarrationFit(candidate,body)){lastError="لم تلتزم صياغة النموذج بميزانية السرد؛ جُرّب النموذج البديل مع حفظ النص.";data={};continue;}}catch{lastError="تعذرت قراءة صياغة السرد؛ جُرّب البديل.";data={};continue;}}
+        break;
+      }
       lastError = data?.error?.message || `Gemini HTTP ${response.status}`;
       const limited = response.status === 429 || /quota|rate.?limit|high demand/i.test(lastError);
       const unavailable=[404,500,502,503,504].includes(response.status);
