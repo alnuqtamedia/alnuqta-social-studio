@@ -20,3 +20,6 @@ assert.equal(C.sceneGeography({voiceover:'مراجعة عقد القرض وحس�
 assert.equal(C.sceneGeography({voiceover:'انتقد عضو الكونغرس الأميركي القرار',visualQuery:'US Capitol Congress'},iraq).country,'United States');
 assert.equal(C.sceneGeography({voiceover:'مجلس النواب العراقي يصوت على الحكومة'},iraq).entity,'Council of Representatives of Iraq');
 console.log('Scene routing regressions passed: conceptual footage, US Congress and Iraqi parliament.');
+
+assert.equal(C.geography('التركيز على تنظيم المهام'),null);
+assert.equal(C.geography('العمال في تركيا').country,'Turkey');
