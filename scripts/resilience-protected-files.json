@@ -1,0 +1,16 @@
+{
+  "backend/_shared/gemini-output.mjs": "7578b9a8910bca62f7919b38f6de573ce31354d4",
+  "backend/_shared/studio-security.ts": "333b1d27c3cb1418e5973ddab401cec3fcad0f5a",
+  "backend/gemini-studio-preview/index.ts": "4310cc50569ae51a067b83ef5dfb6c9a0da4e510",
+  "backend/gemini-tts-preview/index.ts": "2cd3a12979c02bdab45840925ae5f33f330f579f",
+  "backend/pexels-search-preview/index.ts": "5314fd9b918fa2adb72d8b105067e3350c97f7fc",
+  "supabase/functions/_shared/commons-media.mjs": "5ea7fa7cf6151dc0453017c7c98396ab73b16d2c",
+  "supabase/functions/_shared/flash-speech.mjs": "da4d218c6e58c03f7b52283cb70cd44cbb493fbf",
+  "supabase/functions/_shared/gemini-output.mjs": "7578b9a8910bca62f7919b38f6de573ce31354d4",
+  "supabase/functions/_shared/media-review.mjs": "31b0243cb1cc1a5cefaa3d9f1a132b8ac5727803",
+  "supabase/functions/_shared/studio-security.ts": "333b1d27c3cb1418e5973ddab401cec3fcad0f5a",
+  "supabase/functions/gemini-studio-preview/index.ts": "6d480b36c76b3dd5de9d9199e2fbe2e3f187761f",
+  "supabase/functions/gemini-studio-preview/previous-v5.txt": "4310cc50569ae51a067b83ef5dfb6c9a0da4e510",
+  "supabase/functions/gemini-tts-preview/index.ts": "92f1f7aa079a13291fb8683973349d1c18a1cfe7",
+  "supabase/functions/gemini-tts-preview/previous-v4.txt": "daa7e24f6d1df3a715c188c1902e81d56b31a4db"
+}
