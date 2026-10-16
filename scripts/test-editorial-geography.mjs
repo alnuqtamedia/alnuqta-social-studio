@@ -15,3 +15,8 @@ q=clone();q.imageinfo[0].url='https://evil.test/payload';q.imageinfo[0].thumburl
 await assert.rejects(searchCommons({country:'Iraq',query:'x',aliases:[{}]}),/invalid/);
 const result=await searchCommons({...iraq,query:'Iraq market'},async(url,opts)=>{assert(url.startsWith('https://commons.wikimedia.org/w/api.php?'));assert.equal(opts.redirect,'error');return {ok:true,json:async()=>({query:{pages:{12:p}}})};});assert.equal(result.items.length,1);
 console.log('Editorial geography: Iraq/Egypt, city/entity constraints, foreign maps, license and URL rejection passed.');
+// A report's country must not swallow a different scene location or generic visual query.
+assert.equal(C.sceneGeography({voiceover:'مراجعة عقد القرض وحساب القسط',visualQuery:'bank advisor loan contract'},iraq),null);
+assert.equal(C.sceneGeography({voiceover:'انتقد عضو الكونغرس الأميركي القرار',visualQuery:'US Capitol Congress'},iraq).country,'United States');
+assert.equal(C.sceneGeography({voiceover:'مجلس النواب العراقي يصوت على الحكومة'},iraq).entity,'Council of Representatives of Iraq');
+console.log('Scene routing regressions passed: conceptual footage, US Congress and Iraqi parliament.');
