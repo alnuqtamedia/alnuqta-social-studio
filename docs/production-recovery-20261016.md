@@ -29,3 +29,11 @@ Scope: existing social studio, not the news site. Keep the production interface,
 ## Limits
 
 No guarantee of unlimited free quota, exact-duration speech for every text, current-event footage for every event, or automatic editorial correctness. The service retains complete speech and reports an actual duration mismatch rather than cutting words. Production readiness requires a complete fresh browser test; record its result below.
+
+## Live verification follow-up
+
+- PR 8 / main 44a8cdb: exact country-token matching prevents التركيز from matching Turkey; normalize original Commons JPEG/PNG/WebP URLs to 330px thumbnails without broadening provider hosts or removing byte limits. Preserve live planner v17 bundle in docs/studio-live-backup-20261016.json.
+- PR 9 / main d845d5d: validate measured narration word-budget output before accepting a model response, using the existing bounded fallback when unchanged/out of budget. Backend v22; JWT remains enabled. Full npm test and GitHub Actions run 133 passed.
+- Fresh browser command generated three scenes with continuous Gemini voice, aligned boundaries, and automatically selected actual Pexels video clips in all three scenes. No scene lacked media.
+- In this fresh test, voice was 34.25 seconds against 40 requested; fitting failed due to provider timeout. This was recorded before the latest fallback validation change. Do not report exact duration as verified.
+- Local browser video preview verification is in progress. Post/carousel exporters pass automated regression checks; a fresh browser export of every format has not yet been verified in this session.

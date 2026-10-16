@@ -117,3 +117,12 @@ ctx.topics.customScript={title:'اختبار العراق',slides:[{title:'أس�
 ctx.fetch=async(url,opts)=>{const b=JSON.parse(opts.body);if(b.action==='search-editorial-media'){editorialSearches++;return {ok:true,json:async()=>({items:[{id:'commons-88',type:'photo',provider:'commons',mediaUrl:'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Baghdad.jpg/960px-Baghdad.jpg',preview:'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Baghdad.jpg/960px-Baghdad.jpg',pageUrl:'https://commons.wikimedia.org/wiki/File:Baghdad.jpg',creator:'Author',licenseAutomatic:true,geographyMatched:true}]})};}if(b.action==='review-media')return {ok:true,json:async()=>({reviews:[{scene:1,candidates:[{id:'commons-88:photo',safe:true,score:.9,reason:'سوق ببغداد بحسب المصدر'}]}]})};throw Error('Unexpected planner or voice request');};
 await ctx.StudioProduction.correctCurrent();assert.equal(editorialSearches,1);assert.equal(ctx.topics.customScript.slides[0].voiceover,'نص محفوظ');assert.equal(ctx.topics.customScript.slides[0].mediaItems[0].providerId,'commons-88:photo');assert.equal(ctx.topics.customScript.slides[0].mediaVideoUrl,'');assert.equal(ctx.topics.customScript.slides[0].previousMediaItems[0].url,'https://old.example/foreign.jpg');
 console.log('Country correction replaces legacy media without changing narration or requiring a text-planner request.');
+
+// A modest gap can use one natural re-reading without changing text or waveform speed.
+ctx.StudioProduction.state.audioCache.clear();let paceCalls=[];const pacedDurations=[35,40];
+ctx.AudioContext=class {async decodeAudioData(){return {duration:pacedDurations.shift()};}async close(){}};
+ctx.requestNarrationTts=async(text,hint)=>{paceCalls.push({text,hint});return {audio:'AA==',mimeType:'audio/wav'};};
+ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);return b.action==='fit-narration'?{ok:false,json:async()=>({error:'provider busy'})}:{ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
+const unchanged=[{voiceover:'نص تعليق متصل محفوظ دون تغيير الكلمات'}];await ctx.StudioProduction.narration(unchanged,40);
+assert.equal(ctx.aiVoiceoverDuration,40);assert.equal(paceCalls.length,2);assert.equal(paceCalls[0].text,paceCalls[1].text);assert.match(paceCalls[1].hint,/40/);assert.equal(ctx.aiScriptFitNote,'');
+console.log('Natural pacing fallback keeps complete text and accepts only a closer measured reading.');
