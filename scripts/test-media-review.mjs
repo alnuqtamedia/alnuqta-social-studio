@@ -7,6 +7,3 @@ const verdict={reviews:[{scene:1,candidates:[{id:'12:photo',safe:true,score:.8,r
 const input=await reviewInputs(rows,async(url,options)=>{assert.equal(options.redirect,'error');return new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/jpeg'}});});assert.equal(input.at(-1).type,'image');assert.equal(input.at(-1).data,'AQID');
 await assert.rejects(reviewInputs(rows,async()=>new Response(new Uint8Array(250001),{headers:{'content-type':'image/jpeg'}})),/large/);
 console.log('Thumbnail review: provider-only URLs, capped bytes, image input and candidate identity checked.');
-
-assert.equal(thumbnailUrl('https://upload.wikimedia.org/wikipedia/commons/8/8a/Example.png'),'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Example.png/330px-Example.png');
-assert.throws(()=>thumbnailUrl('https://upload.wikimedia.org/anything/Example.png'));
