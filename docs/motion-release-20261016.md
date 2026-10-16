@@ -20,3 +20,7 @@ Full npm test and build pass, including source-anchored graphics, phrase text co
 ## Rollback
 
 Source: backup/pre-motion-20261016 at 0d137c4124966801b737f1afba8dc02f76be141c. Previous live planner v23 bundle: docs/pre-motion-planner-20261016.json. Preserve verify_jwt=true and existing secrets. No changes to the news site, authentication, billing or direct social publishing.
+
+## Browser result
+
+Production build 2026-10-16-motion-r1 verified. A newly created local test project (not the user's prior video) imported through the normal backup UI and exported successfully: three scenes with moving local test media, 12.00s audio, 12.00s video, and a 12s requested duration. Downloaded VP8/Opus 720x1280 file inspected at 2s and 7s: title, source-derived icons, concept cards and changing subtitle phrases are burned into the output. Uses a local synthetic audio test signal, so this proves rendering/timing integration, not fresh Gemini speech duration accuracy. No provider quota used for this test. Subject cues ordered by anchor position in narration.

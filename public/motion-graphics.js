@@ -39,6 +39,7 @@ function plan(slide){
  // Optional model annotations must quote an anchor and label already in the narration.
  for(const g of Array.isArray(slide.graphics)?slide.graphics:[]){const label=String(g?.label||'').trim(),anchor=String(g?.anchor||label).trim();if(label&&label.length<=36&&anchor.length<=100&&text.includes(norm(label))&&text.includes(norm(anchor))){annotations.push({label,icon:icons[g.icon]?g.icon:'marker',at:Math.max(0,norm(narration).indexOf(norm(anchor)))/Math.max(1,text.length)});}if(annotations.length===4)break;}
  if(!annotations.length)for(const [icon,,re] of lexicon){const match=re.exec(text);if(match){const original=tokens.find(w=>re.test(norm(w)));if(original)annotations.push({icon,label:original.replace(/^[،؛:؟.!«»]+|[،؛:؟.!«»]+$/g,''),at:match.index/Math.max(1,text.length)});}if(annotations.length===4)break;}
+ annotations.sort((a,b)=>a.at-b.at);
  const phrases=[];let cursor=0;for(let i=0;i<tokens.length;){const start=i;let n=0;while(i<tokens.length&&n<6){const w=tokens[i++];n++;if(n>=3&&/[.؟!؛،:]$/.test(w))break;}const phrase=tokens.slice(start,i),weight=phrase.join(' ').length;phrases.push({words:phrase,start:cursor,weight});cursor+=weight;}
  for(const p of phrases){p.start/=Math.max(1,cursor);p.span=p.weight/Math.max(1,cursor);}
  let title=String(slide.title||slide.header||'').trim();if(/^(?:الخاتمة|المقدمة|المشهد\s*\d*|الرمز\s*(?:سين|صاد|لام|س|ص|ل))$/.test(title))title=String(slide.subtitle||slide.caption||narration).replace(/^[^:]{1,8}:\s*/,'').split(/\s+/).slice(0,7).join(' ');
