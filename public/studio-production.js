@@ -172,8 +172,57 @@ async function render(){invalidatePreview();
 }
 exportVerticalVideo=async()=>busy(render);
 function downloadReviewed(){if(!socialVideo||!state.previewPassed||state.previewSignature!==projectSignature()){invalidatePreview();return status('العمل تغيّر أو لا توجد معاينة مجتازة؛ أنشئ معاينة جديدة أولاً.','error');}const a=document.createElement('a');a.href=socialVideo.url;a.download=socialVideo.name;a.click();}
+
+function creativeEditor(){
+ const box=document.createElement('details');box.className='text-xs border rounded p-2';
+ box.innerHTML=`<summary>إخراج المشهد: اقتباس، مقارنة، إبراز وثيقة</summary>
+ <p>اختر المشهد واضغط تحميل إعداداته. الإضافة تظهر عند تفعيل الرسوم المتحركة وإنشاء معاينة جديدة.</p>
+ <label>رقم المشهد <input id="creative-scene" type="number" min="1" step="1" value="1" class="bg-navy p-1 w-20"></label>
+ <button id="creative-load" type="button">تحميل إعدادات المشهد</button>
+ <label class="block">القالب <select id="creative-kind" class="bg-navy p-1"><option value="">الإخراج المعتاد</option value="quote">اقتباس من التعليق</option><option value="comparison">مقارنة رقمين</option><option value="document-focus">إبراز منطقة في وثيقة</option></select></label>
+ <div id="creative-fields">
+ <label class="block">اسم المصدر <input id="creative-source" maxlength="100" class="w-full bg-navy p-1"></label>
+ <div id="creative-quote-fields"><label>الاقتباس الحرفي من التعليق <textarea id="creative-quote" maxlength="180" rows="2" class="w-full bg-navy p-1"></textarea></label></div>
+ <div id="creative-comparison-fields"><p>أدخل قيماً من المصدر نفسه وبالوحدة والفترة نفسيهما. لا تُستخرج الأرقام تلقائياً.</p>
+ <label>وحدة القياس <input id="creative-unit" maxlength="24" class="bg-navy p-1"></label>
+ <label class="block">عنوان القيمة الأولى <input id="creative-label-1" maxlength="30" class="bg-navy p-1"> القيمة <input id="creative-value-1" type="number" min="0" max="1000000000000000" step="any" class="bg-navy p-1 w-28"></label>
+ <label class="block">عنوان القيمة الثانية <input id="creative-label-2" maxlength="30" class="bg-navy p-1"> القيمة <input id="creative-value-2" type="number" min="0" max="1000000000000000" step="any" class="bg-navy p-1 w-28"></label></div>
+ <div id="creative-document-fields"><p>لمشهد من نوع وثيقة فقط. حدّد منطقة الإبراز كنسب من الصورة النهائية، وراجع موضعها في الفيديو.</p>
+ <label>من اليسار % <input id="creative-x" type="number" min="0" max="100" value="10" class="bg-navy w-16"></label>
+ <label>من الأعلى % <input id="creative-y" type="number" min="0" max="100" value="25" class="bg-navy w-16"></label>
+ <label>العرض % <input id="creative-width" type="number" min="1" max="100" value="80" class="bg-navy w-16"></label>
+ <label>الارتفاع % <input id="creative-height" type="number" min="1" max="100" value="10" class="bg-navy w-16"></label></div>
+ </div><button id="creative-apply" type="button" class="border rounded p-2">تطبيق على المشهد</button>
+ <p id="creative-status" role="status"></p>`;
+ $('production-motion').parentElement.after(box);
+ const visibility=()=>{const k=$('creative-kind').value;$('creative-fields').hidden=!k;$('creative-quote-fields').hidden=k!=='quote';$('creative-comparison-fields').hidden=k!=='comparison';$('creative-document-fields').hidden=k!=='document-focus';};
+ const scene=()=>{const i=Number($('creative-scene').value)-1,slides=topics[activeTikTokTopic]?.slides||[];if(!Number.isInteger(i)||i<0||i>=slides.length)throw Error('اختر رقم مشهد موجود.');return slides[i];};
+ $('creative-kind').onchange=visibility;
+ $('creative-load').onclick=()=>{try{
+  const s=scene(),c=s.creative||{};$('creative-kind').value=c.kind||'';$('creative-source').value=c.source||'';$('creative-quote').value=c.text||'';$('creative-unit').value=c.unit||'';
+  for(let i=1;i<=2;i++){$('creative-label-'+i).value=c.items?.[i-1]?.label||'';$('creative-value-'+i).value=c.items?.[i-1]?.value??'';}
+  for(const key of ['x','y','width','height'])$('creative-'+key).value=(c.rect?.[key]??({x:.1,y:.25,width:.8,height:.1}[key]))*100;
+  visibility();$('creative-status').textContent='حُمّلت إعدادات المشهد: '+(s.title||s.header||'بلا عنوان');
+ }catch(e){$('creative-status').textContent=e.message;}};
+ $('creative-apply').onclick=()=>{try{
+  if(state.busy)throw Error('انتظر انتهاء الإنتاج أولاً.');
+  const s=scene(),kind=$('creative-kind').value;let c=null;
+  if(kind){c={kind,source:$('creative-source').value.trim()};
+   if(kind==='quote')c.text=$('creative-quote').value.trim();
+   if(kind==='comparison'){c.unit=$('creative-unit').value.trim();c.items=[1,2].map(i=>({label:$('creative-label-'+i).value.trim(),value:$('creative-value-'+i).value.trim()===''?NaN:Number($('creative-value-'+i).value)}));}
+   if(kind==='document-focus'){c.rect={};for(const key of ['x','y','width','height'])c.rect[key]=$('creative-'+key).value.trim()===''?NaN:Number($('creative-'+key).value)/100;}
+   if(!window.StudioMotion?.creativePlan({...s,creative:c}))throw Error(kind==='quote'?'أدخل المصدر واقتباساً حرفياً موجوداً في تعليق هذا المشهد.':kind==='document-focus'?'اختر مشهداً من نوع وثيقة وأدخل المصدر ومنطقة ضمن حدود الصورة.':'أدخل المصدر والوحدة والعنوانين وقيمتين صالحتين غير سالبتين.');
+  }
+  invalidatePreview();if(c)s.creative=c;else delete s.creative;
+  $('creative-status').textContent='طُبّق القالب على المشهد المحدد. أنشئ معاينة جديدة، واحفظ المشروع للاحتفاظ بالتعديل.';
+  productionReport();
+ }catch(e){$('creative-status').textContent=e.message;}};
+ visibility();
+}
+
 function init(){
  const input=$('ai-command-input'),panel=document.createElement('div');panel.className='space-y-2 border border-navy-light rounded p-2';panel.innerHTML=`<label class="text-[10px]">المادة الأصلية (تُرسل إلى Gemini عند التنفيذ)<textarea id="studio-source-text" rows="3" maxlength="40000" class="w-full bg-navy p-2 rounded text-xs" placeholder="الصق المادة هنا أو اختر PDF نصياً"></textarea></label><label class="block text-[10px]">تصحيح العمل الحالي<textarea id="production-correction" rows="2" class="w-full bg-navy p-2 rounded text-xs" placeholder="مثلاً: أظهر الحسابات في المشهد الثالث وبدّل اللقطة الثانية"></textarea></label><button id="production-correct" type="button" class="border rounded p-2 text-xs">تطبيق التصحيح وتحديث المعاينة</button><input id="studio-source-file" type="file" accept=".pdf,.txt,.md" class="text-[10px] w-full"><p id="studio-source-status" class="text-[10px] text-gray-400">قراءة PDF محلية؛ لا تُرسل ملفات سرية إلى Gemini المجاني.</p><label class="block text-[10px]"><input id="command-audio-consent" type="checkbox"> أوافق على إرسال تسجيل الأمر فقط إلى Gemini لتفريغه.</label><button id="command-mic" type="button" class="border border-brandRed rounded p-2 text-xs">🎙 تسجيل الأمر</button><label class="block text-[10px]"><input id="production-auto" type="checkbox" checked> تجهيز الوسائط والصوت بعد الأمر تلقائياً</label><select id="production-orientation" class="bg-navy p-2 rounded text-xs"><option value="portrait">عمودي 9:16</option><option value="landscape">أفقي 16:9</option></select><div class="flex gap-2"><button id="production-prepare" type="button" class="border border-brandRed rounded p-2 text-xs">تجهيز الإنتاج</button><button id="production-cancel" type="button" disabled class="border rounded p-2 text-xs">إلغاء</button><button id="production-new" type="button" class="border rounded p-2 text-xs">عمل جديد</button></div><label class="block text-[10px]"><input id="production-motion" type="checkbox" checked> عناوين وسبتايتل ورسوم متحركة</label><div class="flex gap-2"><button id="production-preview" type="button" class="border border-brandRed rounded p-2 text-xs">إنشاء معاينة الفيديو</button><button id="production-download" type="button" disabled class="border rounded p-2 text-xs">تنزيل النسخة المعاينة</button><button id="production-sources" type="button" class="border rounded p-2 text-xs">مصادر الوسائط</button></div><details class="text-xs"><summary>ضبط توقيت انتقال المشاهد</summary><div id="production-timing" class="flex flex-col gap-2"></div><button id="production-timing-apply" type="button">حفظ حدود المشاهد</button></details><pre id="production-report" class="whitespace-pre-wrap text-[10px] bg-navy p-2" aria-label="تقرير إنجاز الفيديو"></pre><p id="production-progress" role="status" class="text-[10px] text-gray-300"></p><video id="production-video-preview" controls playsinline class="hidden w-full max-h-72" aria-label="معاينة الفيديو قبل التنزيل"></video>`;input.after(panel);
+ creativeEditor();
  $('production-motion').onchange=invalidatePreview;
  $('production-preview').onclick=()=>busy(render);$('production-download').onclick=downloadReviewed;downloadSocialVideo=downloadReviewed;
  $('production-sources').onclick=()=>{const slides=topics[activeTikTokTopic]?.slides||[];const text=slides.flatMap((s,i)=>getSceneMedia(s).map(m=>`مشهد ${i+1}: ${m.credit||''}\n${m.sourceUrl||''}\n${m.licenseUrl||''}`)).join('\n\n');const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='alnuqta-media-sources.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);};
