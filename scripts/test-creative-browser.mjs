@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawnSync} from 'node:child_process';
 import {chromium} from 'playwright';
 
 const out=path.resolve('artifacts/creative-browser');
@@ -130,7 +130,16 @@ try{
  assert(Math.abs(end('audio')-6)<.6,'audio duration');
  assert(Math.abs(end('video')-6)<.6,'video duration');
  assert(Math.abs(end('audio')-end('video'))<.6,'audio/video sync');
- const summary={...checks,diagnostics:result.diagnostics,packetEnds:{audio:end('audio'),video:end('video')},pageErrors:errors,note:'Synthetic media and synthetic tone; does not verify spoken narration or editorial accuracy.'};
+ const frameSimilarity=[];
+ for(let i=0;i<3;i++){
+  const decoded=path.join(out,'decoded-scene-'+(i+1)+'.png');
+  execFileSync('ffmpeg',['-v','error','-y','-ss',String(i*2+1),'-i',file,'-frames:v','1',decoded]);
+  const metrics=spawnSync('ffmpeg',['-i',path.join(out,'scene-'+(i+1)+'-720x1280.png'),'-i',decoded,'-lavfi','ssim','-f','null','-'],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
+  const match=String(metrics.stderr).match(/All:([0-9.]+)/);assert.equal(metrics.status,0,'frame comparison failed');
+  assert(match&&Number(match[1])>.90,'Decoded frame differs from composed preview: '+metrics.stderr);
+  frameSimilarity.push({scene:i+1,decoded:true,ssim:Number(match[1])});
+ }
+ const summary={...checks,decodedFrames:frameSimilarity,diagnostics:result.diagnostics,packetEnds:{audio:end('audio'),video:end('video')},pageErrors:errors,note:'Synthetic media and synthetic tone; does not verify spoken narration or editorial accuracy.'};
  await fs.writeFile(path.join(out,'verification.json'),JSON.stringify(summary,null,2));
  assert.equal(errors.length,0,'Browser page errors: '+errors.join('; '));
  console.log(JSON.stringify(summary));
