@@ -26,3 +26,10 @@ for(const creative of [quote,compare,doc])for(const [width,height] of [[720,1280
 }
 assert(calls>0);
 console.log('Creative overlay validation and 18 mock canvas scenarios passed; pixel/video QA still required.');
+
+assert.equal(api.parseCreativeCommand('ولد فيديو 60 ثانية'),null);
+assert.equal(api.parseCreativeCommand('أزل القالب من المشهد 2').creative,null);
+assert.equal(api.parseCreativeCommand('اقتباس للمشهد ٢: "نص" المصدر "مصدر"').sceneIndex,1);
+assert.equal(api.parseCreativeCommand('مقارنة للمشهد 1: "أ" 0 و "ب" 12 الوحدة "دينار" المصدر "جدول"').creative.items[0].value,0);
+assert.throws(()=>api.parseCreativeCommand('مقارنة للمشهد 2: بيانات ناقصة'));
+console.log('Bounded creative commands passed without intercepting normal generation requests.');
