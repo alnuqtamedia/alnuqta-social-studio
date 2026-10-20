@@ -573,6 +573,7 @@
                 duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || '',
                 caption: slide.caption || slide.subtitle || '', visualAsset: slide.visualAsset || { id: '', url: '' }, source: slide.source || slide.mediaCredit || '', editorNotes: slide.editorNotes || '',
                 creative: window.StudioMotion?.creativePlan(slide) || undefined,
+                cinema: window.StudioCinema?.normalize(slide) || undefined,
                 graphics:Array.isArray(slide.graphics)?slide.graphics.slice(0,4):[], visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || slide.visualAsset?.url || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || slide.source || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || '',
                 mediaItems: Array.isArray(slide.mediaItems) && slide.mediaItems.length ? slide.mediaItems : (slide.mediaUrl || slide.mediaVideoUrl ? [{ url: slide.mediaVideoUrl || slide.mediaUrl, preview: slide.mediaUrl || slide.mediaVideoUrl, kind: slide.mediaVideoUrl ? 'video' : 'image', credit: slide.mediaCredit || '', sourceUrl: slide.mediaSourceUrl || '', generated: Boolean(slide.mediaGenerated) }] : [])
             })) : [];
@@ -1945,7 +1946,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-19-export-info-r1';
+        const STUDIO_BUILD='2026-10-20-cinema-r1';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2540,6 +2541,7 @@ function newsDownload(){
 <script src="public/preview-config.js"></script>
 <script src="public/production-core.js"></script>
 <script src="public/motion-graphics.js"></script>
+<script src="public/cinematic-effects.js"></script>
 <script src="public/studio-production.js"></script>
 </body>
 </html>

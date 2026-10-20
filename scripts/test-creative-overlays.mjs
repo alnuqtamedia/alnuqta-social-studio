@@ -34,6 +34,7 @@ assert.equal(api.parseCreativeCommand('مقارنة للمشهد 1: "أ" 0 و "�
 assert.throws(()=>api.parseCreativeCommand('مقارنة للمشهد 2: بيانات ناقصة'));
 console.log('Bounded creative commands passed without intercepting normal generation requests.');
 
+vm.runInContext(fs.readFileSync(new URL('../public/cinematic-effects.js',import.meta.url),'utf8'),sandbox);
 const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const normalize=html.slice(html.indexOf('function normalizeAISlides('),html.indexOf('function applyGeminiResult('));
 vm.runInContext('var window=globalThis;'+normalize,sandbox);

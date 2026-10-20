@@ -32,7 +32,7 @@ await page.route('**/*',route=>{
 });
 try{
  await page.goto(origin,{waitUntil:'load'});
- await page.waitForFunction(()=>window.StudioProduction&&window.StudioMotion?.parseCreativeCommand);
+ await page.waitForFunction(()=>window.StudioProduction&&window.StudioMotion?.parseCreativeCommand&&window.StudioCinema);
  // Only synthetic fixtures. No provider calls, real credentials, or source documents.
  await page.evaluate(()=>{
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;
@@ -63,9 +63,25 @@ try{
  await page.locator('#creative-source').fill('مصدر اصطناعي للاختبار');
  await page.locator('#creative-quote').fill('اقتباس حرفي');
  await page.locator('#creative-apply').click();
+ await page.locator('summary').filter({hasText:'السينما: حركة الصورة'}).click();
+ await page.locator('#cinema-scene').fill('1');
+ await page.locator('#cinema-load').click();
+ await page.locator('#cinema-look').selectOption('cinematic');
+ await page.locator('#cinema-motion').selectOption('zoom-in');
+ await page.locator('#cinema-intensity').fill('65');
+ await page.locator('#cinema-vignette').fill('15');
+ await page.locator('#cinema-grain').check();
+ await page.locator('#cinema-transition').selectOption('fade');
+ await page.locator('#cinema-apply').click();
+ assert.match(await page.locator('#cinema-status').textContent(),/حُفظت/);
  assert.match(await page.locator('#creative-status').textContent(),/طُبّق/);
  const checks=await page.evaluate(async()=>{
-  const first=topics.customScript.slides[0];if(first.creative?.kind!=='quote')throw Error('UI quote not applied');
+  const first=topics.customScript.slides[0];
+  if(first.cinema?.motion!=='zoom-in'||first.cinema?.intensity!==.65)throw Error('Cinema UI did not apply');
+  StudioProduction.applyCinemaCommand('سينما للمشهد 2: وثائقي حركة يسار انتقال مسح يسار');
+  StudioProduction.applyCinemaCommand('سينما للمشهد 3: سينمائي حركة تقريب انتقال سواد');
+  if(topics.customScript.slides[2].cinema.look!=='natural'||topics.customScript.slides[2].cinema.motion!=='static')throw Error('Document grading protection failed');
+  if(first.creative?.kind!=='quote')throw Error('UI quote not applied');
   StudioProduction.applyCreativeCommand('مقارنة للمشهد 2: "أ" 0 و "ب" 12 الوحدة "دينار" المصدر "جدول اصطناعي"');
   if(topics.customScript.slides[1].creative?.items[0].value!==0)throw Error('Zero value was lost');
   topics.customScript.slides[2].creative={kind:'document-focus',source:'وثيقة اصطناعية',rect:{x:.1,y:.2,width:.8,height:.1}};
@@ -82,8 +98,27 @@ try{
   document.getElementById('saved-studio-projects').value=snapshot.id;
   await restoreStudioProject();
   if(topics.customScript.slides[1].creative?.kind!=='comparison')throw Error('Snapshot restore failed');
-  return {ui:true,commands:true,voiceUnchanged:true,indexedDBRoundtrip:true};
+  if(topics.customScript.slides[0].cinema?.intensity!==.65||topics.customScript.slides[1].cinema?.transition!=='wipe-left')throw Error('Cinema settings lost after restore');
+  return {ui:true,commands:true,cinemaUI:true,evidenceProtected:true,cinemaSnapshot:true,voiceUnchanged:true,indexedDBRoundtrip:true};
  });
+ const cinemaPixels=await page.evaluate(async()=>{
+  const C=window.StudioCinema,canvas=document.createElement('canvas');canvas.width=200;canvas.height=200;const ctx=canvas.getContext('2d');
+  const current=()=>{ctx.fillStyle='#0000ff';ctx.fillRect(0,0,200,200);},previous=()=>{ctx.fillStyle='#ff0000';ctx.fillRect(0,0,200,200);};
+  const pixel=x=>Array.from(ctx.getImageData(x,100,1,1).data).slice(0,3);
+  for(const type of ['cut','fade','dip-black','wipe-left','wipe-right']){
+   C.transition(ctx,current,previous,{type,progress:1,width:200,height:200});if(pixel(100)[2]!==255)throw Error('Transition final frame: '+type);
+  }
+  C.transition(ctx,current,previous,{type:'dip-black',progress:.5,width:200,height:200});if(pixel(100).some(x=>x!==0))throw Error('Dip black midpoint');
+  C.transition(ctx,current,previous,{type:'wipe-left',progress:.5,width:200,height:200});if(pixel(10)[0]!==255||pixel(190)[2]!==255)throw Error('Wipe direction or clipping');
+  const image=new Image();image.src=topics.customScript.slides[0].mediaItems[0].url;await image.decode();
+  const scene=topics.customScript.slides[0];
+  const sample=t=>{ctx.clearRect(0,0,200,200);C.drawMedia(ctx,image,scene,200,200,t,2);C.drawFinish(ctx,scene,200,200,t);return new Uint8Array(ctx.getImageData(0,0,200,200).data);};
+  const a=sample(.2),b=sample(1.8),repeat=sample(1.8);let changed=0;
+  for(let i=0;i<a.length;i++){if(a[i]!==b[i])changed++;if(b[i]!==repeat[i])throw Error('Nondeterministic cinema frame');}
+  if(changed<500)throw Error('Motion/grain does not animate');if(ctx.filter!=='none'||ctx.globalAlpha!==1)throw Error('Cinema leaked canvas state');
+  return {transitions:true,motionChangedChannels:changed,deterministicGrain:true,isolatedFilter:true};
+ });
+ console.log('Cinema real pixels',JSON.stringify(cinemaPixels));
  // Capture actual pixels in portrait and landscape, using the same renderer as export.
  for(const [width,height] of [[720,1280],[1280,720]]){
   for(let i=0;i<3;i++){
@@ -145,7 +180,7 @@ try{
   assert(match&&Number(match[1])>.90,'Decoded frame differs from composed preview: '+metrics.stderr);
   frameSimilarity.push({scene:i+1,decoded:true,ssim:Number(match[1])});
  }
- const summary={...checks,decodedFrames:frameSimilarity,diagnostics:result.diagnostics,packetEnds:{audio:end('audio'),video:end('video')},pageErrors:errors,note:'Synthetic media and synthetic tone; does not verify spoken narration or editorial accuracy.'};
+ const summary={...checks,cinemaPixels,decodedFrames:frameSimilarity,diagnostics:result.diagnostics,packetEnds:{audio:end('audio'),video:end('video')},pageErrors:errors,note:'Synthetic media and synthetic tone; does not verify spoken narration or editorial accuracy.'};
  await fs.writeFile(path.join(out,'verification.json'),JSON.stringify(summary,null,2));
  assert.equal(errors.length,0,'Browser page errors: '+errors.join('; '));
  console.log(JSON.stringify(summary));
