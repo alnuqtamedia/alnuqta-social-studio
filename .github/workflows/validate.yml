@@ -25,3 +25,33 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+
+  creative-browser:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Install pinned browser test runner
+        run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.56.1
+      - name: Install Chromium and media probe
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
+      - name: Verify real browser creative export
+        run: node scripts/test-creative-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: creative-browser-proof
+          path: artifacts/creative-browser/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -572,6 +572,7 @@
                 cta: slide.cta || 'تابع تحقيقات النقطة Media', handle: slide.handle || '@alnuqtamedia',
                 duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || '',
                 caption: slide.caption || slide.subtitle || '', visualAsset: slide.visualAsset || { id: '', url: '' }, source: slide.source || slide.mediaCredit || '', editorNotes: slide.editorNotes || '',
+                creative: window.StudioMotion?.creativePlan(slide) || undefined,
                 graphics:Array.isArray(slide.graphics)?slide.graphics.slice(0,4):[], visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || slide.visualAsset?.url || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || slide.source || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || '',
                 mediaItems: Array.isArray(slide.mediaItems) && slide.mediaItems.length ? slide.mediaItems : (slide.mediaUrl || slide.mediaVideoUrl ? [{ url: slide.mediaVideoUrl || slide.mediaUrl, preview: slide.mediaUrl || slide.mediaVideoUrl, kind: slide.mediaVideoUrl ? 'video' : 'image', credit: slide.mediaCredit || '', sourceUrl: slide.mediaSourceUrl || '', generated: Boolean(slide.mediaGenerated) }] : [])
             })) : [];
