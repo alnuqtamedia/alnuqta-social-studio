@@ -119,7 +119,7 @@ try{
   StudioProduction.state.abort=new AbortController();
   await StudioProduction.render();
   if(!StudioProduction.state.previewPassed)throw Error('Export rejected: '+document.getElementById('production-report').textContent);
-  const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=reject;reader.readAsDataURL(socialVideo.blob);});
+  const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.slice(reader.result.indexOf(';base64,')+8));reader.onerror=reject;reader.readAsDataURL(socialVideo.blob);});
   return {data,diagnostics:window.lastExportDiagnostics};
  });
  console.log('Export transfer',JSON.stringify({diagnostics:result.diagnostics,base64Length:result.data.length,bytes:Buffer.from(result.data,'base64').length,header:Buffer.from(result.data,'base64').subarray(0,64).toString('hex')}));
