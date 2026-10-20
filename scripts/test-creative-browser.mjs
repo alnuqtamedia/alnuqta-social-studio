@@ -56,9 +56,9 @@ try{
  await page.waitForFunction(()=>topics.customScript?.title==='اختبار تلقائي'&&!StudioProduction.state.busy);
  const automatic=await page.evaluate(()=>{
   const scene=topics.customScript.slides[0];
-  return {look:scene.cinema?.look,motion:scene.cinema?.motion,transition:scene.cinema?.transition,quote:scene.creative?.text};
+  return {look:scene.cinema?.look,motion:scene.cinema?.motion,transition:scene.cinema?.transition,quote:scene.creative?.text,typography:scene.typography};
  });
- assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر'});
+ assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر',typography:'kinetic'});
  assert.equal(automaticRequests,1);
  console.log('Natural command automatic scene settings',JSON.stringify(automatic));
  await page.unroute('**/functions/v1/gemini-studio-preview');
@@ -77,7 +77,7 @@ try{
    {id:3,type:'outro',title:'الوثيقة',subtitle:'وثيقة اختبار اصطناعية',voiceover:'هنا نبرز منطقة من وثيقة اختبار',duration:2,visualType:'document',mediaItems:media()}
   ]};
   activeTopic=activeTikTokTopic='customScript';activeTikTokSlide=currentSlideIndex=0;activeTab='tiktok';
-  topics.customScript.slides.forEach(s=>s.duration=testSeconds/3);
+  topics.customScript.slides.forEach(s=>{s.duration=testSeconds/3;s.typography='kinetic';});
   window.aiSceneDurations=[testSeconds/3,testSeconds/3,testSeconds/3];
   document.getElementById('production-motion').checked=true;
   document.getElementById('production-orientation').value=testOrientation;
@@ -129,6 +129,7 @@ try{
   document.getElementById('saved-studio-projects').value=snapshot.id;
   await restoreStudioProject();
   if(topics.customScript.slides[1].creative?.kind!=='comparison')throw Error('Snapshot restore failed');
+  if(topics.customScript.slides[0].typography!=='kinetic')throw Error('Kinetic typography lost on restore');
   if(topics.customScript.slides[0].cinema?.intensity!==.65||topics.customScript.slides[1].cinema?.transition!=='wipe-left')throw Error('Cinema settings lost after restore');
   return {ui:true,commands:true,cinemaUI:true,evidenceProtected:true,cinemaSnapshot:true,voiceUnchanged:true,indexedDBRoundtrip:true};
  });
