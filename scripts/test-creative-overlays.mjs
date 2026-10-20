@@ -33,3 +33,19 @@ assert.equal(api.parseCreativeCommand('اقتباس للمشهد ٢: "نص" ال
 assert.equal(api.parseCreativeCommand('مقارنة للمشهد 1: "أ" 0 و "ب" 12 الوحدة "دينار" المصدر "جدول"').creative.items[0].value,0);
 assert.throws(()=>api.parseCreativeCommand('مقارنة للمشهد 2: بيانات ناقصة'));
 console.log('Bounded creative commands passed without intercepting normal generation requests.');
+
+const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+const normalize=html.slice(html.indexOf('function normalizeAISlides('),html.indexOf('function applyGeminiResult('));
+vm.runInContext('var window=globalThis;'+normalize,sandbox);
+const scene={title:'التقرير',voiceover:'هذا اقتباس حرفي موجود',creative:quote};
+const normalized=sandbox.normalizeAISlides([scene],'','')[0];
+assert.equal(normalized.creative.kind,'quote');
+assert.equal(normalized.creative.source,'مصدر');
+assert.equal(sandbox.normalizeAISlides([{...scene,voiceover:'نص مختلف'}],'','')[0].creative,undefined);
+const pack=html.slice(html.indexOf('async function packProjectValue('),html.indexOf('async function refreshSavedProjects('));
+sandbox.Blob=Blob;sandbox.URL=URL;vm.runInContext(pack,sandbox);
+const packed=await sandbox.packProjectValue({slides:[normalized]});
+const restored=sandbox.unpackProjectValue(JSON.parse(JSON.stringify(packed)),[]);
+assert.equal(restored.slides[0].creative.text,quote.text);
+assert.equal(restored.slides[0].creative.source,quote.source);
+console.log('Creative normalization and snapshot roundtrip passed.');
