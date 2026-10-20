@@ -63,6 +63,16 @@ try{
  console.log('Natural command automatic scene settings',JSON.stringify(automatic));
  await page.unroute('**/functions/v1/gemini-studio-preview');
  await page.locator('#studio-source-text').fill('');
+ for(const [width,height] of [[720,1280],[1280,720]]){
+  for(const [name,time] of [['opening',.8],['settled',3]]){
+   const png=await page.evaluate(({width,height,time})=>{
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    StudioProduction.paint(canvas.getContext('2d'),{title:'المبيعات ليست أرباحاً',voiceover:'المبيعات ليست أرباحاً، فالتكاليف تغير حسابات المشروع.',typography:'kinetic'},null,width,height,time,8);
+    return canvas.toDataURL('image/png').split(',')[1];
+   },{width,height,time});
+   await fs.writeFile(path.join(out,'kinetic-'+name+'-'+width+'x'+height+'.png'),Buffer.from(png,'base64'));
+  }
+ }
  // Only synthetic fixtures. No provider calls, real credentials, or source documents.
  await page.evaluate(({testSeconds,testOrientation})=>{
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;

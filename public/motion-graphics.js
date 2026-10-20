@@ -174,6 +174,8 @@ function drawKinetic(ctx,slide,{width:W,height:H,time=0,duration=1}){
   for(let row=0;row<f.lines.length;row++){let x=W-M-S*.035;for(const word of words(f.lines[row])){const width=ctx.measureText(word).width,baseline=y+S*.025+f.size+row*f.size*1.5;if(k===highlight){ctx.fillStyle='#b10d18';ctx.fillRect(x-width-S*.005,baseline-f.size*1.05,width+S*.01,f.size*1.35);}ctx.fillStyle='#fff';ctx.fillText(word,x,baseline);x-=ctx.measureText(word+' ').width;k++;}}
   ctx.restore();
  }
+ // A restrained progress accent keeps static evidence scenes advancing in the capture stream.
+ ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(M,H*.935,cw,2);ctx.fillStyle='#e31217';ctx.fillRect(W-M-cw*q,H*.935,cw*q,2);
  ctx.restore();
 }
 function draw(ctx,slide,{width:W,height:H,time=0,duration=1}){
