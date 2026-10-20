@@ -189,7 +189,7 @@ function creativeEditor(host){
  <p>أوامر محلية دون طلب توليد جديد: اقتباس للمشهد 2: &quot;النص الحرفي&quot; المصدر &quot;اسم المصدر&quot;؛ مقارنة للمشهد 2: &quot;2025&quot; 20 و &quot;2026&quot; 30 الوحدة &quot;مليون دينار&quot; المصدر &quot;التقرير&quot;؛ أزل القالب من المشهد 2.</p><p>اختر المشهد واضغط تحميل إعداداته. الإضافة تظهر عند تفعيل الرسوم المتحركة وإنشاء معاينة جديدة.</p>
  <label>رقم المشهد <input id="creative-scene" type="number" min="1" step="1" value="1" class="bg-navy p-1 w-20"></label>
  <button id="creative-load" type="button">تحميل إعدادات المشهد</button>
- <label class="block">القالب <select id="creative-kind" class="bg-navy p-1"><option value="">الإخراج المعتاد</option value="quote">اقتباس من التعليق</option><option value="comparison">مقارنة رقمين</option><option value="document-focus">إبراز منطقة في وثيقة</option></select></label>
+ <label class="block">القالب <select id="creative-kind" class="bg-navy p-1"><option value="">الإخراج المعتاد</option><option value="quote">اقتباس من التعليق</option><option value="comparison">مقارنة رقمين</option><option value="document-focus">إبراز منطقة في وثيقة</option></select></label>
  <div id="creative-fields">
  <label class="block">اسم المصدر <input id="creative-source" maxlength="100" class="w-full bg-navy p-1"></label>
  <div id="creative-quote-fields"><label>الاقتباس الحرفي من التعليق <textarea id="creative-quote" maxlength="180" rows="2" class="w-full bg-navy p-1"></textarea></label></div>
