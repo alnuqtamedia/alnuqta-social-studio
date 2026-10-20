@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "status": "design-only-not-runtime-enabled",
+  "brand": {
+    "name": "النقطة Media",
+    "colors": {
+      "background": "#071426",
+      "accent": "#e31217",
+      "text": "#ffffff"
+    },
+    "direction": "rtl"
+  },
+  "profiles": [
+    {
+      "id": "investigative",
+      "name": "تحقيق وثائقي",
+      "priority": [
+        "document-focus",
+        "quote",
+        "timeline",
+        "relationship-map"
+      ],
+      "transition": "cut",
+      "evidenceRequired": true
+    },
+    {
+      "id": "economic",
+      "name": "تقرير اقتصادي",
+      "priority": [
+        "literal-number-card",
+        "comparison-chart",
+        "trend-chart",
+        "flow-diagram"
+      ],
+      "transition": "fade",
+      "evidenceRequired": true
+    },
+    {
+      "id": "cinematic",
+      "name": "إعلان سينمائي",
+      "priority": [
+        "image-pan",
+        "chapter-title",
+        "color-look",
+        "logo-reveal"
+      ],
+      "transition": "fade",
+      "evidenceRequired": false
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "animated-title",
+      "name": "عنوان متحرك",
+      "status": "existing",
+      "implementation": "public/motion-graphics.js"
+    },
+    {
+      "id": "phrase-subtitle",
+      "name": "سبتايتل عبارات بتوقيت تقديري",
+      "status": "existing",
+      "implementation": "public/motion-graphics.js"
+    },
+    {
+      "id": "subject-icon",
+      "name": "أيقونة مستندة إلى نص التعليق",
+      "status": "existing",
+      "implementation": "public/motion-graphics.js"
+    },
+    {
+      "id": "literal-number-card",
+      "name": "بطاقة بيانات حرفية بلا رسم إحصائي",
+      "status": "existing",
+      "implementation": "public/motion-graphics.js"
+    },
+    {
+      "id": "document-focus",
+      "name": "تقريب وتظليل موضع محدد من وثيقة",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "quote",
+      "name": "اقتباس موثق مع اسم المصدر",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "timeline",
+      "name": "خط زمني بأحداث وتواريخ موثقة",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "relationship-map",
+      "name": "شبكة علاقات مدعومة بمصادر",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "comparison-chart",
+      "name": "مقارنة قيم بوحدات ومصادر",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "trend-chart",
+      "name": "اتجاه زمني بمقياس ومحاور واضحة",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "flow-diagram",
+      "name": "تدفق مالي موثق باتجاهات وقيم",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "map-route",
+      "name": "خريطة ومسار مع إسناد البيانات",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "image-pan",
+      "name": "حركة صورة محسوبة من زمن المشهد",
+      "status": "requires-audit",
+      "implementation": null
+    },
+    {
+      "id": "chapter-title",
+      "name": "عنوان فصل",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "color-look",
+      "name": "تلوين قابل للضبط",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "logo-reveal",
+      "name": "كشف شعار النقطة الأصلي",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "audio-ducking",
+      "name": "خفض الموسيقى تحت التعليق",
+      "status": "planned",
+      "implementation": null
+    },
+    {
+      "id": "cinematic-transition",
+      "name": "انتقالات GLSL منتقاة",
+      "status": "planned",
+      "implementation": null
+    }
+  ],
+  "sources": [
+    {
+      "repo": "https://github.com/gl-transitions/gl-transitions",
+      "purpose": "transitions",
+      "status": "candidate-not-vendored"
+    },
+    {
+      "repo": "https://github.com/pixijs/filters",
+      "purpose": "visual effects and color",
+      "status": "candidate-not-vendored"
+    },
+    {
+      "repo": "https://github.com/antvis/G2",
+      "purpose": "data graphics",
+      "status": "candidate-not-vendored"
+    },
+    {
+      "repo": "https://github.com/maplibre/maplibre-gl-js",
+      "purpose": "maps",
+      "status": "candidate-not-vendored"
+    },
+    {
+      "repo": "https://github.com/Tonejs/Tone.js",
+      "purpose": "audio processing",
+      "status": "candidate-not-vendored"
+    }
+  ],
+  "constraints": {
+    "runtimeMustFilterStatus": "existing",
+    "automaticDependencyInstall": false,
+    "publishAutomatically": false,
+    "modifySavedProjects": false,
+    "wordTiming": "estimated-unless-aligned",
+    "defaultResolution": 720,
+    "heavyEffectsDefault": false
+  }
+}
