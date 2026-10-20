@@ -18,13 +18,13 @@ assert(!clean({...slide,creative:comparison}).creative);
 assert.equal(clean({...slide,creative:comparison},{slides:[{creative:comparison}]}).creative.kind,'comparison');
 assert(!clean({title:'مشروع قديم'}).cinema);
 // Run the real planner handler with mocked provider/security, including its response schema.
-let handle,requests=[];
+let handle,requests=[],providerSlide=slide;
 const ctx=vm.createContext({Response,AbortSignal,console,JSON,Object,Number,String,Array,Error,
  directionPrompt,cinemaSchema,quoteSchema,sanitizeDirection,
  authorizeStudioOrigin:()=>({cors:{'Content-Type':'application/json'}}),
  enforceStudioRateLimit:async()=>null,extractText:d=>d.output_text,
  Deno:{env:{get:k=>k==='GEMINI_API_KEY'?'test-key':undefined},serve:fn=>{handle=fn}},
- fetch:async(url,options)=>{requests.push(JSON.parse(options.body));return {ok:true,status:200,text:async()=>JSON.stringify({output_text:JSON.stringify({outputType:'video',title:'خبر',subtitle:'تقرير',slides:[slide]})})}}
+ fetch:async(url,options)=>{requests.push(JSON.parse(options.body));return {ok:true,status:200,text:async()=>JSON.stringify({output_text:JSON.stringify({outputType:'video',title:'خبر',subtitle:'تقرير',slides:[providerSlide]})})}}
 });
 const backend=fs.readFileSync('supabase/functions/gemini-studio-preview/index.ts','utf8')
  .replace(/^import .*;\n/gm,'').replace(/: (Request|unknown|any)\b/g,'').replace(/:(unknown|any)\b/g,'');
@@ -36,7 +36,13 @@ assert.equal(result.slides[0].cinema.look,'cinematic');
 assert.equal(result.slides[0].creative.text,'العمل مستمر');
 assert(requests[0].input.includes(directionPrompt));
 assert(requests[0].response_format.schema.properties.slides.items.properties.cinema);
+assert(requests[0].response_format.schema.properties.slides.items.required.includes('cinema'));
 assert.equal(requests[0].store,false);
+providerSlide={...slide,cinema:undefined};
+assert.equal((await handle(req)).status,422,'missing direction must not silently produce a plain video');
+providerSlide={...slide,cinema:{...cinema,intensity:4}};
+assert.equal((await handle(req)).status,422,'invalid direction must preserve previous work');
+providerSlide=slide;
 const renderCtx=vm.createContext({});
 vm.runInContext(fs.readFileSync('public/cinematic-effects.js','utf8'),renderCtx);
 vm.runInContext(fs.readFileSync('public/motion-graphics.js','utf8'),renderCtx);
