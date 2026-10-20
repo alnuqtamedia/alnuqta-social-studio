@@ -29,10 +29,23 @@ function colorFilter(c){
  if(c.look==='mono')return `grayscale(${a}) contrast(${1+.08*a})`;
  return 'none';
 }
+const gradedImages=new WeakMap();
+function gradedImage(element,c){
+ // Cache grading for still images: repeating Canvas filters at 30fps is costly on older CPUs.
+ if(!element.naturalWidth||element.videoWidth||!root.document||c.look==='natural'||c.intensity===0)return null;
+ const key=c.look+':'+c.intensity+':'+element.naturalWidth+':'+element.naturalHeight;
+ const existing=gradedImages.get(element);if(existing?.key===key)return existing.canvas;
+ const canvas=root.document.createElement('canvas'),scale=Math.min(1,1920/Math.max(element.naturalWidth,element.naturalHeight));
+ canvas.width=Math.max(1,Math.round(element.naturalWidth*scale));canvas.height=Math.max(1,Math.round(element.naturalHeight*scale));
+ const context=canvas.getContext('2d');if(!context||!('filter' in context))return null;
+ context.filter=colorFilter(c);context.drawImage(element,0,0,canvas.width,canvas.height);
+ gradedImages.set(element,{key,canvas});return canvas;
+}
 function drawMedia(ctx,element,slide,W,H,time,duration){
  const c=settings(slide);if(!c)return false;
  const r=geometry(element.videoWidth||element.naturalWidth||element.width,element.videoHeight||element.naturalHeight||element.height,W,H,c.motion,time,duration);if(!r)return false;
- ctx.save();try{ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();if('filter' in ctx)ctx.filter=colorFilter(c);ctx.drawImage(element,r.x,r.y,r.width,r.height);}finally{ctx.restore();}
+ const graded=gradedImage(element,c);
+ ctx.save();try{ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();if('filter' in ctx)ctx.filter=graded?'none':colorFilter(c);ctx.drawImage(graded||element,r.x,r.y,r.width,r.height);}finally{ctx.restore();}
  return true;
 }
 let tile=null;const patterns=new WeakMap();
