@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "design-only-not-runtime-enabled",
+  "status": "draft-implementation-not-deployed",
   "brand": {
     "name": "النقطة Media",
     "colors": {
@@ -76,14 +76,14 @@
     {
       "id": "document-focus",
       "name": "تقريب وتظليل موضع محدد من وثيقة",
-      "status": "planned",
-      "implementation": null
+      "status": "implemented-on-draft",
+      "implementation": "public/motion-graphics.js"
     },
     {
       "id": "quote",
       "name": "اقتباس موثق مع اسم المصدر",
-      "status": "planned",
-      "implementation": null
+      "status": "implemented-on-draft",
+      "implementation": "public/motion-graphics.js"
     },
     {
       "id": "timeline",
@@ -100,8 +100,8 @@
     {
       "id": "comparison-chart",
       "name": "مقارنة قيم بوحدات ومصادر",
-      "status": "planned",
-      "implementation": null
+      "status": "implemented-on-draft",
+      "implementation": "public/motion-graphics.js"
     },
     {
       "id": "trend-chart",
@@ -186,7 +186,7 @@
     }
   ],
   "constraints": {
-    "runtimeMustFilterStatus": "existing",
+    "runtimeMustFilterStatus": "This document is not a runtime registry; actual renderer validates slide.creative",
     "automaticDependencyInstall": false,
     "publishAutomatically": false,
     "modifySavedProjects": false,
