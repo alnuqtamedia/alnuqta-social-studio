@@ -36,6 +36,33 @@ await page.route('**/*',route=>{
 try{
  await page.goto(origin,{waitUntil:'load'});
  await page.waitForFunction(()=>window.StudioProduction&&window.StudioMotion?.parseCreativeCommand&&window.StudioCinema);
+ // Exercise the ordinary command button, with a mocked planner response and no provider traffic.
+ let automaticRequests=0;
+ await page.route('**/functions/v1/gemini-studio-preview',async route=>{
+  const body=route.request().postDataJSON();
+  assert.match(body.command,/سينمائي/);
+  assert.equal(body.currentContent.sourceMaterial,'التقرير: العمل مستمر');
+  automaticRequests++;
+  await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({outputType:'video',title:'اختبار تلقائي',subtitle:'مادة اصطناعية',slides:[{
+   title:'خبر',voiceover:'قال التقرير إن العمل مستمر',duration:5,visualType:'illustrative',visualQuery:'general work',
+   cinema:{motion:'zoom-in',look:'cinematic',intensity:.5,vignette:.1,grain:false,transition:'dip-black',transitionSeconds:.4},
+   creative:{kind:'quote',text:'العمل مستمر',source:'التقرير'}
+  }]})});
+ });
+ await page.locator('#production-auto').uncheck();
+ await page.locator('#studio-source-text').fill('التقرير: العمل مستمر');
+ await page.locator('#ai-command-input').fill('حوّل التقرير إلى فيديو سينمائي');
+ await page.locator('#ai-run-btn').click();
+ await page.waitForFunction(()=>topics.customScript?.title==='اختبار تلقائي'&&!StudioProduction.state.busy);
+ const automatic=await page.evaluate(()=>{
+  const scene=topics.customScript.slides[0];
+  return {look:scene.cinema?.look,motion:scene.cinema?.motion,transition:scene.cinema?.transition,quote:scene.creative?.text};
+ });
+ assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر'});
+ assert.equal(automaticRequests,1);
+ console.log('Natural command automatic scene settings',JSON.stringify(automatic));
+ await page.unroute('**/functions/v1/gemini-studio-preview');
+ await page.locator('#studio-source-text').fill('');
  // Only synthetic fixtures. No provider calls, real credentials, or source documents.
  await page.evaluate(({testSeconds,testOrientation})=>{
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;
