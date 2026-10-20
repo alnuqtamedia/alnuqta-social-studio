@@ -23,6 +23,8 @@ const origin='http://127.0.0.1:'+server.address().port;
 const browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const errors=[];
+// The external Tailwind CDN is intentionally blocked; supply only its configuration namespace.
+await page.addInitScript(()=>{window.tailwind={config:{}};});
 page.on('pageerror',error=>errors.push(error.message));
 await page.route('**/*',route=>{
  const url=route.request().url();
@@ -41,8 +43,8 @@ try{
   const media=()=>[{url:image,preview:image,kind:'image',local:false,credit:'Synthetic test fixture'}];
   topics.customScript={title:'اختبار إبداعي اصطناعي',slides:[
    {id:1,type:'cover',title:'الاقتباس',subtitle:'نص اختبار',voiceover:'هذا اقتباس حرفي موجود في التعليق',duration:2,visualType:'illustrative',mediaItems:media()},
-   {id:2,type:'content',title:'المقارنة',subtitle:'بيانات اختبار اصطناعية',voiceover:'مقارنة أرقام اصطناعية للاختبار',duration:2,visualType:'data',mediaItems:media()},
-   {id:3,type:'outro',title:'الوثيقة',subtitle:'وثيقة اختبار اصطناعية',voiceover:'نبرز منطقة من وثيقة اختبار',duration:2,visualType:'document',mediaItems:media()}
+   {id:2,type:'content',title:'المقارنة',subtitle:'بيانات اختبار اصطناعية',voiceover:'هذه مقارنة بين أرقام اصطناعية للاختبار',duration:2,visualType:'data',mediaItems:media()},
+   {id:3,type:'outro',title:'الوثيقة',subtitle:'وثيقة اختبار اصطناعية',voiceover:'هنا نبرز منطقة من وثيقة اختبار',duration:2,visualType:'document',mediaItems:media()}
   ]};
   activeTopic=activeTikTokTopic='customScript';activeTikTokSlide=currentSlideIndex=0;activeTab='tiktok';
   window.aiSceneDurations=[2,2,2];
@@ -120,6 +122,7 @@ try{
   const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=reject;reader.readAsDataURL(socialVideo.blob);});
   return {data,diagnostics:window.lastExportDiagnostics};
  });
+ console.log('Export transfer',JSON.stringify({diagnostics:result.diagnostics,base64Length:result.data.length,bytes:Buffer.from(result.data,'base64').length,header:Buffer.from(result.data,'base64').subarray(0,64).toString('hex')}));
  const ext=result.diagnostics.mimeType.startsWith('video/mp4')?'mp4':'webm';
  const file=path.join(out,'synthetic-creative-export.'+ext);
  await fs.writeFile(file,Buffer.from(result.data,'base64'));
