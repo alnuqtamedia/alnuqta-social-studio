@@ -52,6 +52,20 @@ function icon(ctx,name,x,y,size,progress=1){if(!root.Path2D)return;let path=path
 function panel(ctx,x,y,w,h,alpha=.88){ctx.fillStyle=`rgba(7,20,38,${alpha})`;ctx.fillRect(x,y,w,h);ctx.fillStyle='#e31217';ctx.fillRect(x+w-4,y,4,h);}
 
 /* Explicit, opt-in creative overlays. Never infer statistics or evidence. */
+
+function parseCreativeCommand(command){
+ const text=String(command||'').trim().replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/٫/g,'.');
+ // A deliberately bounded local command grammar; other requests still use the normal planner.
+ let m=text.match(/^(?:أزل|ازل|احذف) القالب من المشهد (\d+)\s*[.!؟]?$/);
+ if(m)return {sceneIndex:Number(m[1])-1,creative:null};
+ m=text.match(/^اقتباس للمشهد (\d+):?\s*"([^"]{1,180})"\s+المصدر\s+"([^"]{1,100})"\s*$/);
+ if(m)return {sceneIndex:Number(m[1])-1,creative:{kind:'quote',text:m[2],source:m[3]}};
+ m=text.match(/^مقارنة للمشهد (\d+):?\s*"([^"]{1,30})"\s+([0-9]+(?:\.[0-9]+)?)\s+و\s*"([^"]{1,30})"\s+([0-9]+(?:\.[0-9]+)?)\s+الوحدة\s+"([^"]{1,24})"\s+المصدر\s+"([^"]{1,100})"\s*$/);
+ if(m)return {sceneIndex:Number(m[1])-1,creative:{kind:'comparison',items:[{label:m[2],value:Number(m[3])},{label:m[4],value:Number(m[5])}],unit:m[6],source:m[7]}};
+ if(/^(?:اقتباس للمشهد|مقارنة للمشهد|(?:أزل|ازل|احذف) القالب من المشهد)/.test(text))throw Error('صيغة الأمر الإبداعي غير مكتملة؛ استخدم المثال في بطاقة إخراج المشهد.');
+ return null;
+}
+
 function creativePlan(slide){
  const c=slide&&slide.creative;
  if(!c||typeof c!=='object')return null;
@@ -131,5 +145,5 @@ function draw(ctx,slide,{width:W,height:H,time=0,duration=1}){
  const phrase=p.phrases.find((a,i)=>q>=a.start&&(q<a.start+a.span||i===p.phrases.length-1));if(phrase){const text=phrase.words.join(' '),f=fit(ctx,text,contentW-S*.06,2,Math.round(S*.043)),h=f.lines.length*f.size*1.5+S*.04,y=H*.84-h/2;panel(ctx,M,y,contentW,h,.93);ctx.font=`700 ${f.size}px Cairo, Arial`;const phase=clamp((q-phrase.start)/phrase.span),highlight=Math.min(phrase.words.length-1,Math.floor(phase*phrase.words.length));let k=0;for(let row=0;row<f.lines.length;row++){let x=W-M-S*.03;for(const word of words(f.lines[row])){ctx.fillStyle=k===highlight?'#ff6570':'#fff';ctx.fillText(word,x,y+S*.02+f.size+row*f.size*1.5);x-=ctx.measureText(word+' ').width;k++;}}}
  ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(M,H*.935,contentW,3);ctx.fillStyle='#e31217';ctx.fillRect(W-M-contentW*q,H*.935,contentW*q,3);ctx.restore();
 }
-root.StudioMotion={plan,draw,creativePlan,icons:Object.keys(icons)};
+root.StudioMotion={plan,draw,creativePlan,parseCreativeCommand,icons:Object.keys(icons)};
 })(typeof window==='undefined'?globalThis:window);
