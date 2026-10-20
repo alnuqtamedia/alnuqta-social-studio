@@ -129,8 +129,10 @@ try{
  const probe=JSON.parse(execFileSync('ffprobe',['-v','error','-show_streams','-show_format','-of','json',file],{encoding:'utf8'}));
  assert(probe.streams.some(s=>s.codec_type==='audio'));
  assert(probe.streams.some(s=>s.codec_type==='video'));
- const packetData=JSON.parse(execFileSync('ffprobe',['-v','error','-show_packets','-show_entries','packet=codec_type,pts_time,duration_time','-of','json',file],{encoding:'utf8'}));
- const end=type=>Math.max(...packetData.packets.filter(p=>p.codec_type===type).map(p=>Number(p.pts_time)+Number(p.duration_time||0)));
+ const packetData=JSON.parse(execFileSync('ffprobe',['-v','error','-show_packets','-show_entries','packet=codec_type,stream_index,pts_time,dts_time,duration_time','-of','json',file],{encoding:'utf8'}));
+ const packets=type=>packetData.packets.filter(p=>(p.codec_type||probe.streams.find(s=>s.index===p.stream_index)?.codec_type)===type);
+ const end=type=>{const times=packets(type).map(p=>Number(p.pts_time??p.dts_time)+Number(p.duration_time||0)).filter(Number.isFinite);assert(times.length,'No timestamped packets: '+type);return Math.max(...times);};
+ console.log('Independent packet verification',JSON.stringify({streams:probe.streams.map(s=>({index:s.index,type:s.codec_type})),audioPackets:packets('audio').length,videoPackets:packets('video').length,audioEnd:end('audio'),videoEnd:end('video'),sample:packetData.packets.slice(-3)}));
  assert(Math.abs(end('audio')-6)<.6,'audio duration');
  assert(Math.abs(end('video')-6)<.6,'video duration');
  assert(Math.abs(end('audio')-end('video'))<.6,'audio/video sync');
