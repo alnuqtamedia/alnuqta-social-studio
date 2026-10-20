@@ -56,6 +56,7 @@ try{
  await page.locator('summary').filter({hasText:'إخراج المشهد:'}).click();
  await page.locator('#creative-scene').fill('1');
  await page.locator('#creative-load').click();
+ console.log('Creative select before action',await page.locator('#creative-kind').evaluate(el=>({html:el.outerHTML,options:Array.from(el.options).map(x=>({value:x.value,text:x.textContent})),count:document.querySelectorAll('#creative-kind').length})));
  await page.locator('#creative-kind').selectOption('quote');
  await page.locator('#creative-source').fill('مصدر اصطناعي للاختبار');
  await page.locator('#creative-quote').fill('اقتباس حرفي');
@@ -145,6 +146,8 @@ try{
  console.log(JSON.stringify(summary));
 }catch(error){
  await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});
- await fs.writeFile(path.join(out,'error.txt'),String(error.stack)+'\n'+errors.join('\n'));
+ const dom=await page.evaluate(()=>({select:document.getElementById('creative-kind')?.outerHTML,status:document.getElementById('creative-status')?.textContent})).catch(()=>({}));
+ console.error('Browser diagnostics',JSON.stringify(dom),errors);
+ await fs.writeFile(path.join(out,'error.txt'),String(error.stack)+'\n'+errors.join('\n')+'\n'+JSON.stringify(dom));
  throw error;
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
