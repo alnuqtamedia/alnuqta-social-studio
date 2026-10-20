@@ -48,6 +48,16 @@ jobs:
           sudo apt-get install -y ffmpeg
       - name: Verify real browser creative export
         run: node scripts/test-creative-browser.mjs
+      - name: Verify 45-second portrait export
+        run: node scripts/test-creative-browser.mjs
+        env:
+          CINEMA_TEST_SECONDS: 45
+          CINEMA_TEST_ORIENTATION: portrait
+      - name: Verify 120-second landscape export
+        run: node scripts/test-creative-browser.mjs
+        env:
+          CINEMA_TEST_SECONDS: 120
+          CINEMA_TEST_ORIENTATION: landscape
       - uses: actions/upload-artifact@v4
         if: always()
         with:
