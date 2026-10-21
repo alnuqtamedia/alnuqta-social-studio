@@ -137,3 +137,19 @@ assert.deepEqual(Array.from(ctx.StudioProduction.correctionTargets('المشرو
 console.log('Local infographic correction preserves narration and all-scene targeting.');
 
 const spelled={visualType:'data',voiceover:'النقل مئة ألف دينار. الكهرباء مئة ألف دينار.'};ctx.StudioProduction.prepareDataScene(spelled);assert.equal(spelled.points.length,2);assert(ctx.StudioProduction.localDataReady(spelled));
+
+// Preflight recovers misclassified numeric scenes while preserving evidence requirements.
+const missingNumeric={title:'بداية الراتب',visualType:'illustrative',voiceover:'الراتب مليون دينار. الإيجار ثلاثمئة ألف دينار.',mediaItems:[]};
+const originalNarration=missingNumeric.voiceover;assert(ctx.StudioProduction.prepareLocalVisual(missingNumeric));assert.equal(missingNumeric.visualType,'data');assert.equal(missingNumeric.voiceover,originalNarration);assert(!ctx.StudioProduction.needsMedia(missingNumeric));
+for(const type of ['document','portrait','real','archive','map']){const scene={...missingNumeric,visualType:type};assert(!ctx.StudioProduction.prepareLocalVisual(scene));assert.equal(scene.visualType,type);}
+const actualFootage={visualType:'broll',voiceover:'مليون دينار',mediaItems:[{url:'blob:existing'}]};assert(!ctx.StudioProduction.prepareLocalVisual(actualFootage));assert.equal(actualFootage.visualType,'broll');
+const noFacts={title:'وثيقة مطلوبة',visualType:'document',mediaItems:[]};const issues=ctx.StudioProduction.missingVisuals([missingNumeric,noFacts]);assert.equal(issues.length,1);assert.equal(issues[0].scene,2);assert(ctx.StudioProduction.visualReadinessError([missingNumeric,noFacts]).includes('وثيقة مطلوبة'));assert(!ctx.StudioProduction.visualReadinessError([missingNumeric]));
+// Match the legacy media fallback used by the real editor, not just mediaItems.
+ctx.getSceneMedia=s=>s.mediaItems?.length?s.mediaItems:s.mediaVideoUrl||s.mediaUrl?[{url:s.mediaVideoUrl||s.mediaUrl}]:[];
+ctx.topics.customScript.slides=[{title:'النفقات',visualType:'data',voiceover:'النقل مئة ألف دينار',points:['النقل 100 ألف'],mediaUrl:'https://legacy.invalid/old.jpg',mediaItems:[]}];el('production-correction').value='حوّل المشهد 1 إلى إنفوغرافيك اقتصادي';await ctx.StudioProduction.correctCurrent();assert.equal(ctx.getSceneMedia(ctx.topics.customScript.slides[0]).length,0);
+console.log('Automatic numeric fallback, named missing scenes, protected evidence and legacy media clearing passed.');
+
+// Motion-text fallback is explicit in the report, opt-in to the graphic pack, and never replaces evidence.
+ctx.StudioDesignPack={normalize:s=>s.design?.pack==='press-v1'?s.design:null};const explainer={title:'مثال تدريبي',visualType:'illustrative',voiceover:'هذا مثال توضيحي وليس متوسطاً وطنياً',design:{pack:'press-v1',preset:'finance'},mediaItems:[]};assert(!ctx.StudioProduction.prepareLocalVisual(explainer));assert(ctx.StudioProduction.prepareLocalVisual(explainer,true));assert.equal(explainer.visualType,'text-only');assert.equal(explainer.productionVisual.kind,'motion-text');assert(explainer.productionMediaReview.note.includes('ليس فيديو مصوراً'));const evidence={...explainer,visualType:'document'};assert(!ctx.StudioProduction.prepareLocalVisual(evidence,true));
+
+const decimal={visualType:'illustrative',voiceover:'التكلفة 3.5 مليون دينار. العائد ٤.٢ مليون دينار.'};ctx.StudioProduction.prepareLocalVisual(decimal);assert.equal(decimal.points.length,2);assert(decimal.points[0].includes('3.5'));assert(decimal.points[1].includes('٤.٢'));
