@@ -48,7 +48,7 @@ async function commandMic(){if(mic){mic.stop();return;}if(state.busy)return;
   }catch(e){status('تعذر تفريغ الأمر: '+e.message,'error');}finally{micChunks=[];}
  };mic.onerror=()=>{micStream?.getTracks().forEach(t=>t.stop());clearTimeout(micTimer);mic=null;micStream=null;$('command-mic').textContent='🎙 تسجيل الأمر';status('تعذر تسجيل الأمر؛ أعد المحاولة.','error');};mic.start();micTimer=setTimeout(()=>mic?.stop(),90000);$('command-mic').textContent='■ إنهاء الأمر';status('يسجّل الأمر فقط؛ ينتهي تلقائياً بعد 90 ثانية.');}catch(e){micStream?.getTracks().forEach(t=>t.stop());status('تعذر فتح المايك: '+e.message,'error');}}
 function prepareDataScene(s){
- const numbered=String(s.voiceover||'').split(/[.!؟؛\n]+/).map(x=>x.trim()).filter(x=>/\d|[٠-٩]|مليون|مليار|ألف|الف|آلاف|مئة|مائة|مئتان|مئتين|خمسة|عشرين|خمسةً|ستمئة|أربعمئة/.test(x));
+ const numbered=String(s.voiceover||'').split(/\.(?![0-9٠-٩])|[!؟؛\n]+/).map(x=>x.trim()).filter(x=>/\d|[٠-٩]|مليون|مليار|ألف|الف|آلاف|مئة|مائة|مئتان|مئتين|خمسة|عشرين|خمسةً|ستمئة|أربعمئة/.test(x));
  const existing=Array.isArray(s.points)?s.points.filter(x=>typeof x==='string'&&x.trim()):[];
  if((!existing.length||!existing.some(x=>/[0-9٠-٩]|ألف|مليون|مليار|مئة|مائة/.test(x)))&&numbered.length)s.points=numbered.slice(0,4);
  s.productionVisual={kind:'data',ready:Boolean(s.points?.length),note:s.points?.length?'رسوم حسابية من النص؛ راجع الأرقام':'لا توجد تفاصيل حسابية؛ اكتبها في تصحيح المشهد'};

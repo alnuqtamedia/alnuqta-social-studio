@@ -151,3 +151,5 @@ console.log('Automatic numeric fallback, named missing scenes, protected evidenc
 
 // Motion-text fallback is explicit in the report, opt-in to the graphic pack, and never replaces evidence.
 ctx.StudioDesignPack={normalize:s=>s.design?.pack==='press-v1'?s.design:null};const explainer={title:'مثال تدريبي',visualType:'illustrative',voiceover:'هذا مثال توضيحي وليس متوسطاً وطنياً',design:{pack:'press-v1',preset:'finance'},mediaItems:[]};assert(!ctx.StudioProduction.prepareLocalVisual(explainer));assert(ctx.StudioProduction.prepareLocalVisual(explainer,true));assert.equal(explainer.visualType,'text-only');assert.equal(explainer.productionVisual.kind,'motion-text');assert(explainer.productionMediaReview.note.includes('ليس فيديو مصوراً'));const evidence={...explainer,visualType:'document'};assert(!ctx.StudioProduction.prepareLocalVisual(evidence,true));
+
+const decimal={visualType:'illustrative',voiceover:'التكلفة 3.5 مليون دينار. العائد ٤.٢ مليون دينار.'};ctx.StudioProduction.prepareLocalVisual(decimal);assert.equal(decimal.points.length,2);assert(decimal.points[0].includes('3.5'));assert(decimal.points[1].includes('٤.٢'));
