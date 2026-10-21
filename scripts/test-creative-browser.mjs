@@ -65,6 +65,9 @@ try{
  await page.evaluate(()=>StudioDesignPack.load());
  const designCheck=await page.evaluate(()=>{const D=StudioDesignPack;for(const d of Object.values(D.state.icons))new Path2D(d);return {icons:Object.keys(D.state.icons).length,font:document.fonts.check('700 32px StudioCairo'),catalog:D.state.catalog.length};});
  assert.equal(designCheck.icons,4808);assert.equal(designCheck.font,true);assert.equal(designCheck.catalog,16);
+ const fallbackCheck=await page.evaluate(()=>{const s={title:'مثال تدريبي',voiceover:'هذا مثال توضيحي وليس متوسطاً وطنياً',visualType:'illustrative',design:{pack:'press-v1',preset:'finance'},mediaItems:[]};if(StudioProduction.prepareLocalVisual(s))throw Error('Text fallback bypassed media search');if(!StudioProduction.prepareLocalVisual(s,true)||StudioProduction.needsMedia(s))throw Error('Local motion-text blocked');const c=document.createElement('canvas');c.width=720;c.height=1280;const ctx=c.getContext('2d'),draw=ctx.fillText.bind(ctx),labels=[];ctx.fillText=(text,...args)=>{labels.push(text);draw(text,...args);};StudioProduction.paint(ctx,s,null,720,1280,4,8);if(!labels.some(t=>t.includes('مثال')))throw Error('Fallback title not painted');const issues=StudioProduction.missingVisuals([s,{title:'وثيقة أصلية',visualType:'document',mediaItems:[]}]);return {kind:s.productionVisual.kind,missing:issues.map(x=>x.scene),note:s.productionMediaReview.note};});
+ assert.equal(fallbackCheck.kind,'motion-text');assert.deepEqual(fallbackCheck.missing,[2]);assert.match(fallbackCheck.note,/ليس فيديو مصوراً/);
+
  // Verify the real Chart.js adapter: shared zero baseline, exact ratios, no live instances,
  // bounded cache, deterministic seek and both render orientations.
  const chartChecks=await page.evaluate(()=>{
@@ -217,7 +220,7 @@ try{
   await fs.writeFile(path.join(out,'design-'+preset+'.png'),Buffer.from(png,'base64'));
  }
 
- await page.evaluate(()=>{const s=topics.customScript.slides[1];s.mediaItems=[];s.points=['أ: 0 دينار','ب: 12 دينار'];StudioProduction.prepareDataScene(s);if(!StudioProduction.localDataReady(s))throw Error('Standalone numeric scene not ready');});
+ await page.evaluate(()=>{const s=topics.customScript.slides[1];s.mediaItems=[];s.points=['أ: 0 دينار','ب: 12 دينار'];s.visualType='illustrative';StudioProduction.prepareLocalVisual(s);if(!StudioProduction.localDataReady(s))throw Error('Standalone numeric scene not ready');});
  // Capture actual pixels in portrait and landscape, using the same renderer as export.
  for(const [width,height] of [[720,1280],[1280,720]]){
   for(let i=0;i<3;i++){
