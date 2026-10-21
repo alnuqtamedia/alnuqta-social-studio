@@ -202,7 +202,7 @@ function creativeEditor(host){
  <div id="creative-fields">
  <label class="block">اسم المصدر <input id="creative-source" maxlength="100" class="w-full bg-navy p-1"></label>
  <div id="creative-quote-fields"><label>الاقتباس الحرفي من التعليق <textarea id="creative-quote" maxlength="180" rows="2" class="w-full bg-navy p-1"></textarea></label></div>
- <div id="creative-comparison-fields"><p>أدخل قيماً من المصدر نفسه وبالوحدة والفترة نفسيهما. لا تُستخرج الأرقام تلقائياً.</p>
+ <div id="creative-comparison-fields"><p>أدخل قيماً من المصدر نفسه وبالوحدة والفترة نفسيهما. لا تُستخرج الأرقام تلقائياً. عند تفعيل حزمة الجرافيك يظهر رسم Chart.js بمقياس موحد يبدأ من الصفر، وتبقى الأرقام كاملة مع الوحدة والمصدر.</p>
  <label>وحدة القياس <input id="creative-unit" maxlength="24" class="bg-navy p-1"></label>
  <label class="block">عنوان القيمة الأولى <input id="creative-label-1" maxlength="30" class="bg-navy p-1"> القيمة <input id="creative-value-1" type="number" min="0" max="1000000000000000" step="any" class="bg-navy p-1 w-28"></label>
  <label class="block">عنوان القيمة الثانية <input id="creative-label-2" maxlength="30" class="bg-navy p-1"> القيمة <input id="creative-value-2" type="number" min="0" max="1000000000000000" step="any" class="bg-navy p-1 w-28"></label></div>

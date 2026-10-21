@@ -116,7 +116,9 @@ function drawCreative(ctx,c,{W,H,S,M,time,duration,alpha,design}){
    creativeText(ctx,c.text,M+S*.035,y+H*.055,cw-S*.10,H*.13,Math.round(S*.036),'#fff',family);
    creativeText(ctx,'المصدر: '+c.source,M+S*.025,y+H*.202,cw-S*.05,H*.045,Math.round(S*.025),'#ffb4b9',family);
   }else{
+   const chartDrawn=root.StudioDesignPack?.comparison(ctx,{design},c,{W,H,S,M,time});
    const max=Math.max(1,...c.items.map(item=>item.value)),rowH=H*.046;
+   if(!chartDrawn){
    c.items.forEach((item,i)=>{
     const yy=y+H*.015+i*rowH,bw=cw*.49,xx=M+S*.025;
     creativeText(ctx,item.label,W-M-cw*.43,yy,cw*.40,rowH*.55,Math.round(S*.025),'#fff',family);
@@ -124,6 +126,7 @@ function drawCreative(ctx,c,{W,H,S,M,time,duration,alpha,design}){
     ctx.fillStyle='#e31217';ctx.fillRect(xx+bw-bw*(item.value/max)*e,yy+rowH*.52,bw*(item.value/max)*e,rowH*.22);
     creativeText(ctx,String(item.value)+' '+c.unit,xx,yy,bw,rowH*.53,Math.round(S*.023),'#fff',family);
    });
+   }else creativeText(ctx,'الوحدة: '+c.unit,M+S*.025,y+H*.184,cw-S*.05,H*.022,Math.round(S*.018),'#cbd5e1',family);
    creativeText(ctx,'المصدر: '+c.source,M+S*.025,y+H*.207,cw-S*.05,H*.04,Math.round(S*.024),'#ffb4b9',family);
   }
  }
