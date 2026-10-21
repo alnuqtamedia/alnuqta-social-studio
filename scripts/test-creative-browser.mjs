@@ -62,6 +62,13 @@ try{
  assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر',typography:'kinetic',design:'finance'});
  assert.equal(automaticRequests,1);assert.equal(await page.evaluate(()=>topics.customScript.soundscape.style),'finance');
  console.log('Natural command automatic scene settings',JSON.stringify(automatic));
+ await page.getByText('الموسيقى والمؤثرات الصوتية التلقائية',{exact:true}).click();
+ await page.locator('#sound-style').selectOption('action');assert.equal(await page.evaluate(()=>topics.customScript.soundscape.style),'action');
+ await page.locator('#sound-music').uncheck();assert.equal(await page.evaluate(()=>topics.customScript.soundscape.music),false);
+ const beforeSoundCommand=await page.evaluate(()=>JSON.stringify(topics.customScript.slides));
+ await page.locator('#ai-command-input').fill('موسيقى اقتصادية');await page.locator('#ai-run-btn').click();
+ await page.waitForFunction(()=>topics.customScript.soundscape?.style==='finance'&&!StudioProduction.state.busy);
+ assert.equal(await page.evaluate(()=>JSON.stringify(topics.customScript.slides)),beforeSoundCommand);assert.equal(automaticRequests,1,'Local sound command called Gemini');
  await page.unroute('**/functions/v1/gemini-studio-preview');
  await page.evaluate(()=>StudioDesignPack.load());
  const designCheck=await page.evaluate(()=>{const D=StudioDesignPack;for(const d of Object.values(D.state.icons))new Path2D(d);return {icons:Object.keys(D.state.icons).length,font:document.fonts.check('700 32px StudioCairo'),catalog:D.state.catalog.length};});
@@ -286,7 +293,7 @@ try{
  assert(Math.abs(end('audio')-testSeconds)<.6,'audio duration');
  assert(Math.abs(end('video')-testSeconds)<.6,'video duration');
  assert(Math.abs(end('audio')-end('video'))<.6,'audio/video sync');
- const encoded=execFileSync('ffmpeg',['-v','error','-i',file,'-vn','-ac','1','-ar','8000','-af','highpass=f=700','-f','f32le','-'],{maxBuffer:8*1024*1024});let energy=0,peak=0;for(let i=0;i<encoded.length;i+=4){const v=encoded.readFloatLE(i);assert(Number.isFinite(v));energy+=v*v;peak=Math.max(peak,Math.abs(v));}const extraAudioRms=Math.sqrt(energy/(encoded.length/4));assert(extraAudioRms>.0003,'Downloaded video contains no music/SFX beyond the 440Hz narration fixture');assert(result.diagnostics.soundscape.events>0);assert(result.diagnostics.soundscape.credits.some(c=>c.id==='score-finance'));console.log('Encoded soundtrack verified',JSON.stringify({extraAudioRms,peak}));
+ const encoded=execFileSync('ffmpeg',['-v','error','-i',file,'-vn','-ac','1','-ar','8000','-af','bandreject=f=440:t=q:w=4,highpass=f=100','-f','f32le','-'],{maxBuffer:8*1024*1024});let energy=0,peak=0;for(let i=0;i<encoded.length;i+=4){const v=encoded.readFloatLE(i);assert(Number.isFinite(v));energy+=v*v;peak=Math.max(peak,Math.abs(v));}const extraAudioRms=Math.sqrt(energy/(encoded.length/4));assert(extraAudioRms>.0003,'Downloaded video contains no music/SFX beyond the 440Hz narration fixture');assert(result.diagnostics.soundscape.events>0);assert(result.diagnostics.soundscape.credits.some(c=>c.id==='score-finance'));console.log('Encoded soundtrack verified',JSON.stringify({extraAudioRms,peak}));
  const frameSimilarity=[];
  for(let i=0;i<3;i++){
   const decoded=path.join(out,'decoded-scene-'+(i+1)+'.png');
