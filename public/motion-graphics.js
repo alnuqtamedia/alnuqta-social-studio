@@ -130,7 +130,56 @@ function drawCreative(ctx,c,{W,H,S,M,time,duration,alpha}){
  ctx.restore();
 }
 
+// Explicit scene opt-in: loading an older project keeps its original composition.
+function kineticLayout(W,H,time){
+ const S=Math.min(W,H*.85),enter=ease(time/.65),dock=ease((time-1.8)/.7);
+ return {S,enter,dock,M:S*.065,titleSize:S*(.092-.048*dock),titleY:H*(.43-.28*dock)+(1-enter)*H*.06,titleX:W-S*.065+(1-enter)*S*.22};
+}
+function kineticText(ctx,text,x,y,w,h,size,color='#fff'){
+ let box;do{box=fit(ctx,text,w,3,size,12);size=box.size-1;}while(box.lines.length*box.size*1.4>h&&size>=12);
+ ctx.save();ctx.font=`700 ${box.size}px Cairo, Arial`;ctx.textAlign='right';ctx.fillStyle=color;
+ box.lines.forEach((line,i)=>ctx.fillText(line,x+w,y+box.size+i*box.size*1.4));ctx.restore();
+}
+function drawKinetic(ctx,slide,{width:W,height:H,time=0,duration=1}){
+ const alpha=Number.isFinite(ctx.globalAlpha)?ctx.globalAlpha:1,t=clamp(time,0,Math.max(.01,duration)),q=t/Math.max(.01,duration),p=plan(slide),c=creativePlan(slide),L=kineticLayout(W,H,p.details.length?t+2.5:t),{S,M}=L,cw=W-2*M;
+ ctx.save();ctx.direction='rtl';ctx.textAlign='right';
+ // Large opening typography becomes a compact heading, leaving the footage visible.
+ const f=fit(ctx,p.title,cw,3,Math.round(L.titleSize),18),lh=f.size*1.35;
+ ctx.save();ctx.globalAlpha=c?0:alpha*L.enter;
+ ctx.fillStyle='rgba(7,20,38,.65)';ctx.fillRect(M,L.titleY-f.size,cw,lh*f.lines.length+S*.035);
+ ctx.font=`900 ${f.size}px Cairo, Arial`;
+ f.lines.forEach((line,i)=>{ctx.fillStyle=i===f.lines.length-1?'#ff6570':'#fff';ctx.fillText(line,L.titleX,L.titleY+i*lh);});
+ ctx.fillStyle='#e31217';ctx.fillRect(W-M-cw*.28*L.enter,L.titleY+(f.lines.length-1)*lh+S*.025,cw*.28*L.enter,S*.008);ctx.restore();
+ // Bring the source-backed quote into the centre, rather than stacking two title panels.
+ if(c?.kind==='quote'){
+  const a=ease((t-.65)/.55);ctx.save();ctx.globalAlpha=alpha*a;
+  ctx.fillStyle='rgba(7,20,38,.9)';ctx.fillRect(M,H*.30,cw,H*.29);
+  ctx.fillStyle='#e31217';ctx.font=`900 ${Math.round(S*.16)}px Cairo, Arial`;ctx.fillText('«',W-M-S*.025,H*.39);
+  kineticText(ctx,c.text,M+S*.04,H*.39,cw-S*.08,H*.13,Math.round(S*.067));
+  kineticText(ctx,'المصدر: '+c.source,M+S*.04,H*.54,cw-S*.08,H*.045,Math.round(S*.026),'#cbd5e1');ctx.restore();
+ }else if(c){drawCreative(ctx,c,{W,H,S,M,time:t,duration,alpha});}
+ else if(p.details.length){
+  p.details.slice(0,3).forEach((text,i)=>{const a=ease((t-1-i*.3)/.5);if(!a)return;const y=H*.42+i*H*.075;
+   ctx.save();ctx.globalAlpha=alpha*a;ctx.fillStyle='rgba(7,20,38,.88)';ctx.fillRect(M+(1-a)*S*.09,y,cw,H*.068);
+   ctx.fillStyle='#e31217';ctx.fillRect(W-M-S*.012,y,S*.012,H*.068);kineticText(ctx,text,M+S*.025,y+H*.006,cw-S*.06,H*.06,Math.round(S*.036));ctx.restore();
+  });
+ }
+ const cue=!c&&p.annotations.filter(a=>q>=Math.max(0,a.at-.05)).at(-1);
+ if(cue){const a=ease((q-Math.max(0,cue.at-.05))*duration/.35);ctx.save();ctx.globalAlpha=alpha*a;icon(ctx,cue.icon,W-M-S*.065,H*.68,S*.05,a);ctx.font=`700 ${Math.round(S*.03)}px Cairo, Arial`;ctx.fillStyle='#fff';ctx.fillText(cue.label,W-M-S*.09,H*.715);ctx.restore();}
+ // Preserve every narration word; timing remains estimated within the aligned scene.
+ const phrase=p.phrases.find((a,i)=>q>=a.start&&(q<a.start+a.span||i===p.phrases.length-1));
+ if(phrase){const text=phrase.words.join(' '),f=fit(ctx,text,cw-S*.07,2,Math.round(S*.052)),h=f.lines.length*f.size*1.5+S*.05,age=(q-phrase.start)*duration,a=ease(age/.18),y=H*.83-h/2+(1-a)*S*.025;
+  ctx.save();ctx.globalAlpha=alpha*(.45+.55*a);ctx.fillStyle='rgba(7,20,38,.93)';ctx.fillRect(M,y,cw,h);ctx.font=`700 ${f.size}px Cairo, Arial`;
+  const highlight=Math.min(phrase.words.length-1,Math.floor(clamp((q-phrase.start)/phrase.span)*phrase.words.length));let k=0;
+  for(let row=0;row<f.lines.length;row++){let x=W-M-S*.035;for(const word of words(f.lines[row])){const width=ctx.measureText(word).width,baseline=y+S*.025+f.size+row*f.size*1.5;if(k===highlight){ctx.fillStyle='#b10d18';ctx.fillRect(x-width-S*.005,baseline-f.size*1.05,width+S*.01,f.size*1.35);}ctx.fillStyle='#fff';ctx.fillText(word,x,baseline);x-=ctx.measureText(word+' ').width;k++;}}
+  ctx.restore();
+ }
+ // A restrained progress accent keeps static evidence scenes advancing in the capture stream.
+ ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(M,H*.935,cw,2);ctx.fillStyle='#e31217';ctx.fillRect(W-M-cw*q,H*.935,cw*q,2);
+ ctx.restore();
+}
 function draw(ctx,slide,{width:W,height:H,time=0,duration=1}){
+ if(slide.typography==='kinetic')return drawKinetic(ctx,slide,{width:W,height:H,time,duration});
  const baseAlpha=Number.isFinite(ctx.globalAlpha)?ctx.globalAlpha:1,S=Math.min(W,H*.85),p=plan(slide),creative=creativePlan(slide),t=clamp(Number(time)||0,0,Math.max(.01,duration)),q=t/Math.max(.01,duration),M=S*.06,contentW=W-2*M;
  ctx.save();ctx.direction='rtl';ctx.textAlign='right';
  // A stable, short title enters once; subtitles and subject cues have separate lanes.
@@ -145,5 +194,5 @@ function draw(ctx,slide,{width:W,height:H,time=0,duration=1}){
  const phrase=p.phrases.find((a,i)=>q>=a.start&&(q<a.start+a.span||i===p.phrases.length-1));if(phrase){const text=phrase.words.join(' '),f=fit(ctx,text,contentW-S*.06,2,Math.round(S*.043)),h=f.lines.length*f.size*1.5+S*.04,y=H*.84-h/2;panel(ctx,M,y,contentW,h,.93);ctx.font=`700 ${f.size}px Cairo, Arial`;const phase=clamp((q-phrase.start)/phrase.span),highlight=Math.min(phrase.words.length-1,Math.floor(phase*phrase.words.length));let k=0;for(let row=0;row<f.lines.length;row++){let x=W-M-S*.03;for(const word of words(f.lines[row])){ctx.fillStyle=k===highlight?'#ff6570':'#fff';ctx.fillText(word,x,y+S*.02+f.size+row*f.size*1.5);x-=ctx.measureText(word+' ').width;k++;}}}
  ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(M,H*.935,contentW,3);ctx.fillStyle='#e31217';ctx.fillRect(W-M-contentW*q,H*.935,contentW*q,3);ctx.restore();
 }
-root.StudioMotion={plan,draw,creativePlan,parseCreativeCommand,icons:Object.keys(icons)};
+root.StudioMotion={plan,draw,creativePlan,parseCreativeCommand,kineticLayout,icons:Object.keys(icons)};
 })(typeof window==='undefined'?globalThis:window);
