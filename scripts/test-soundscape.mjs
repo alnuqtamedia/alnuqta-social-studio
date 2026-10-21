@@ -11,3 +11,5 @@ const catalog=JSON.parse(fs.readFileSync('public/audio/catalog.json'));assert.eq
 console.log('Soundscape: automatic genre, opt-outs, bounded levels, protected evidence, scheduled cues, speech duck/recovery, no implicit audio context and pinned CC0 asset hashes passed.');
 
 const quiet=S.speechEnvelope({duration:1,sampleRate:1000,numberOfChannels:1,getChannelData:()=>new Float32Array(1000).fill(.002)});assert(quiet.values[5]<.02,'Quiet narration must still duck the background');
+
+assert.equal(S.fromCommand('وثائقي اقتصادي مع موسيقى هادئة').style,'finance');assert.equal(S.fromCommand('فيديو سينمائي بموسيقى هادئة').style,'cinematic');assert.equal(S.fromCommand('وثائقي بموسيقى هادئة').style,'documentary');
