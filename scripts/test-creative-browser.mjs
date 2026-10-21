@@ -11,7 +11,7 @@ const config={testSeconds,testOrientation};
 const out=path.resolve('artifacts/creative-browser',testOrientation+'-'+testSeconds);
 await fs.mkdir(out,{recursive:true});
 const root=path.resolve('dist');
-const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2'};
+const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.ttf':'font/ttf'};
 const server=http.createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://localhost');
@@ -56,12 +56,34 @@ try{
  await page.waitForFunction(()=>topics.customScript?.title==='اختبار تلقائي'&&!StudioProduction.state.busy);
  const automatic=await page.evaluate(()=>{
   const scene=topics.customScript.slides[0];
-  return {look:scene.cinema?.look,motion:scene.cinema?.motion,transition:scene.cinema?.transition,quote:scene.creative?.text,typography:scene.typography};
+  return {look:scene.cinema?.look,motion:scene.cinema?.motion,transition:scene.cinema?.transition,quote:scene.creative?.text,typography:scene.typography,design:scene.design?.preset};
  });
- assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر',typography:'kinetic'});
+ assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر',typography:'kinetic',design:'editorial'});
  assert.equal(automaticRequests,1);
  console.log('Natural command automatic scene settings',JSON.stringify(automatic));
  await page.unroute('**/functions/v1/gemini-studio-preview');
+ await page.evaluate(()=>StudioDesignPack.load());
+ const designCheck=await page.evaluate(()=>{const D=StudioDesignPack;for(const d of Object.values(D.state.icons))new Path2D(d);return {icons:Object.keys(D.state.icons).length,font:document.fonts.check('700 32px StudioCairo'),catalog:D.state.catalog.length};});
+ assert.equal(designCheck.icons,4808);assert.equal(designCheck.font,true);assert.equal(designCheck.catalog,16);
+ await page.locator('summary').filter({hasText:'مكتبة الجرافيك:'}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('#design-icons button').length>0);
+ const firstIcon=await page.locator('#design-icons button').first().getAttribute('aria-label');
+ await page.locator('#design-next').click();
+ assert.notEqual(await page.locator('#design-icons button').first().getAttribute('aria-label'),firstIcon);
+ await page.locator('#design-prev').click();
+ assert.equal(await page.locator('#design-icons button').first().getAttribute('aria-label'),firstIcon);
+ await page.locator('#design-preset').selectOption('finance');
+ await page.waitForFunction(()=>topics.customScript.slides[0].design?.preset==='finance');
+ await page.locator('#design-search').fill('briefcase');
+ await page.getByRole('button',{name:'briefcase',exact:true}).click();
+ await page.locator('#design-label').fill('العمل');
+ await page.locator('#design-apply-icon').click();
+ await page.waitForFunction(()=>topics.customScript.slides[0].design?.icon==='briefcase');
+ assert.equal(await page.evaluate(()=>topics.customScript.slides[0].creative.kind),'quote');
+ await page.locator('#design-label').fill('عبارة غير موجودة');
+ await page.locator('#design-apply-icon').click();
+ assert.match(await page.locator('#design-status').textContent(),/موجودة حرفياً/);
+ console.log('Design resources/UI',JSON.stringify(designCheck));
  await page.locator('#studio-source-text').fill('');
  for(const [width,height] of [[720,1280],[1280,720]]){
   for(const [name,time] of [['opening',.8],['settled',3]]){
@@ -87,7 +109,7 @@ try{
    {id:3,type:'outro',title:'الوثيقة',subtitle:'وثيقة اختبار اصطناعية',voiceover:'هنا نبرز منطقة من وثيقة اختبار',duration:2,visualType:'document',mediaItems:media()}
   ]};
   activeTopic=activeTikTokTopic='customScript';activeTikTokSlide=currentSlideIndex=0;activeTab='tiktok';
-  topics.customScript.slides.forEach(s=>{s.duration=testSeconds/3;s.typography='kinetic';});
+  topics.customScript.slides.forEach((s,i)=>{s.duration=testSeconds/3;s.typography='kinetic';s.design={pack:'press-v1',preset:i===2?'investigation':i===1?'finance':'editorial'};});
   window.aiSceneDurations=[testSeconds/3,testSeconds/3,testSeconds/3];
   document.getElementById('production-motion').checked=true;
   document.getElementById('production-orientation').value=testOrientation;
@@ -139,6 +161,7 @@ try{
   document.getElementById('saved-studio-projects').value=snapshot.id;
   await restoreStudioProject();
   if(topics.customScript.slides[1].creative?.kind!=='comparison')throw Error('Snapshot restore failed');
+  if(topics.customScript.slides[2].design?.preset!=='investigation')throw Error('Design pack lost on restore');
   if(topics.customScript.slides[0].typography!=='kinetic')throw Error('Kinetic typography lost on restore');
   if(topics.customScript.slides[0].cinema?.intensity!==.65||topics.customScript.slides[1].cinema?.transition!=='wipe-left')throw Error('Cinema settings lost after restore');
   return {ui:true,commands:true,cinemaUI:true,evidenceProtected:true,cinemaSnapshot:true,voiceUnchanged:true,indexedDBRoundtrip:true};
@@ -161,6 +184,19 @@ try{
   return {transitions:true,motionChangedChannels:changed,deterministicGrain:true,isolatedFilter:true};
  });
  console.log('Cinema real pixels',JSON.stringify(cinemaPixels));
+ for(const preset of ['editorial','finance','investigation','minimal']){
+  const png=await page.evaluate(async preset=>{
+   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;
+   const im=new Image();im.src=topics.customScript.slides[0].mediaItems[0].url;await im.decode();
+   const scene={title:'متابعة المال',voiceover:'تبدأ مراجعة الأموال في سجلات المشروع.',typography:'kinetic',design:{pack:'press-v1',preset,icon:'cash',label:'الأموال'}};
+   let calls=0;const original=StudioDesignPack.drawCue;StudioDesignPack.drawCue=(...args)=>{calls++;return original(...args);};
+   try{StudioProduction.paint(canvas.getContext('2d'),scene,{element:im,kind:'image'},720,1280,4,8);}finally{StudioDesignPack.drawCue=original;}
+   if(!calls)throw Error('External graphic resources were not used by the renderer');
+   return canvas.toDataURL('image/png').split(',')[1];
+  },preset);
+  await fs.writeFile(path.join(out,'design-'+preset+'.png'),Buffer.from(png,'base64'));
+ }
+
  // Capture actual pixels in portrait and landscape, using the same renderer as export.
  for(const [width,height] of [[720,1280],[1280,720]]){
   for(let i=0;i<3;i++){

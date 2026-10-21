@@ -1,0 +1,20 @@
+{
+  "tabler": {
+    "repository": "tabler/tabler-icons",
+    "commit": "a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d",
+    "license": "MIT",
+    "icons": 4808,
+    "excludedBrands": 376,
+    "unsupported": 0,
+    "sha256": "fb6e2452b960633c9cb75e89002917491bd2ba9954941ad0bb9c9249429d62e7",
+    "bytes": 844272
+  },
+  "cairo": {
+    "repository": "google/fonts",
+    "commit": "a2c83daed9bc723922de8d0a9512990bd3d91df4",
+    "source": "ofl/cairo/Cairo[slnt,wght].ttf",
+    "license": "OFL-1.1",
+    "sha256": "667c987182391c91f4e57a2f455b1794fb5e3ee6ca4ef3383e86bb690fa9c964",
+    "bytes": 599548
+  }
+}
