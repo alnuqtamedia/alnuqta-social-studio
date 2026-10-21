@@ -14,3 +14,5 @@ const slide={voiceover:'تبدأ مراجعة سجلات المتجر',design:{p
 assert.equal(D.selectedCue(slide,1,null).icon,'file-text');assert.equal(D.selectedCue({...slide,voiceover:'نص آخر'},1,null),null);
 const make=()=>sandbox.rough.generator().rectangle(20,30,120,60,{seed:217,roughness:.6,stroke:'#ff6570'});assert.equal(JSON.stringify(make()),JSON.stringify(make()));
 console.log('Design pack: 4808 pinned paths, source hashes, licenses/status catalog, Arabic search, source-anchored selection, deterministic Rough and bounded D3 easing passed.');
+
+assert.equal(D.presetFor('وثائقي اقتصادي'),'finance');assert.equal(D.presetFor('وثائقي'),'editorial');assert.equal(D.presetFor('وثائقي اقتصادي','تحقيق استقصائي'),'finance');assert.equal(D.presetFor('اقتصادي بدل الاستقصائي'),'finance');

@@ -591,7 +591,7 @@
             const videoMode = ['story','reel','video','tiktok'].includes(output);
             const sourceSlides = Array.isArray(result.slides) ? result.slides : [];
             const kinetic = !/(?:بدون|بلا)\s*(?:حرك|مؤثر)|عناوين\s*(?:ثابتة|بسيطة)|static\s*titles/i.test(document.getElementById('ai-command-input')?.value || '');
-            const designPreset = window.StudioDesignPack?.presetFor([document.getElementById('ai-command-input')?.value,result.title,result.subtitle].join(' ')) || 'editorial';
+            const designPreset = window.StudioDesignPack?.presetFor(document.getElementById('ai-command-input')?.value,[result.title,result.subtitle].join(' ')) || 'editorial';
             const videoSlides = videoMode ? sourceSlides.map((s, i) => ({
                 ...s,
                 typography: kinetic ? 'kinetic' : undefined,
@@ -633,16 +633,7 @@
         }
 
         function commandVideoDuration(command) {
-            let text=String(command||'').replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
-            text=text.split(/(?:مشهد|المشهد|scene)/i)[0].replace(/دقيقتين/g,'2 دقيقة').replace(/(?<![\d\s])دقيقة/g,'1 دقيقة');
-            text=text.replace(/(^|[^\d]\s)(دقيقة|دقيقه)(?=\s|$)/g,'$1 1 دقيقة');
-            const clock=text.match(/(?:مدته|مدة|لمدة|duration)\s*(\d+):(\d{1,2})(?!\d)/i);
-            if(clock){if(Number(clock[2])>=60)throw new Error('الثواني بعد النقطتين يجب أن تكون أقل من 60');return Number(clock[1])*60+Number(clock[2]);}
-            const units=[...text.matchAll(/(\d+(?:\.\d+)?)\s*(ثانية|ثواني|ثوان|دقائق|دقيقة|دقيقه|seconds?|minutes?)/gi)];
-            if(units.length)return units.reduce((sum,m)=>sum+Number(m[1])*(/دق|minute/i.test(m[2])?60:1),0);
-            if(/(?:مدته|مدة|لمدة)\s*دقيقتين/.test(text))return 120;
-            if(/(?:مدته|مدة|لمدة)\s*دقيقة/.test(text))return 60;
-            return null;
+            return window.StudioProductionCore.requestedDuration(command);
         }
 
         const STUDIO_EDITORIAL_RULES='اكتب جميع النصوص والعناوين والتعليق الصوتي بالعربية الفصحى المهنية فقط، دون اللهجة العراقية أو المصرية أو أي لهجة محلية. حافظ على الأسماء والأرقام والحقائق، ولا تضف معلومات أو مصادر أو استنتاجات غير موثقة.';
@@ -1952,7 +1943,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-21-auto-local-r4';
+        const STUDIO_BUILD='2026-10-22-target-style-r5';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2545,11 +2536,11 @@ function newsDownload(){
 }
 </script>
 <script src="public/preview-config.js"></script>
-<script src="public/production-core.js"></script>
-<script src="public/design-pack.js"></script>
+<script src="public/production-core.js?v=20261022-target-style-r5"></script>
+<script src="public/design-pack.js?v=20261022-target-style-r5"></script>
 <script src="public/motion-graphics.js"></script>
 <script src="public/cinematic-effects.js"></script>
-<script src="public/studio-production.js?v=20261021-auto-local-r4"></script>
+<script src="public/studio-production.js?v=20261022-target-style-r5"></script>
 </body>
 </html>
 

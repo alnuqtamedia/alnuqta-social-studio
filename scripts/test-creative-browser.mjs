@@ -40,7 +40,8 @@ try{
  let automaticRequests=0;
  await page.route('**/functions/v1/gemini-studio-preview',async route=>{
   const body=route.request().postDataJSON();
-  assert.match(body.command,/سينمائي/);
+  assert.match(body.command,/وثائقي اقتصادي/);
+  assert.equal(body.currentContent.durationTarget,60);
   assert.equal(body.currentContent.sourceMaterial,'التقرير: العمل مستمر');
   automaticRequests++;
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({outputType:'video',title:'اختبار تلقائي',subtitle:'مادة اصطناعية',slides:[{
@@ -51,14 +52,14 @@ try{
  });
  await page.locator('#production-auto').uncheck();
  await page.locator('#studio-source-text').fill('التقرير: العمل مستمر');
- await page.locator('#ai-command-input').fill('حوّل التقرير إلى فيديو سينمائي');
+ await page.locator('#ai-command-input').fill('حوّل التقرير إلى فيديو وثائقي اقتصادي مدته 60 ثانية. اضبط السرد نحو 60 ثانية.');
  await page.locator('#ai-run-btn').click();
  await page.waitForFunction(()=>topics.customScript?.title==='اختبار تلقائي'&&!StudioProduction.state.busy);
  const automatic=await page.evaluate(()=>{
   const scene=topics.customScript.slides[0];
   return {look:scene.cinema?.look,motion:scene.cinema?.motion,transition:scene.cinema?.transition,quote:scene.creative?.text,typography:scene.typography,design:scene.design?.preset};
  });
- assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر',typography:'kinetic',design:'editorial'});
+ assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر',typography:'kinetic',design:'finance'});
  assert.equal(automaticRequests,1);
  console.log('Natural command automatic scene settings',JSON.stringify(automatic));
  await page.unroute('**/functions/v1/gemini-studio-preview');
