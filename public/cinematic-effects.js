@@ -4,7 +4,7 @@
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const motionNames=['static','zoom-in','zoom-out','pan-left','pan-right'];
 const lookNames=['natural','cinematic','documentary','mono'];
-const transitionNames=['cut','fade','dip-black','wipe-left','wipe-right'];
+const transitionNames=['cut','fade','dip-black','wipe-left','wipe-right','diagonal-wipe','circle-reveal','push-left'];
 function settings(slide){
  const c=slide?.cinema;if(!c||typeof c!=='object'||Array.isArray(c))return null;
  if(!motionNames.includes(c.motion)||!lookNames.includes(c.look)||typeof c.intensity!=='number'||!Number.isFinite(c.intensity)||c.intensity<0||c.intensity>1||typeof c.vignette!=='number'||!Number.isFinite(c.vignette)||c.vignette<0||c.vignette>.35||typeof c.grain!=='boolean')return null;
@@ -68,6 +68,16 @@ function transition(ctx,current,previous,{type='fade',progress=1,width:W,height:
  const p=clamp(Number.isFinite(progress)?progress:1);
  if(!previous||type==='cut'||p>=1){current();return;}
  if(p<=0){previous();return;}
+ // Canvas adaptations of MIT gl-transitions: directionalwipe/circleopen (gre), Directional (Gaëtan Renaudeau).
+ if(type==='push-left'){
+  ctx.save();try{ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();ctx.translate(-W*p,0);previous();ctx.translate(W,0);current();}finally{ctx.restore();}return;
+ }
+ if(type==='circle-reveal'){
+  previous();ctx.save();try{ctx.beginPath();ctx.arc(W/2,H/2,Math.hypot(W,H)/2*p,0,Math.PI*2);ctx.clip();current();}finally{ctx.restore();}return;
+ }
+ if(type==='diagonal-wipe'){
+  previous();ctx.save();try{ctx.beginPath();const edge=2*p;ctx.moveTo(0,0);ctx.lineTo(W*edge,0);ctx.lineTo(0,H*edge);ctx.closePath();ctx.clip();current();}finally{ctx.restore();}return;
+ }
  if(type==='dip-black'){
   (p<.5?previous:current)();ctx.save();try{ctx.globalAlpha*=p<.5?p*2:(1-p)*2;ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);}finally{ctx.restore();}return;
  }

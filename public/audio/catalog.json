@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "score-documentary",
+      "file": "score-documentary.mp3",
+      "title": "Inspiration",
+      "author": "Rafael Krux",
+      "license": "CC0-1.0",
+      "source": "https://github.com/SoundSafari/CC0-1.0-Music/blob/655388f987eacf6d08d73080fcc3e727f267bfde/freepd.com/Inspiration.mp3",
+      "originalSha256": "a254227da398809c79a0c753073a3a92c7341672abc92bb0166b6326e126f0b4",
+      "sha256": "5b19b287dff03a56f4cd0c7bc6b43c33001d049581031299450e7db35bcfc8b0",
+      "adaptation": "28-second mono MP3 excerpt, loudness normalized; runtime crossfaded loop"
+    },
+    {
+      "id": "score-finance",
+      "file": "score-finance.mp3",
+      "title": "Stereotype News",
+      "author": "Rafael Krux",
+      "license": "CC0-1.0",
+      "source": "https://github.com/SoundSafari/CC0-1.0-Music/blob/655388f987eacf6d08d73080fcc3e727f267bfde/freepd.com/Stereotype%20News.mp3",
+      "originalSha256": "be0c93c2c4d59ec054e8f214eae3ce9bca83005491943ce1f8bf0086f2764d9f",
+      "sha256": "54d4c3fd72826822cf7c9449e1b2ea7680ad628bbda90a87547054a3697c62da",
+      "adaptation": "28-second mono MP3 excerpt, loudness normalized; runtime crossfaded loop"
+    },
+    {
+      "id": "score-investigation",
+      "file": "score-investigation.mp3",
+      "title": "Dark Hallway",
+      "author": "Kevin MacLeod",
+      "license": "CC0-1.0",
+      "source": "https://github.com/SoundSafari/CC0-1.0-Music/blob/655388f987eacf6d08d73080fcc3e727f267bfde/freepd.com/Dark%20Hallway.mp3",
+      "originalSha256": "d9a3286a4a8d1fef02d9d1a400a88f8f321d28e01e6ab7dfe07afbd4578c0c60",
+      "sha256": "94b442cbc0951d2c9b187a421c6b9fbf69cf634205020fe365f4018338126096",
+      "adaptation": "28-second mono MP3 excerpt, loudness normalized; runtime crossfaded loop"
+    },
+    {
+      "id": "score-cinematic",
+      "file": "score-cinematic.mp3",
+      "title": "Blood Eagle",
+      "author": "Alexander Nakarada",
+      "license": "CC0-1.0",
+      "source": "https://github.com/SoundSafari/CC0-1.0-Music/blob/655388f987eacf6d08d73080fcc3e727f267bfde/freepd.com/Blood%20Eagle.mp3",
+      "originalSha256": "aefd62e35036f48868f09be6f84054c0bdcf6bc2178fcaeeed276828d0a0ab8a",
+      "sha256": "5cb9dd69446e2b97c465f17d6c5b082659b71a6b766e8415dfa0901c72da26a7",
+      "adaptation": "28-second mono MP3 excerpt, loudness normalized; runtime crossfaded loop"
+    },
+    {
+      "id": "score-ambient",
+      "file": "score-ambient.mp3",
+      "title": "Deep Tones",
+      "author": "Kevin MacLeod",
+      "license": "CC0-1.0",
+      "source": "https://github.com/SoundSafari/CC0-1.0-Music/blob/655388f987eacf6d08d73080fcc3e727f267bfde/freepd.com/Deep%20Tones.mp3",
+      "originalSha256": "5f39d620db1334851d1bc7ed508a7ff182b91bfcff1b2deb5b41c0777e13112c",
+      "sha256": "1efea409225df438f6c97311bb8cdfb20037fa20f877a6c978d7776ac364036d",
+      "adaptation": "28-second mono MP3 excerpt, loudness normalized; runtime crossfaded loop"
+    },
+    {
+      "id": "title",
+      "file": "title.wav",
+      "title": "Kenney click_003",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/click_003.wav",
+      "sha256": "b035afe3fe08b0fd3517c612bdfd362799bffe762d2cbf8f09e6a50322067358"
+    },
+    {
+      "id": "data",
+      "file": "data.wav",
+      "title": "Kenney confirmation_002",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/confirmation_002.wav",
+      "sha256": "b23339f3fdcd9f54520ca73caa3a9ae93ecfb3675acdaf1468990feb5d55d5fa"
+    },
+    {
+      "id": "paper",
+      "file": "paper.wav",
+      "title": "Kenney switch_001",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/switch_001.wav",
+      "sha256": "56a1dd5278d06b4c47c69d7664482bcb3feeac3027fdd8cb6d0883fda7738eb2"
+    },
+    {
+      "id": "sweep",
+      "file": "sweep.wav",
+      "title": "Kenney maximize_004",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/maximize_004.wav",
+      "sha256": "ac0ec4c5fde2dd10c5531e9b3093db59f853e6877f906d5e5afa6ba774f0c5e3"
+    },
+    {
+      "id": "close",
+      "file": "close.wav",
+      "title": "Kenney minimize_004",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/minimize_004.wav",
+      "sha256": "2a287540381ae5df05369015e315663b179ce9248f203d7eb8bf0950338ce4f8"
+    },
+    {
+      "id": "tick",
+      "file": "tick.wav",
+      "title": "Kenney click_002",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/click_002.wav",
+      "sha256": "3ebdb096e13b11d2ff1383e035847acb6a70e159edfb06bc94d59cbe40b1b713"
+    },
+    {
+      "id": "reveal",
+      "file": "reveal.wav",
+      "title": "Kenney open_001",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/open_001.wav",
+      "sha256": "c69aab75d09d98363934c68cda0e9d050973eb5c3ab9987ce8fd5d336a8f7fbd"
+    },
+    {
+      "id": "soft-hit",
+      "file": "soft-hit.wav",
+      "title": "Kenney bong_001",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "source": "https://github.com/Calinou/kenney-interface-sounds/blob/4596a49eaf5a533948d49a47467f606bcdea70ff/addons/kenney_interface_sounds/bong_001.wav",
+      "sha256": "f5d5f83b13edc5321352c2ba57972d1400151e3f27f1c18fcda07d261358511a"
+    }
+  ],
+  "synthesis": {
+    "library": "ZzFX",
+    "license": "MIT",
+    "presets": [
+      "impact",
+      "whoosh",
+      "riser",
+      "subdrop",
+      "shimmer"
+    ],
+    "compositions": "Original studio presets; no third-party melodies"
+  }
+}

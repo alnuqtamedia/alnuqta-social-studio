@@ -133,8 +133,8 @@
       "name": "GL Transitions",
       "url": "https://github.com/gl-transitions/gl-transitions",
       "license": "MIT",
-      "status": "reference",
-      "description": "انتقالات WebGL؛ يجب فحص رخصة كل ملف مختار قبل نقله.",
+      "status": "integrated",
+      "description": "ثلاثة انتقالات مكيفة إلى Canvas: كشف قطري، كشف دائري، ودفع أفقي. تعمل في المعاينة والتصدير.",
       "note": "يحتاج مسار WebGL وفحصاً للأداء"
     },
     {
