@@ -294,10 +294,13 @@ try{
  assert(Math.abs(end('video')-testSeconds)<.6,'video duration');
  assert(Math.abs(end('audio')-end('video'))<.6,'audio/video sync');
  const encoded=execFileSync('ffmpeg',['-v','error','-i',file,'-vn','-ac','1','-ar','8000','-af','bandreject=f=440:t=q:w=4,highpass=f=100','-f','f32le','-'],{maxBuffer:8*1024*1024});let energy=0,peak=0;for(let i=0;i<encoded.length;i+=4){const v=encoded.readFloatLE(i);assert(Number.isFinite(v));energy+=v*v;peak=Math.max(peak,Math.abs(v));}const extraAudioRms=Math.sqrt(energy/(encoded.length/4));assert(extraAudioRms>.0003,'Downloaded video contains no music/SFX beyond the 440Hz narration fixture');assert(result.diagnostics.soundscape.events>0);assert(result.diagnostics.soundscape.credits.some(c=>c.id==='score-finance'));console.log('Encoded soundtrack verified',JSON.stringify({extraAudioRms,peak}));
+ // MediaRecorder may begin with a short initial frame before its ready event starts narration.
+ // Compare the same narration-relative instant, retaining a strict bound on that leading offset.
+ const narrationOffset=result.diagnostics.recorderStartupSeconds||0;assert(narrationOffset>=0&&narrationOffset<.5,'Recorder startup offset is excessive');
  const frameSimilarity=[];
  for(let i=0;i<3;i++){
   const decoded=path.join(out,'decoded-scene-'+(i+1)+'.png');
-  execFileSync('ffmpeg',['-v','error','-y','-ss',String((i+.5)*testSeconds/3),'-i',file,'-frames:v','1',decoded]);
+  execFileSync('ffmpeg',['-v','error','-y','-ss',String((i+.5)*testSeconds/3+narrationOffset),'-i',file,'-frames:v','1',decoded]);
   const metrics=spawnSync('ffmpeg',['-i',path.join(out,'scene-'+(i+1)+(testOrientation==='landscape'?'-1280x720.png':'-720x1280.png')),'-i',decoded,'-lavfi','ssim','-f','null','-'],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
   const match=String(metrics.stderr).match(/All:([0-9.]+)/);assert.equal(metrics.status,0,'frame comparison failed');
   assert(match&&Number(match[1])>.90,'Decoded frame differs from composed preview: '+metrics.stderr);
