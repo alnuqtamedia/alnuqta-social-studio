@@ -25,12 +25,14 @@ const dataScene={voiceover:'القرض 20 مليون دينار. الفوائد 
 assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],5,15),1);
 assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],10,15),0);
 console.log('Pipeline checks passed: correction targets, numeric cards, clip cycling.');
-// Data scenes must request real media, not silently count an empty background as complete.
+// Numeric cards are an explicit local visual, while footage/document scenes still require media.
 let searches=0;ctx.URL=URL;ctx.STUDIO_PREVIEW_PUBLIC={anonKey:'test'};ctx.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(body.action==='review-media')return {ok:true,json:async()=>({reviews:[{scene:1,candidates:[{id:'91:video',safe:true,score:.9,reason:'ملائم'}]}]})};searches++;return {ok:true,json:async()=>({items:[{id:91,type:'video',mediaUrl:'https://videos.pexels.com/finance.mp4',preview:'https://images.pexels.com/videos/91/free-photo.jpg',pageUrl:'https://www.pexels.com/video/finance-91/',creator:'Test',duration:30}]})};};ctx.addSceneMedia=(s,m)=>{s.mediaItems=[...(s.mediaItems||[]),m];};
 const numericScene={title:'تكلفة القرض',visualType:'data',visualQuery:'finance calculator infographic',voiceover:'القرض 20 مليون دينار',duration:12};
-await ctx.StudioProduction.mediaFor([numericScene],true);assert.equal(searches,1);assert.equal(numericScene.mediaItems[0].kind,'video');ctx.topics.customScript.slides=[numericScene];assert(ctx.StudioProduction.productionReport().join('\n').includes('أرقام فوق وسائط'));
-numericScene.mediaItems=[];assert(ctx.StudioProduction.productionReport().join('\n').includes('تحتاج استكمال'));
-console.log('Visual completeness regression passed: numeric scenes fetch media and missing visuals are reported.');
+await ctx.StudioProduction.mediaFor([numericScene],true);assert.equal(searches,0);assert.equal(numericScene.mediaItems,undefined);ctx.topics.customScript.slides=[numericScene];assert(ctx.StudioProduction.productionReport().join('\n').includes('إنفوغرافيك محلي'));
+assert(ctx.StudioProduction.localDataReady(numericScene));assert(!ctx.StudioProduction.needsMedia(numericScene));
+assert(ctx.StudioProduction.needsMedia({visualType:'data',points:[]}));assert(ctx.StudioProduction.needsMedia({visualType:'document',points:['وثيقة']}));assert(ctx.StudioProduction.needsMedia({visualType:'broll',points:['100 دينار']}));
+const invalidCard={visualType:'data',points:[null],productionVisual:{ready:true}};assert(!ctx.StudioProduction.localDataReady(invalidCard));
+console.log('Local data cards bypass stock search; empty data, footage and documents retain media requirements.');
 
 assert.equal(ctx.StudioProduction.visualSearchQuery(numericScene),'person reviewing loan contract calculator financial paperwork desk');
 
@@ -127,3 +129,11 @@ const overlong=[{voiceover:Array(120).fill('كلمة').join(' ')}];await ctx.Stu
 // An explicit duration cannot silently inherit the previous preserve-text mode.
 el('ai-command-input').value='حوّل إلى ريلز 45 ثانية';el('video-sync-mode').value='extend-visuals';await ctx.runGeminiStudioCommand();assert.equal(el('video-total-duration').value,'45');assert.equal(el('video-sync-mode').value,'fit-audio');assert.equal(el('ai-command-input').value,'حوّل إلى ريلز 45 ثانية');
 console.log('Pre-speech budget and explicit command duration preserve source material and reset fitting mode.');
+
+// Explicit infographic correction is local and transactional, with no provider or TTS calls.
+ctx.topics.customScript.slides=[{title:'نفقات',visualType:'data',points:['النقل 100 ألف','الكهرباء 100 ألف'],voiceover:'النقل والكهرباء مئتا ألف دينار',mediaItems:[]}];
+el('production-correction').value='حوّل المشهد 1 إلى إنفوغرافيك اقتصادي';const beforeSearch=searches;const voiceBefore=ctx.topics.customScript.slides[0].voiceover;await ctx.StudioProduction.correctCurrent();assert.equal(searches,beforeSearch);assert.equal(ctx.topics.customScript.slides[0].voiceover,voiceBefore);assert.equal(ctx.topics.customScript.slides[0].design.preset,'finance');assert.equal(ctx.topics.customScript.slides[0].mediaItems.length,0);
+assert.deepEqual(Array.from(ctx.StudioProduction.correctionTargets('المشروع الحالي وجميع المشاهد بما فيها 3 و4',new Array(5).fill({}))),[0,1,2,3,4]);
+console.log('Local infographic correction preserves narration and all-scene targeting.');
+
+const spelled={visualType:'data',voiceover:'النقل مئة ألف دينار. الكهرباء مئة ألف دينار.'};ctx.StudioProduction.prepareDataScene(spelled);assert.equal(spelled.points.length,2);assert(ctx.StudioProduction.localDataReady(spelled));

@@ -27,3 +27,6 @@ const html=fs.readFileSync('index.html','utf8');
 assert(html.includes("typography: kinetic ? 'kinetic' : undefined"));
 assert(html.includes("typography: slide.typography === 'kinetic' ? 'kinetic' : undefined"));
 console.log('Kinetic typography: opening/docked layout, both formats, quote focus, finite coordinates, explicit generation and unchanged source passed.');
+
+// All four local cards remain visible in both orientations without a media asset.
+for(const [width,height] of [[720,1280],[1280,720]]){painted.length=0;const points=['الإيجار 300 ألف','الطعام 250 ألف','النقل 100 ألف','الخدمات 100 ألف'];M.draw(ctx,{title:'النفقات',typography:'kinetic',visualType:'data',voiceover:'تفاصيل النفقات',points},{width,height,time:5,duration:10});for(const point of points)assert(painted.some(p=>p.t===point),'missing card '+point);}
