@@ -217,16 +217,17 @@ try{
   await fs.writeFile(path.join(out,'design-'+preset+'.png'),Buffer.from(png,'base64'));
  }
 
+ await page.evaluate(()=>{const s=topics.customScript.slides[1];s.mediaItems=[];s.points=['أ: 0 دينار','ب: 12 دينار'];StudioProduction.prepareDataScene(s);if(!StudioProduction.localDataReady(s))throw Error('Standalone numeric scene not ready');});
  // Capture actual pixels in portrait and landscape, using the same renderer as export.
  for(const [width,height] of [[720,1280],[1280,720]]){
   for(let i=0;i<3;i++){
    const rendered=await page.evaluate(async({width,height,i,testSeconds})=>{
-    const s=topics.customScript.slides[i],image=new Image();image.src=s.mediaItems[0].url;await image.decode();
+    const s=topics.customScript.slides[i];let image=null;if(s.mediaItems.length){image=new Image();image.src=s.mediaItems[0].url;await image.decode();}
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
     const ctx=canvas.getContext('2d');
     const render=(time,creative)=>{
      const scene={...s};if(!creative)delete scene.creative;
-     StudioProduction.paint(ctx,scene,{element:image,kind:'image'},width,height,time,testSeconds/3);
+     StudioProduction.paint(ctx,scene,image?{element:image,kind:'image'}:null,width,height,time,testSeconds/3);
      return new Uint8Array(ctx.getImageData(0,0,width,height).data);
     };
     const baseline=render(testSeconds/6,false),pixels=render(testSeconds/6,true);let changed=0;

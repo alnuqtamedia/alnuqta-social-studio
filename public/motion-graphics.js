@@ -162,7 +162,7 @@ function drawKinetic(ctx,slide,{width:W,height:H,time=0,duration=1}){
   kineticText(ctx,'المصدر: '+c.source,M+S*.04,H*.54,cw-S*.08,H*.045,Math.round(S*.026),'#cbd5e1',family);ctx.restore();
  }else if(c){drawCreative(ctx,c,{W,H,S,M,time:t,duration,alpha,design:slide.design});}
  else if(p.details.length){
-  p.details.slice(0,3).forEach((text,i)=>{const a=ease((t-1-i*.3)/.5);if(!a)return;const y=H*.42+i*H*.075;
+  p.details.slice(0,4).forEach((text,i)=>{const a=ease((t-1-i*.3)/.5);if(!a)return;const y=H*.35+i*H*.075;
    ctx.save();ctx.globalAlpha=alpha*a;ctx.fillStyle='rgba(7,20,38,.88)';ctx.fillRect(M+(1-a)*S*.09,y,cw,H*.068);
    ctx.fillStyle='#e31217';ctx.fillRect(W-M-S*.012,y,S*.012,H*.068);kineticText(ctx,text,M+S*.025,y+H*.006,cw-S*.06,H*.06,Math.round(S*.036),'#fff',family);ctx.restore();
   });
