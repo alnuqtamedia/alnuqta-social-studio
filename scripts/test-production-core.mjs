@@ -14,3 +14,10 @@ const json='{}';assert.equal(extractText({outputs:[{text:json}],steps:[{type:'mo
 const page=fs.readFileSync('index.html','utf8');const slideRenderer=page.slice(page.indexOf('        function buildSlideHTML('),page.indexOf('        function pcm16ToWavBlob('));const renderer=vm.createContext({escapeHtml:s=>String(s||'')});vm.runInContext(slideRenderer,renderer);const contentSlide={type:'content',title:'عنوان اختبار',subtitle:'تفاصيل محفوظة',points:[]};const rendered=renderer.buildSlideHTML(contentSlide,2,3);assert(rendered.includes(contentSlide.title));assert(rendered.includes(contentSlide.subtitle));assert.equal(contentSlide.header,undefined);console.log('Carousel regression passed: generated title and details remain visible without template-specific fields.');
 
 assert.equal(C.requestedDuration('ريلز ٤٥ ثانية'),45);assert.equal(C.requestedDuration('تقرير تلفزيوني دقيقتين'),120);assert.equal(C.requestedDuration('ريلز دقيقة ونصف'),90);assert.equal(C.requestedDuration('بوست صورة 9:16'),null);assert.throws(()=>C.requestedDuration('فيديو 700 ثانية'),/المدة/);console.log('Command duration parsing passed.');
+
+for(const input of ['فيديو 60 ثانية. اضبط السرد نحو 60 ثانية.\nقيد إنتاج ملزم: مدة 60 ثانية لكل الفيديو','فيديو ۶۰ ثانية'])assert.equal(C.requestedDuration(input),60);
+assert.equal(C.requestedDuration('فيديو دقيقة و30 ثانية'),90);
+assert.equal(C.requestedDuration('مدة 1:00'),60);
+assert.equal(C.requestedDuration('المشهد 1: 10 ثانية\nمدة الفيديو 60 ثانية'),60);
+assert.throws(()=>C.requestedDuration('فيديو 60 ثانية أو 90 ثانية'),/مدداً مختلفة/);
+const durationCode=page.slice(page.indexOf('function commandVideoDuration('),page.indexOf('function commandVideoDuration(')+250);assert(durationCode.includes('StudioProductionCore.requestedDuration(command)'));

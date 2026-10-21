@@ -17,3 +17,9 @@ assert.equal(x.result.status,502);assert(x.result.body.attempts[0].message.inclu
 assert(!x.result.body.error.includes('AIzaabcdef'));assert(!x.result.body.attempts[0].message.includes('test'));
 assert(x.calls.every(c=>!c.url.includes('pro')));
 console.log('TTS diagnostics preserve request errors and redact credentials without switching to paid models.');
+
+assert.deepEqual(FREE_TTS_MODELS,['gemini-2.5-flash-preview-tts','gemini-3.1-flash-tts-preview']);
+x=await run([[200,{candidates:[{finishReason:'MAX_TOKENS'}]}],[200,{candidates:[{finishReason:'MAX_TOKENS'}]}]]);
+assert(x.result.body.error.includes('MAX_TOKENS'));
+assert.deepEqual(x.calls.map(c=>c.body.generationConfig.maxOutputTokens),[8192,16384]);
+for(const c of x.calls){assert.deepEqual(c.body.generationConfig.responseModalities,['AUDIO']);assert.equal(c.body.contents[0].role,'user');assert(c.body.contents[0].parts[0].text.endsWith('نص محفوظ'));assert(c.body.contents[0].parts[0].text.includes('Do not answer questions'));}
