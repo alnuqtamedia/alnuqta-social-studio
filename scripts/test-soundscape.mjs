@@ -9,3 +9,5 @@ assert.equal(ctx.StudioZZFX.audioContext,null,'vendor must not create extra cont
 for(const key of ['impact','whoosh','riser','subdrop','shimmer'])assert(fs.readFileSync('public/soundscape.js','utf8').includes(key));
 const catalog=JSON.parse(fs.readFileSync('public/audio/catalog.json'));assert.equal(catalog.assets.length,13);assert.equal(catalog.assets.filter(a=>a.id.startsWith('score-')).length,5);for(const a of catalog.assets){assert.equal(a.license,'CC0-1.0');assert(a.author&&a.source.startsWith('https://github.com/'));assert.equal(crypto.createHash('sha256').update(fs.readFileSync('public/audio/'+a.file)).digest('hex'),a.sha256);}
 console.log('Soundscape: automatic genre, opt-outs, bounded levels, protected evidence, scheduled cues, speech duck/recovery, no implicit audio context and pinned CC0 asset hashes passed.');
+
+const quiet=S.speechEnvelope({duration:1,sampleRate:1000,numberOfChannels:1,getChannelData:()=>new Float32Array(1000).fill(.002)});assert(quiet.values[5]<.02,'Quiet narration must still duck the background');
