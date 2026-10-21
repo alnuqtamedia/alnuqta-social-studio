@@ -573,6 +573,7 @@
                 duration: Number(slide.duration || 4), voiceover: slide.voiceover || slide.narration || '',
                 caption: slide.caption || slide.subtitle || '', visualAsset: slide.visualAsset || { id: '', url: '' }, source: slide.source || slide.mediaCredit || '', editorNotes: slide.editorNotes || '',
                 typography: slide.typography === 'kinetic' ? 'kinetic' : undefined,
+                design: window.StudioDesignPack?.normalize(slide) || undefined,
                 creative: window.StudioMotion?.creativePlan(slide) || undefined,
                 cinema: window.StudioCinema?.normalize(slide) || undefined,
                 graphics:Array.isArray(slide.graphics)?slide.graphics.slice(0,4):[], visualType: slide.visualType || '', visualQuery: slide.visualQuery || '', motion: slide.motion || 'zoom-in', transition: slide.transition || 'fade', mediaUrl: slide.mediaUrl || slide.visualAsset?.url || '', mediaVideoUrl: slide.mediaVideoUrl || '', mediaCredit: slide.mediaCredit || slide.source || '', mediaSourceUrl: slide.mediaSourceUrl || '', mediaGenerated: Boolean(slide.mediaGenerated), mediaKind: slide.mediaKind || '',
@@ -590,9 +591,11 @@
             const videoMode = ['story','reel','video','tiktok'].includes(output);
             const sourceSlides = Array.isArray(result.slides) ? result.slides : [];
             const kinetic = !/(?:بدون|بلا)\s*(?:حرك|مؤثر)|عناوين\s*(?:ثابتة|بسيطة)|static\s*titles/i.test(document.getElementById('ai-command-input')?.value || '');
+            const designPreset = window.StudioDesignPack?.presetFor([document.getElementById('ai-command-input')?.value,result.title,result.subtitle].join(' ')) || 'editorial';
             const videoSlides = videoMode ? sourceSlides.map((s, i) => ({
                 ...s,
                 typography: kinetic ? 'kinetic' : undefined,
+                design: kinetic ? {pack:'press-v1',preset:designPreset} : undefined,
                 type: i === 0 ? 'cover' : (i === sourceSlides.length - 1 ? 'outro' : 'content'),
                 badge: s.badge || (output === 'story' ? 'STORY' : output === 'tiktok' ? 'TIKTOK' : 'فيديو صحفي'),
                 title: s.title || s.header || (i === 0 ? result.title : ''),
@@ -1949,7 +1952,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-21-kinetic-r1';
+        const STUDIO_BUILD='2026-10-21-design-pack-r1';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2543,6 +2546,7 @@ function newsDownload(){
 </script>
 <script src="public/preview-config.js"></script>
 <script src="public/production-core.js"></script>
+<script src="public/design-pack.js"></script>
 <script src="public/motion-graphics.js"></script>
 <script src="public/cinematic-effects.js"></script>
 <script src="public/studio-production.js"></script>

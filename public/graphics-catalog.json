@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-21",
+  "resources": [
+    {
+      "id": "tabler",
+      "name": "Tabler Icons",
+      "url": "https://github.com/tabler/tabler-icons",
+      "license": "MIT",
+      "status": "integrated",
+      "description": "4808 أيقونات خطية محلية قابلة للبحث والاستخدام فوق الفيديو. شعارات العلامات التجارية مستبعدة.",
+      "note": "الحزمة الحالية"
+    },
+    {
+      "id": "d3-ease",
+      "name": "D3 Ease",
+      "url": "https://github.com/d3/d3-ease",
+      "license": "BSD-3-Clause",
+      "status": "integrated",
+      "description": "منحنيات حركة مطبّقة على دخول العنوان والبيانات والانتقال إلى موضعه النهائي.",
+      "note": "3.0.1"
+    },
+    {
+      "id": "rough",
+      "name": "Rough.js",
+      "url": "https://github.com/rough-stuff/rough",
+      "license": "MIT",
+      "status": "integrated",
+      "description": "علامات قلم ثابتة البذرة لتحديد منطقة الوثيقة التي يحددها المحرر، وتزيين تلميحات التحقيق.",
+      "note": "4.6.6"
+    },
+    {
+      "id": "cairo",
+      "name": "Cairo Arabic",
+      "url": "https://github.com/google/fonts/tree/a2c83daed9bc723922de8d0a9512990bd3d91df4/ofl/cairo",
+      "license": "OFL-1.1",
+      "status": "integrated",
+      "description": "خط عربي متغير محلي للعناوين والسبتايتل في الحزمة؛ دون الاعتماد على طلب خطوط خارجي.",
+      "note": "نسخة GitHub مثبتة"
+    },
+    {
+      "id": "lottie",
+      "name": "Lottie Web",
+      "url": "https://github.com/airbnb/lottie-web",
+      "license": "MIT",
+      "status": "reference",
+      "description": "تشغيل قوالب موشن جاهزة؛ ترخيص المشغل لا يثبت ترخيص كل ملف أنيميشن.",
+      "note": "يحتاج محولاً للرندر وقوالب مرخصة"
+    },
+    {
+      "id": "d3-shape",
+      "name": "D3 Shape",
+      "url": "https://github.com/d3/d3-shape",
+      "license": "ISC",
+      "status": "reference",
+      "description": "أشكال للخطوط والمساحات والدوائر البيانية، ببيانات صريحة ومصدر واضح.",
+      "note": "يحتاج نموذج بيانات ومحولاً"
+    },
+    {
+      "id": "chartjs",
+      "name": "Chart.js",
+      "url": "https://github.com/chartjs/Chart.js",
+      "license": "MIT",
+      "status": "reference",
+      "description": "رسوم اقتصادية وإحصائية؛ لا ينشئ بيانات أو مصادر من نفسه.",
+      "note": "يحتاج توقيت فيديو ثابتاً وبيانات موثقة"
+    },
+    {
+      "id": "fabric",
+      "name": "Fabric.js",
+      "url": "https://github.com/fabricjs/fabric.js",
+      "license": "MIT",
+      "status": "reference",
+      "description": "محرر Canvas تفاعلي لتحريك العناصر وتغيير الحجم واستيراد SVG.",
+      "note": "محرك تحرير مختلف عن المحرك الحالي"
+    },
+    {
+      "id": "konva",
+      "name": "Konva",
+      "url": "https://github.com/konvajs/konva",
+      "license": "MIT",
+      "status": "reference",
+      "description": "طبقات وأشكال Canvas وتحديد وسحب عناصر التصميم.",
+      "note": "يحتاج دمجاً في المحرر"
+    },
+    {
+      "id": "svgjs",
+      "name": "SVG.js",
+      "url": "https://github.com/svgdotjs/svg.js",
+      "license": "MIT",
+      "status": "reference",
+      "description": "بناء وتعديل الرسوم المتجهية داخل SVG.",
+      "note": "يحتاج تحويلاً إلى إطارات Canvas"
+    },
+    {
+      "id": "paper",
+      "name": "Paper.js",
+      "url": "https://github.com/paperjs/paper.js",
+      "license": "MIT",
+      "status": "reference",
+      "description": "مسارات ورسوم متجهية ومنحنيات هندسية للتصميم.",
+      "note": "محرك مشهد مستقل"
+    },
+    {
+      "id": "anime",
+      "name": "Anime.js",
+      "url": "https://github.com/juliangarnier/anime",
+      "license": "MIT",
+      "status": "reference",
+      "description": "توقيت وحركات وواجهات تحكم للأنيميشن.",
+      "note": "يحتاج ربط ساعته بساعة تصدير الفيديو"
+    },
+    {
+      "id": "motioncanvas",
+      "name": "Motion Canvas",
+      "url": "https://github.com/motion-canvas/motion-canvas",
+      "license": "MIT",
+      "status": "reference",
+      "description": "موشن جرافيك برمجي ومشاهد تعليمية مركبة.",
+      "note": "يحتاج مسار بناء ومحرراً مستقلين"
+    },
+    {
+      "id": "particles",
+      "name": "tsParticles",
+      "url": "https://github.com/tsparticles/tsparticles",
+      "license": "MIT",
+      "status": "reference",
+      "description": "جزيئات وخلفيات إبداعية للإعلانات.",
+      "note": "اختياري؛ يلزم قياس الأداء على الجهاز"
+    },
+    {
+      "id": "gltransitions",
+      "name": "GL Transitions",
+      "url": "https://github.com/gl-transitions/gl-transitions",
+      "license": "MIT",
+      "status": "reference",
+      "description": "انتقالات WebGL؛ يجب فحص رخصة كل ملف مختار قبل نقله.",
+      "note": "يحتاج مسار WebGL وفحصاً للأداء"
+    },
+    {
+      "id": "phosphor",
+      "name": "Phosphor Icons",
+      "url": "https://github.com/phosphor-icons/core",
+      "license": "MIT",
+      "status": "reference",
+      "description": "مجموعة أيقونات بأوزان مختلفة لتوسيع اللغة البصرية.",
+      "note": "بديل إضافي؛ Tabler مدمج بالفعل"
+    }
+  ]
+}
