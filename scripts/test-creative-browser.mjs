@@ -65,6 +65,26 @@ try{
  await page.evaluate(()=>StudioDesignPack.load());
  const designCheck=await page.evaluate(()=>{const D=StudioDesignPack;for(const d of Object.values(D.state.icons))new Path2D(d);return {icons:Object.keys(D.state.icons).length,font:document.fonts.check('700 32px StudioCairo'),catalog:D.state.catalog.length};});
  assert.equal(designCheck.icons,4808);assert.equal(designCheck.font,true);assert.equal(designCheck.catalog,16);
+ // Verify the real Chart.js adapter: shared zero baseline, exact ratios, no live instances,
+ // bounded cache, deterministic seek and both render orientations.
+ const chartChecks=await page.evaluate(()=>{
+  const D=StudioDesignPack,Actual=window.Chart,records=[];
+  window.Chart=new Proxy(Actual,{construct(Target,args){const chart=Reflect.construct(Target,args);records.push({min:chart.scales.x.min,max:chart.scales.x.max,animation:chart.options.animation,widths:chart.getDatasetMeta(0).data.map(b=>Math.abs(b.x-b.base))});return chart;}});
+  const slide={design:{pack:'press-v1',preset:'finance'}},c={kind:'comparison',source:'بيانات تدريبية افتراضية',unit:'مليون دينار',items:[{label:'المبيعات',value:100},{label:'التكاليف',value:50}]};
+  function render(W,H,time,data=c){const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;D.comparison(canvas.getContext('2d'),slide,data,{W,H,S:Math.min(W,H*.85),M:Math.min(W,H*.85)*.065,time});return canvas.toDataURL();}
+  try{
+   const end=render(720,1280,2),same=render(720,1280,2),mid=render(720,1280,.1);if(end!==same||end===mid)throw Error('Chart seek is not deterministic or reveal is static');
+   render(1280,720,2);const zero={...c,items:[{label:'صفر',value:0},{label:'قيمة',value:12}]};render(720,1280,2,zero);
+   const first=records[0],z=records.at(-1);if(first.min!==0||first.max!==100||Math.abs(first.widths[1]/first.widths[0]-.5)>.001||z.widths[0]!==0)throw Error('Comparison baseline or ratios changed');
+   if(records.some(r=>r.animation!==false)||Object.keys(Actual.instances).length)throw Error('Chart animation or instance leaked');
+   for(let i=0;i<5;i++)render(720,1280,2,{...c,items:[{label:'أ',value:i},{label:'ب',value:20}]});
+   if(D.state.charts.size!==3)throw Error('Chart bitmap cache is not bounded');
+   const count=D.state.charts.size,canvas=document.createElement('canvas');if(D.comparison(canvas.getContext('2d'),slide,{...c,items:[{label:'أ',value:-1},{label:'ب',value:2}]},{W:720,H:1280,S:720,M:45,time:1})!==false||D.state.charts.size!==count)throw Error('Invalid values accepted');
+   return {instances:Object.keys(Actual.instances).length,cache:D.state.charts.size,ratio:first.widths[1]/first.widths[0],zero:z.widths[0]};
+  }finally{window.Chart=Actual;}
+ });
+ assert.equal(chartChecks.instances,0);assert.equal(chartChecks.cache,3);assert.equal(chartChecks.zero,0);assert(Math.abs(chartChecks.ratio-.5)<.001);
+ console.log('Chart adapter',JSON.stringify(chartChecks));
  await page.locator('summary').filter({hasText:'مكتبة الجرافيك:'}).click();
  await page.waitForFunction(()=>document.querySelectorAll('#design-icons button').length>0);
  const firstIcon=await page.locator('#design-icons button').first().getAttribute('aria-label');

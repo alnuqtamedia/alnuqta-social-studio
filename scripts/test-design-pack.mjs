@@ -4,7 +4,7 @@ const D=sandbox.StudioDesignPack,source=JSON.parse(fs.readFileSync('public/vendo
 Object.assign(D.state.icons,data.icons);D.state.ready=true;
 assert.equal(Object.keys(D.state.icons).length,source.tabler.icons);assert(source.tabler.icons>4500);assert.equal(data.unsupported.length,0);assert(!Object.keys(data.icons).some(x=>x.startsWith('brand-')));
 for(const [path,sha] of [['public/vendor/tabler/outline-paths.json',source.tabler.sha256],['public/vendor/cairo/Cairo.ttf',source.cairo.sha256]])assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex'),sha);
-const catalog=JSON.parse(fs.readFileSync('public/graphics-catalog.json'));assert.equal(catalog.resources.filter(x=>x.status==='integrated').length,4);assert.equal(catalog.resources.length,16);assert(catalog.resources.every(x=>x.url.startsWith('https://github.com/')&&['MIT','ISC','BSD-3-Clause','OFL-1.1'].includes(x.license)));
+const catalog=JSON.parse(fs.readFileSync('public/graphics-catalog.json'));assert.equal(catalog.resources.filter(x=>x.status==='integrated').length,5);assert.equal(catalog.resources.length,16);assert(catalog.resources.every(x=>x.url.startsWith('https://github.com/')&&['MIT','ISC','BSD-3-Clause','OFL-1.1'].includes(x.license)));
 assert.equal(D.normalize({}),null);assert.equal(D.font({}),'Cairo');assert.equal(D.font({design:{pack:'press-v1',preset:'finance'}}),'StudioCairo');
 for(const preset of Object.keys(D.presets))for(const t of [-1,0,.1,.5,.9,1,2]){const value=D.ease({pack:'press-v1',preset},t);assert(Number.isFinite(value)&&value>=0&&value<=1);}
 assert.notEqual(D.ease({pack:'press-v1',preset:'finance'},.4),D.ease({pack:'press-v1',preset:'investigation'},.4));
