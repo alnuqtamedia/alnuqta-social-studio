@@ -23,7 +23,7 @@ const server=http.createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin='http://127.0.0.1:'+server.address().port;
-const browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
+const browser=await chromium.launch({channel:'chromium',headless:true,args:['--autoplay-policy=no-user-gesture-required']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const errors=[];
 // The external Tailwind CDN is intentionally blocked; supply only its configuration namespace.
@@ -60,8 +60,15 @@ try{
   return {look:scene.cinema?.look,motion:scene.cinema?.motion,transition:scene.cinema?.transition,quote:scene.creative?.text,typography:scene.typography,design:scene.design?.preset};
  });
  assert.deepEqual(automatic,{look:'cinematic',motion:'zoom-in',transition:'dip-black',quote:'العمل مستمر',typography:'kinetic',design:'finance'});
- assert.equal(automaticRequests,1);
+ assert.equal(automaticRequests,1);assert.equal(await page.evaluate(()=>topics.customScript.soundscape.style),'finance');
  console.log('Natural command automatic scene settings',JSON.stringify(automatic));
+ await page.getByText('الموسيقى والمؤثرات الصوتية التلقائية',{exact:true}).click();
+ await page.locator('#sound-style').selectOption('action');assert.equal(await page.evaluate(()=>topics.customScript.soundscape.style),'action');
+ await page.locator('#sound-music').uncheck();assert.equal(await page.evaluate(()=>topics.customScript.soundscape.music),false);
+ const beforeSoundCommand=await page.evaluate(()=>JSON.stringify(topics.customScript.slides));
+ await page.locator('#ai-command-input').fill('موسيقى اقتصادية');await page.locator('#ai-run-btn').click();
+ await page.waitForFunction(()=>topics.customScript.soundscape?.style==='finance'&&!StudioProduction.state.busy);
+ assert.equal(await page.evaluate(()=>JSON.stringify(topics.customScript.slides)),beforeSoundCommand);assert.equal(automaticRequests,1,'Local sound command called Gemini');
  await page.unroute('**/functions/v1/gemini-studio-preview');
  await page.evaluate(()=>StudioDesignPack.load());
  const designCheck=await page.evaluate(()=>{const D=StudioDesignPack;for(const d of Object.values(D.state.icons))new Path2D(d);return {icons:Object.keys(D.state.icons).length,font:document.fonts.check('700 32px StudioCairo'),catalog:D.state.catalog.length};});
@@ -127,7 +134,7 @@ try{
   for(let i=0;i<10;i++)ctx.fillText('SYNTHETIC TEST DOCUMENT '+i,90,230+i*50);
   const image=canvas.toDataURL('image/png');
   const media=()=>[{url:image,preview:image,kind:'image',local:false,credit:'Synthetic test fixture'}];
-  topics.customScript={title:'اختبار إبداعي اصطناعي',slides:[
+  topics.customScript={title:'اختبار إبداعي اصطناعي',soundscape:StudioSoundscape.fromCommand('وثائقي اقتصادي'),slides:[
    {id:1,type:'cover',title:'الاقتباس',subtitle:'نص اختبار',voiceover:'هذا اقتباس حرفي موجود في التعليق',duration:2,visualType:'illustrative',mediaItems:media()},
    {id:2,type:'content',title:'المقارنة',subtitle:'بيانات اختبار اصطناعية',voiceover:'هذه مقارنة بين أرقام اصطناعية للاختبار',duration:2,visualType:'data',mediaItems:media()},
    {id:3,type:'outro',title:'الوثيقة',subtitle:'وثيقة اختبار اصطناعية',voiceover:'هنا نبرز منطقة من وثيقة اختبار',duration:2,visualType:'document',mediaItems:media()}
@@ -181,9 +188,11 @@ try{
   await saveStudioProject();
   const snapshots=await projectStore('readonly',store=>store.getAll());
   const snapshot=snapshots.at(-1);
+  if(snapshot.topic.soundscape?.style!=='finance')throw Error('Sound settings not saved');
   if(!snapshot?.topic?.slides[0].creative)throw Error('IndexedDB snapshot missing creative settings');
   document.getElementById('saved-studio-projects').value=snapshot.id;
   await restoreStudioProject();
+  if(topics.customScript.soundscape?.style!=='finance')throw Error('Sound settings not restored');
   if(topics.customScript.slides[1].creative?.kind!=='comparison')throw Error('Snapshot restore failed');
   if(topics.customScript.slides[2].design?.preset!=='investigation')throw Error('Design pack lost on restore');
   if(topics.customScript.slides[0].typography!=='kinetic')throw Error('Kinetic typography lost on restore');
@@ -194,11 +203,12 @@ try{
   const C=window.StudioCinema,canvas=document.createElement('canvas');canvas.width=200;canvas.height=200;const ctx=canvas.getContext('2d');
   const current=()=>{ctx.fillStyle='#0000ff';ctx.fillRect(0,0,200,200);},previous=()=>{ctx.fillStyle='#ff0000';ctx.fillRect(0,0,200,200);};
   const pixel=x=>Array.from(ctx.getImageData(x,100,1,1).data).slice(0,3);
-  for(const type of ['cut','fade','dip-black','wipe-left','wipe-right']){
+  for(const type of ['cut','fade','dip-black','wipe-left','wipe-right','diagonal-wipe','circle-reveal','push-left']){
    C.transition(ctx,current,previous,{type,progress:1,width:200,height:200});if(pixel(100)[2]!==255)throw Error('Transition final frame: '+type);
   }
   C.transition(ctx,current,previous,{type:'dip-black',progress:.5,width:200,height:200});if(pixel(100).some(x=>x!==0))throw Error('Dip black midpoint');
   C.transition(ctx,current,previous,{type:'wipe-left',progress:.5,width:200,height:200});if(pixel(10)[0]!==255||pixel(190)[2]!==255)throw Error('Wipe direction or clipping');
+  for(const type of ['diagonal-wipe','circle-reveal','push-left']){C.transition(ctx,current,previous,{type,progress:.35,width:200,height:200});const data=ctx.getImageData(0,0,200,200).data;let red=0,blue=0;for(let i=0;i<data.length;i+=4){if(data[i]>200)red++;if(data[i+2]>200)blue++;}if(red<200||blue<200)throw Error('New transition is not composited: '+type);}
   const image=new Image();image.src=topics.customScript.slides[0].mediaItems[0].url;await image.decode();
   const scene=topics.customScript.slides[0];
   const sample=t=>{ctx.clearRect(0,0,200,200);C.drawMedia(ctx,image,scene,200,200,t,2);C.drawFinish(ctx,scene,200,200,t);return new Uint8Array(ctx.getImageData(0,0,200,200).data);};
@@ -208,6 +218,15 @@ try{
   return {transitions:true,motionChangedChannels:changed,deterministicGrain:true,isolatedFilter:true};
  });
  console.log('Cinema real pixels',JSON.stringify(cinemaPixels));
+ const soundCheck=await page.evaluate(async()=>{
+  const result=[];const S=StudioSoundscape;
+  for(const style of Object.keys(S.names)){
+   const ac=new OfflineAudioContext(1,8*24000,24000),voice=ac.createBuffer(1,8*24000,24000),data=voice.getChannelData(0);for(let i=0;i<data.length;i++)if(i<48000||i>96000)data[i]=.15*Math.sin(2*Math.PI*440*i/24000);
+   const settings=S.normalize({style}),prepared=await S.prepare(ac,settings),mix=S.createMix(ac,{narration:voice,slides:[{visualType:'data'},{visualType:'broll'}],durations:[4,4],prepared,destination:ac.destination,monitor:false});mix.start(0);const rendered=await ac.startRendering(),pcm=rendered.getChannelData(0);let peak=0,tail=0;for(let i=0;i<pcm.length;i++){if(!Number.isFinite(pcm[i]))throw Error('Nonfinite sound mix');peak=Math.max(peak,Math.abs(pcm[i]));if(i>60000&&i<90000)tail+=pcm[i]*pcm[i];}const rms=Math.sqrt(tail/30000);if(peak>=.98||rms<.0001)throw Error('Empty/clipped music: '+style);result.push({style,peak,silentGapRms:rms,events:mix.plan.length});mix.stop();
+  }
+  const plain=new OfflineAudioContext(1,24000,24000),v=plain.createBuffer(1,24000,24000);v.getChannelData(0).fill(.1);const m=S.createMix(plain,{narration:v,slides:[{}],durations:[1],prepared:{settings:null,buffers:{},credits:[]},destination:plain.destination,monitor:false});m.start(0);const rendered=await plain.startRendering();if(Math.abs(rendered.getChannelData(0)[100]-.1)>.000001)throw Error('Voice-only signal changed');m.stop();return result;
+ });console.log('Real offline music/SFX mix',JSON.stringify(soundCheck));
+
  for(const preset of ['editorial','finance','investigation','minimal']){
   const png=await page.evaluate(async preset=>{
    const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;
@@ -274,16 +293,20 @@ try{
  assert(Math.abs(end('audio')-testSeconds)<.6,'audio duration');
  assert(Math.abs(end('video')-testSeconds)<.6,'video duration');
  assert(Math.abs(end('audio')-end('video'))<.6,'audio/video sync');
+ const encoded=execFileSync('ffmpeg',['-v','error','-i',file,'-vn','-ac','1','-ar','8000','-af','bandreject=f=440:t=q:w=4,highpass=f=100','-f','f32le','-'],{maxBuffer:8*1024*1024});let energy=0,peak=0;for(let i=0;i<encoded.length;i+=4){const v=encoded.readFloatLE(i);assert(Number.isFinite(v));energy+=v*v;peak=Math.max(peak,Math.abs(v));}const extraAudioRms=Math.sqrt(energy/(encoded.length/4));assert(extraAudioRms>.0003,'Downloaded video contains no music/SFX beyond the 440Hz narration fixture');assert(result.diagnostics.soundscape.events>0);assert(result.diagnostics.soundscape.credits.some(c=>c.id==='score-finance'));console.log('Encoded soundtrack verified',JSON.stringify({extraAudioRms,peak}));
+ // MediaRecorder may begin with a short initial frame before its ready event starts narration.
+ // Compare the same narration-relative instant, retaining a strict bound on that leading offset.
+ const narrationOffset=result.diagnostics.recorderStartupSeconds||0;assert(narrationOffset>=0&&narrationOffset<.5,'Recorder startup offset is excessive');
  const frameSimilarity=[];
  for(let i=0;i<3;i++){
   const decoded=path.join(out,'decoded-scene-'+(i+1)+'.png');
-  execFileSync('ffmpeg',['-v','error','-y','-ss',String((i+.5)*testSeconds/3),'-i',file,'-frames:v','1',decoded]);
+  execFileSync('ffmpeg',['-v','error','-y','-ss',String((i+.5)*testSeconds/3+narrationOffset),'-i',file,'-frames:v','1',decoded]);
   const metrics=spawnSync('ffmpeg',['-i',path.join(out,'scene-'+(i+1)+(testOrientation==='landscape'?'-1280x720.png':'-720x1280.png')),'-i',decoded,'-lavfi','ssim','-f','null','-'],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
   const match=String(metrics.stderr).match(/All:([0-9.]+)/);assert.equal(metrics.status,0,'frame comparison failed');
   assert(match&&Number(match[1])>.90,'Decoded frame differs from composed preview: '+metrics.stderr);
   frameSimilarity.push({scene:i+1,decoded:true,ssim:Number(match[1])});
  }
- const summary={...config,...checks,cinemaPixels,decodedFrames:frameSimilarity,diagnostics:result.diagnostics,packetEnds:{audio:end('audio'),video:end('video')},pageErrors:errors,note:'Synthetic media and synthetic tone; does not verify spoken narration or editorial accuracy.'};
+ const summary={...config,...checks,cinemaPixels,soundCheck,extraAudioRms,decodedFrames:frameSimilarity,diagnostics:result.diagnostics,packetEnds:{audio:end('audio'),video:end('video')},pageErrors:errors,note:'Synthetic media and synthetic tone; does not verify spoken narration or editorial accuracy.'};
  await fs.writeFile(path.join(out,'verification.json'),JSON.stringify(summary,null,2));
  assert.equal(errors.length,0,'Browser page errors: '+errors.join('; '));
  console.log(JSON.stringify(summary));

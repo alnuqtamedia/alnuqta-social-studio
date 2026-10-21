@@ -1,13 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const files = fs.readdirSync(dist, { recursive: true }).map(String).sort();
-const forbidden = files.filter(file => /(^|\/)(node_modules|\.git)(\/|$)|\.(mp4|webm|mov|wav|mp3|log|zip)$/i.test(file));
+const audio=JSON.parse(fs.readFileSync(path.join(dist,'public/audio/catalog.json')));
+const approvedAudio=new Set(audio.assets.map(a=>'public/audio/'+a.file));
+for(const a of audio.assets){if(!/^[a-z-]+\.(mp3|wav)$/.test(a.file)||a.license!=='CC0-1.0'||!a.source.startsWith('https://github.com/'))throw Error('Unapproved audio manifest entry');const digest=crypto.createHash('sha256').update(fs.readFileSync(path.join(dist,'public/audio',a.file))).digest('hex');if(digest!==a.sha256)throw Error('Audio hash mismatch: '+a.file);}
+const forbidden = files.filter(file => !approvedAudio.has(file)&& /(^|\/)(node_modules|\.git)(\/|$)|\.(mp4|webm|mov|wav|mp3|log|zip)$/i.test(file));
 if (forbidden.length) throw new Error(`Forbidden deployment files: ${forbidden.join(', ')}`);
 if (!files.includes('index.html')) throw new Error('Pages bundle is missing index.html');
-const expected=['.nojekyll','index.html','project-backup.html','public','public/cinematic-effects.js','public/design-pack.js','public/graphics-catalog.json','public/motion-graphics.js','public/pdfjs','public/preview-config.js','public/production-core.js','public/studio-production.js','public/vendor','public/vendor/THIRD_PARTY_NOTICES.md','public/vendor/sources.json','public/vendor/cairo','public/vendor/cairo/Cairo.ttf','public/vendor/cairo/OFL.txt','public/vendor/cairo/fonts.css','public/vendor/tabler','public/vendor/tabler/LICENSE','public/vendor/tabler/outline-paths.json','public/vendor/d3-ease.min.js','public/vendor/rough.js','public/vendor/chart.umd.min.js','public/vendor/licenses/chart.js.txt','public/vendor/licenses/kurkle-color.txt','public/vendor/licenses',...['d3-ease','roughjs','hachure-fill','path-data-parser','points-on-curve','points-on-path'].map(n=>'public/vendor/licenses/'+n+'.txt'),'social-accounts.html'].sort();
+const expected=['public/soundscape.js','public/audio','public/audio/catalog.json','public/audio/LICENSE-FreePD-CC0.txt','public/audio/LICENSE-Kenney-CC0.txt',...approvedAudio,'public/vendor/zzfx-samples.js','public/vendor/licenses/zzfx.txt','public/vendor/gl-transitions','public/vendor/gl-transitions/LICENSE','public/vendor/gl-transitions/circleopen.glsl','public/vendor/gl-transitions/Directional.glsl','public/vendor/gl-transitions/directionalwipe.glsl','.nojekyll','index.html','project-backup.html','public','public/cinematic-effects.js','public/design-pack.js','public/graphics-catalog.json','public/motion-graphics.js','public/pdfjs','public/preview-config.js','public/production-core.js','public/studio-production.js','public/vendor','public/vendor/THIRD_PARTY_NOTICES.md','public/vendor/sources.json','public/vendor/cairo','public/vendor/cairo/Cairo.ttf','public/vendor/cairo/OFL.txt','public/vendor/cairo/fonts.css','public/vendor/tabler','public/vendor/tabler/LICENSE','public/vendor/tabler/outline-paths.json','public/vendor/d3-ease.min.js','public/vendor/rough.js','public/vendor/chart.umd.min.js','public/vendor/licenses/chart.js.txt','public/vendor/licenses/kurkle-color.txt','public/vendor/licenses',...['d3-ease','roughjs','hachure-fill','path-data-parser','points-on-curve','points-on-path'].map(n=>'public/vendor/licenses/'+n+'.txt'),'social-accounts.html'].sort();
 if(files.filter(x=>!x.startsWith('public/pdfjs/')).join(',')!==expected.join(','))throw Error('Unexpected Pages bundle: '+files.join(','));
 console.log(`Pages bundle verified: ${files.length} files, no node_modules, no .git, no test media, no logs.`);

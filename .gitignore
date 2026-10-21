@@ -12,3 +12,9 @@ dist/
 .env.*
 !.env.example
 
+
+# Reviewed redistributable production audio only.
+!public/audio/*.wav
+!public/audio/*.mp3
+
+artifacts/
