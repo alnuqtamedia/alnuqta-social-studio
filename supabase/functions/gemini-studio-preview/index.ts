@@ -3,6 +3,7 @@ import { authorizeStudioOrigin, enforceStudioRateLimit } from "../_shared/studio
 
 import { reviewInputs, validateReviews, validateVerdicts, reviewSchema, reviewPrompt } from "../_shared/media-review.mjs";
 import { extractText } from "../_shared/gemini-output.mjs";
+import { parseStructuredOutput } from "../_shared/structured-output.mjs";
 
 import { directionPrompt, cinemaSchema, quoteSchema, sanitizeDirection } from "../_shared/creative-direction.mjs";
 
@@ -49,29 +50,48 @@ Deno.serve(async (req: Request) => {
     let data: any = {};
     let raw = "";
     let lastError = "";
+    const requestStarted=Date.now();
+    const requestTimeout=()=>AbortSignal.timeout(Math.max(1000,Math.min(60000,110000-(Date.now()-requestStarted))));
+    let parsedOutput: any;
+    let recoveryAttempted=false;
     for (const model of models) {
-      let response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+      let response: any;
+      let schemaRejected=false;
+      for(let attempt=0;attempt<2;attempt++){
+      const note={type:"text",text:"أعد توليد الإجابة كاملة من المادة الأصلية ككائن JSON واحد صالح فقط. لا تتابع إجابة سابقة ولا تضف شرحاً أو markdown. اجعل الحقول البصرية موجزة مع إبقاء التعليق كاملاً وكل الحقائق والأرقام وإعدادات cinema المطلوبة."+(schemaRejected?" المخطط: "+JSON.stringify(mediaReview?reviewSchema:align?alignmentSchema:fit?fitSchema:RESPONSE_SCHEMA):"")};
+      const attemptInput=attempt?(typeof input==="string"?input+"\n"+note.text:[...input,note]):input;
+      response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({model,input,store:false,...(mediaReview?{response_format:{type:"text",mime_type:"application/json",schema:reviewSchema}}:align?{response_format:{type:"text",mime_type:"application/json",schema:alignmentSchema}}:!transcribe ? {response_format:{type:"text",mime_type:"application/json",schema:fit?fitSchema:RESPONSE_SCHEMA}} : {})}),
-        signal:AbortSignal.timeout(60000),
+        body: JSON.stringify({model,input:attemptInput,store:false,...(!schemaRejected&&(mediaReview?{response_format:{type:"text",mime_type:"application/json",schema:reviewSchema}}:align?{response_format:{type:"text",mime_type:"application/json",schema:alignmentSchema}}:!transcribe ? {response_format:{type:"text",mime_type:"application/json",schema:fit?fitSchema:RESPONSE_SCHEMA}} : {}))}),
+        signal:requestTimeout(),
       });
       // Some Interactions models reject schema-constrained requests with a generic 400.
       // Retry once without response_format, keeping store:false and enforcing JSON locally.
-      if(response.status===400&&!transcribe){
+      if(response.status===400&&!transcribe&&!schemaRejected){
         const rejected=await response.text();
         if(/invalid.argument|invalid_request|schema|response.format/i.test(rejected)){
+          schemaRejected=true;
           const schema=mediaReview?reviewSchema:align?alignmentSchema:fit?fitSchema:RESPONSE_SCHEMA;
           const instruction={type:"text",text:"أرجع JSON فقط مطابقاً لهذا المخطط، بلا markdown: "+JSON.stringify(schema)};
-          const fallbackInput=typeof input==="string"?input+"\n"+instruction.text:[...input,instruction];
+          const fallbackInput=typeof attemptInput==="string"?attemptInput+"\n"+instruction.text:[...attemptInput,instruction];
           response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
             method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
-            body:JSON.stringify({model,input:fallbackInput,store:false}),signal:AbortSignal.timeout(60000),
+            body:JSON.stringify({model,input:fallbackInput,store:false}),signal:requestTimeout(),
           });
         }else return reply({error:"Gemini rejected the request",details:rejected.slice(0,300)},502);
       }
       raw = await response.text();
       try { data = raw ? JSON.parse(raw) : {}; } catch { return reply({ error: "Gemini أعاد استجابة غير قابلة للقراءة." }, 502); }
+      if(response.ok&&!transcribe){
+        try{parsedOutput=parseStructuredOutput(data);}catch(error:any){
+          const code=error instanceof Error?error["code"]||'invalid_json':'invalid_json';
+          if(!recoveryAttempted&&Date.now()-requestStarted<105000&&!audioRequest&&!mediaReview&&!fit&&['invalid_json','invalid_json_object','empty_output','incomplete_output'].includes(code)){recoveryAttempted=true;continue;}
+          return reply({error:recoveryAttempted?"تعذر إكمال خطة Gemini بعد محاولة استرداد تلقائية واحدة؛ النص والمشروع السابق محفوظان.":"Gemini لم يُرجع خطة مكتملة قابلة للقراءة؛ النص والمشروع السابق محفوظان.",code,recoveryAttempted},502);
+        }
+      }
+      break;
+      }
       if (response.ok) break;
       lastError = data?.error?.message || `Gemini HTTP ${response.status}`;
       const limited = response.status === 429 || /quota|rate.?limit|high demand/i.test(lastError);
@@ -82,8 +102,9 @@ Deno.serve(async (req: Request) => {
     const output = extractText(data).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     if (!output) return reply({ error: "Gemini لم يُرجع محتوى. أعد المحاولة." }, 502);
     if(transcribe)return reply({text:output.slice(0,6000)});
-    try { const parsed=JSON.parse(output);if(!mediaReview&&!align){if(!Array.isArray(parsed.slides)||!parsed.slides.length||parsed.slides.length>20||parsed.slides.some((s:any)=>typeof s.voiceover!=="string"))return reply({error:"خطة Gemini غير مكتملة؛ النص السابق محفوظ."},422);if(!fit&&(!RESPONSE_SCHEMA.properties.outputType.enum.includes(parsed.outputType)||typeof parsed.title!=="string"||typeof parsed.subtitle!=="string"||parsed.slides.some((s:any)=>typeof s.title!=="string"||!Number.isFinite(s.duration)||s.duration<1||s.duration>30||!RESPONSE_SCHEMA.properties.slides.items.properties.visualType.enum.includes(s.visualType)||typeof s.visualQuery!=="string")))return reply({error:"حقول خطة Gemini غير صالحة؛ النص السابق محفوظ."},422);if(fit&&parsed.slides.length!==body.currentContent?.slides?.length)return reply({error:"تغيّر عدد مشاهد التعليق؛ النص السابق محفوظ."},422);}if(mediaReview){try{return reply(validateVerdicts(parsed,body.reviews));}catch{return reply({error:"الفحص البصري لم يرجع تقييمات المشاهد بشكل كامل؛ لم تُعتمد وسائط غير مفحوصة.",details:output.slice(0,250)},422);}}if(align){if(!parsed.complete||!Array.isArray(parsed.segments)||parsed.segments.length!==body.scenes.length)return reply({error:"alignment_incomplete"},422);let previous=-1;for(let i=0;i<parsed.segments.length;i++){const x=parsed.segments[i];if(x.scene!==i+1||typeof x.start!=="number"||x.start<0||x.start>=body.duration||x.start<=previous||typeof x.text!=="string"||!x.text.trim())return reply({error:"alignment_invalid"},422);previous=x.start;}}if(!mediaReview&&!align&&!fit){sanitizeDirection(parsed,body.currentContent||{});if(["video","reel","tiktok","story"].includes(parsed.outputType)&&parsed.slides.some((s:any)=>!s.cinema))return reply({error:"إعدادات الإخراج غير مكتملة؛ العمل السابق محفوظ. أعد الطلب."},422);}return reply(parsed); } catch { return reply({ error: "Gemini أعاد JSON غير مكتمل. أعد المحاولة.", details: output.slice(0, 250) }, 502); }
+    try { const parsed=parsedOutput;if(!mediaReview&&!align){if(!Array.isArray(parsed.slides)||!parsed.slides.length||parsed.slides.length>20||parsed.slides.some((s:any)=>typeof s.voiceover!=="string"))return reply({error:"خطة Gemini غير مكتملة؛ النص السابق محفوظ."},422);if(!fit&&(!RESPONSE_SCHEMA.properties.outputType.enum.includes(parsed.outputType)||typeof parsed.title!=="string"||typeof parsed.subtitle!=="string"||parsed.slides.some((s:any)=>typeof s.title!=="string"||!Number.isFinite(s.duration)||s.duration<1||s.duration>30||!RESPONSE_SCHEMA.properties.slides.items.properties.visualType.enum.includes(s.visualType)||typeof s.visualQuery!=="string")))return reply({error:"حقول خطة Gemini غير صالحة؛ النص السابق محفوظ."},422);if(fit&&parsed.slides.length!==body.currentContent?.slides?.length)return reply({error:"تغيّر عدد مشاهد التعليق؛ النص السابق محفوظ."},422);}if(mediaReview){try{return reply(validateVerdicts(parsed,body.reviews));}catch{return reply({error:"الفحص البصري لم يرجع تقييمات المشاهد بشكل كامل؛ لم تُعتمد وسائط غير مفحوصة.",details:output.slice(0,250)},422);}}if(align){if(!parsed.complete||!Array.isArray(parsed.segments)||parsed.segments.length!==body.scenes.length)return reply({error:"alignment_incomplete"},422);let previous=-1;for(let i=0;i<parsed.segments.length;i++){const x=parsed.segments[i];if(x.scene!==i+1||typeof x.start!=="number"||x.start<0||x.start>=body.duration||x.start<=previous||typeof x.text!=="string"||!x.text.trim())return reply({error:"alignment_invalid"},422);previous=x.start;}}if(!mediaReview&&!align&&!fit){sanitizeDirection(parsed,body.currentContent||{});if(["video","reel","tiktok","story"].includes(parsed.outputType)&&parsed.slides.some((s:any)=>!s.cinema))return reply({error:"إعدادات الإخراج غير مكتملة؛ العمل السابق محفوظ. أعد الطلب."},422);}return reply(parsed); } catch { return reply({ error: "تعذر التحقق من خطة Gemini؛ النص والمشروع السابق محفوظان.", code:"plan_validation_failed" }, 502); }
   } catch (error) {
+    if(error instanceof Error&&["TimeoutError","AbortError"].includes(error.name))return reply({error:"انتهت مهلة Gemini قبل اكتمال الخطة؛ النص والمشروع السابق محفوظان.",code:"generation_timeout"},504);
     return reply({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
