@@ -66,6 +66,12 @@ try{
  const designCheck=await page.evaluate(()=>{const D=StudioDesignPack;for(const d of Object.values(D.state.icons))new Path2D(d);return {icons:Object.keys(D.state.icons).length,font:document.fonts.check('700 32px StudioCairo'),catalog:D.state.catalog.length};});
  assert.equal(designCheck.icons,4808);assert.equal(designCheck.font,true);assert.equal(designCheck.catalog,16);
  await page.locator('summary').filter({hasText:'مكتبة الجرافيك:'}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('#design-icons button').length>0);
+ const firstIcon=await page.locator('#design-icons button').first().getAttribute('aria-label');
+ await page.locator('#design-next').click();
+ assert.notEqual(await page.locator('#design-icons button').first().getAttribute('aria-label'),firstIcon);
+ await page.locator('#design-prev').click();
+ assert.equal(await page.locator('#design-icons button').first().getAttribute('aria-label'),firstIcon);
  await page.locator('#design-preset').selectOption('finance');
  await page.waitForFunction(()=>topics.customScript.slides[0].design?.preset==='finance');
  await page.locator('#design-search').fill('briefcase');
