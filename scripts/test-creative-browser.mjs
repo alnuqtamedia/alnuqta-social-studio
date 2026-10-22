@@ -23,7 +23,7 @@ const server=http.createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin='http://127.0.0.1:'+server.address().port;
-const browser=await chromium.launch({channel:'chromium',headless:true,args:['--autoplay-policy=no-user-gesture-required']});
+const browser=await chromium.launch({...(process.env.PW_HEADLESS_SHELL?{}:{channel:'chromium'}),headless:true,args:['--autoplay-policy=no-user-gesture-required']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const errors=[];
 // The external Tailwind CDN is intentionally blocked; supply only its configuration namespace.
@@ -74,7 +74,7 @@ try{
  const designCheck=await page.evaluate(()=>{const D=StudioDesignPack;for(const d of Object.values(D.state.icons))new Path2D(d);return {icons:Object.keys(D.state.icons).length,font:document.fonts.check('700 32px StudioCairo'),catalog:D.state.catalog.length};});
  assert.equal(designCheck.icons,4808);assert.equal(designCheck.font,true);assert.equal(designCheck.catalog,16);
  const fallbackCheck=await page.evaluate(()=>{const s={title:'مثال تدريبي',voiceover:'هذا مثال توضيحي وليس متوسطاً وطنياً',visualType:'illustrative',design:{pack:'press-v1',preset:'finance'},mediaItems:[]};if(StudioProduction.prepareLocalVisual(s))throw Error('Text fallback bypassed media search');if(!StudioProduction.prepareLocalVisual(s,true)||StudioProduction.needsMedia(s))throw Error('Local motion-text blocked');const c=document.createElement('canvas');c.width=720;c.height=1280;const ctx=c.getContext('2d'),draw=ctx.fillText.bind(ctx),labels=[];ctx.fillText=(text,...args)=>{labels.push(text);draw(text,...args);};StudioProduction.paint(ctx,s,null,720,1280,4,8);if(!labels.some(t=>t.includes('مثال')))throw Error('Fallback title not painted');const issues=StudioProduction.missingVisuals([s,{title:'وثيقة أصلية',visualType:'document',mediaItems:[]}]);return {kind:s.productionVisual.kind,missing:issues.map(x=>x.scene),note:s.productionMediaReview.note};});
- assert.equal(fallbackCheck.kind,'motion-text');assert.deepEqual(fallbackCheck.missing,[2]);assert.match(fallbackCheck.note,/ليس فيديو مصوراً/);
+ assert.equal(fallbackCheck.kind,'illustration');assert.deepEqual(fallbackCheck.missing,[2]);assert.match(fallbackCheck.note,/رسم توضيحي/);
 
  // Verify the real Chart.js adapter: shared zero baseline, exact ratios, no live instances,
  // bounded cache, deterministic seek and both render orientations.
