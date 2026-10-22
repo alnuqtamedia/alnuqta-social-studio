@@ -144,8 +144,9 @@ function kineticText(ctx,text,x,y,w,h,size,color='#fff',family='Cairo'){
  box.lines.forEach((line,i)=>ctx.fillText(line,x+w,y+box.size+i*box.size*1.4));ctx.restore();
 }
 function drawKinetic(ctx,slide,{width:W,height:H,time=0,duration=1}){
- const alpha=Number.isFinite(ctx.globalAlpha)?ctx.globalAlpha:1,t=clamp(time,0,Math.max(.01,duration)),q=t/Math.max(.01,duration),p=plan(slide),c=creativePlan(slide),L=kineticLayout(W,H,p.details.length?t+2.5:t,slide.design),{S,M}=L,cw=W-2*M,family=root.StudioDesignPack?.font(slide)||'Cairo';
+ const alpha=Number.isFinite(ctx.globalAlpha)?ctx.globalAlpha:1,t=clamp(time,0,Math.max(.01,duration)),q=t/Math.max(.01,duration),p=plan(slide),c=creativePlan(slide),L=kineticLayout(W,H,slide.illustration?t+3:p.details.length?t+2.5:t,slide.design),{S,M}=L,cw=W-2*M,family=root.StudioDesignPack?.font(slide)||'Cairo';
  ctx.save();ctx.direction='rtl';ctx.textAlign='right';
+ if(slide.illustration&&W>H){L.titleY=H*.25;L.titleSize=S*.052;}
  // Large opening typography becomes a compact heading, leaving the footage visible.
  const f=fit(ctx,p.title,cw,3,Math.round(L.titleSize),18,family),lh=f.size*1.35;
  ctx.save();ctx.globalAlpha=c?0:alpha*L.enter;
@@ -161,14 +162,14 @@ function drawKinetic(ctx,slide,{width:W,height:H,time=0,duration=1}){
   kineticText(ctx,c.text,M+S*.04,H*.39,cw-S*.08,H*.13,Math.round(S*.067),'#fff',family);
   kineticText(ctx,'المصدر: '+c.source,M+S*.04,H*.54,cw-S*.08,H*.045,Math.round(S*.026),'#cbd5e1',family);ctx.restore();
  }else if(c){drawCreative(ctx,c,{W,H,S,M,time:t,duration,alpha,design:slide.design});}
- else if(p.details.length){
+ else if(p.details.length&&!slide.illustration){
   p.details.slice(0,4).forEach((text,i)=>{const a=ease((t-1-i*.3)/.5);if(!a)return;const y=H*.35+i*H*.075;
    ctx.save();ctx.globalAlpha=alpha*a;ctx.fillStyle='rgba(7,20,38,.88)';ctx.fillRect(M+(1-a)*S*.09,y,cw,H*.068);
    ctx.fillStyle='#e31217';ctx.fillRect(W-M-S*.012,y,S*.012,H*.068);kineticText(ctx,text,M+S*.025,y+H*.006,cw-S*.06,H*.06,Math.round(S*.036),'#fff',family);ctx.restore();
   });
  }
  const fallback=p.annotations.filter(a=>q>=Math.max(0,a.at-.05)).at(-1),explicit=root.StudioDesignPack?.selectedCue(slide,q,null),cue=explicit||(!c&&fallback);
- if(cue&&!root.StudioDesignPack?.drawCue(ctx,slide,cue,{W,H,S,M,time:t,duration,alpha})){const a=ease((q-Math.max(0,cue.at-.05))*duration/.35);ctx.save();ctx.globalAlpha=alpha*a;icon(ctx,cue.icon,W-M-S*.065,H*.68,S*.05,a);ctx.font=`700 ${Math.round(S*.03)}px ${family}, Arial`;ctx.fillStyle='#fff';ctx.fillText(cue.label,W-M-S*.09,H*.715);ctx.restore();}
+ if(cue&&!slide.illustration&&!root.StudioDesignPack?.drawCue(ctx,slide,cue,{W,H,S,M,time:t,duration,alpha})){const a=ease((q-Math.max(0,cue.at-.05))*duration/.35);ctx.save();ctx.globalAlpha=alpha*a;icon(ctx,cue.icon,W-M-S*.065,H*.68,S*.05,a);ctx.font=`700 ${Math.round(S*.03)}px ${family}, Arial`;ctx.fillStyle='#fff';ctx.fillText(cue.label,W-M-S*.09,H*.715);ctx.restore();}
  // Preserve every narration word; timing remains estimated within the aligned scene.
  const phrase=p.phrases.find((a,i)=>q>=a.start&&(q<a.start+a.span||i===p.phrases.length-1));
  if(phrase){const text=phrase.words.join(' '),f=fit(ctx,text,cw-S*.07,2,Math.round(S*.052),16,family),h=f.lines.length*f.size*1.5+S*.05,age=(q-phrase.start)*duration,a=ease(age/.18),y=H*.83-h/2+(1-a)*S*.025;

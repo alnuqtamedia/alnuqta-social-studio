@@ -48,6 +48,8 @@ jobs:
           sudo apt-get install -y ffmpeg
       - name: Verify real browser creative export
         run: node scripts/test-creative-browser.mjs
+      - name: Verify geographic graphics and local FFmpeg export
+        run: node scripts/test-illustrated-browser.mjs
       - name: Verify 45-second portrait export
         run: node scripts/test-creative-browser.mjs
         env:
@@ -62,6 +64,8 @@ jobs:
         if: always()
         with:
           name: creative-browser-proof
-          path: artifacts/creative-browser/
+          path: |
+            artifacts/creative-browser/
+            artifacts/illustrated-browser/
           retention-days: 7
           if-no-files-found: ignore

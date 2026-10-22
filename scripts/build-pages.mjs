@@ -27,3 +27,12 @@ console.log(`Pages bundle ready: ${files.length} files (${files.join(', ')})`);
 
 fs.copyFileSync(path.join(root,'node_modules/chart.js/LICENSE.md'),path.join(vendor,'licenses/chart.js.txt'));
 fs.copyFileSync(path.join(root,'node_modules/@kurkle/color/LICENSE.md'),path.join(vendor,'licenses/kurkle-color.txt'));
+
+// Pinned MIT Lottie player and a lazy, single-thread FFmpeg build, served locally.
+fs.copyFileSync(path.join(root,'node_modules/lottie-web/build/player/lottie_canvas.min.js'),path.join(vendor,'lottie_canvas.min.js'));
+fs.copyFileSync(path.join(root,'node_modules/lottie-web/LICENSE.md'),path.join(vendor,'licenses/lottie-web.txt'));
+const ffmpeg=path.join(vendor,'ffmpeg');fs.mkdirSync(ffmpeg,{recursive:true});
+for(const name of ['ffmpeg.js','814.ffmpeg.js'])fs.copyFileSync(path.join(root,'node_modules/@ffmpeg/ffmpeg/dist/umd',name),path.join(ffmpeg,name));
+for(const name of ['ffmpeg-core.js','ffmpeg-core.wasm'])fs.copyFileSync(path.join(root,'node_modules/@ffmpeg/core/dist/umd',name),path.join(ffmpeg,name));
+fs.copyFileSync(path.join(root,'public/vendor/ffmpeg-notices/LICENSE-wrapper'),path.join(ffmpeg,'LICENSE-wrapper'));
+fs.copyFileSync(path.join(root,'node_modules/@ffmpeg/core/package.json'),path.join(ffmpeg,'core-package.json'));
