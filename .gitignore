@@ -18,3 +18,8 @@ dist/
 !public/audio/*.mp3
 
 artifacts/
+
+# Private voice runtime files stay outside the public repository.
+__pycache__/
+.venv/
+services/private-voice/private/

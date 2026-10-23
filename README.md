@@ -28,7 +28,8 @@
 مسار الإنتاج الحالي في `public/studio-production.js` يستدعي:
 
 - `gemini-studio-preview`: التخطيط والتصحيح وفحص الوسائط وضبط السرد.
-- `gemini-tts-preview`: التعليق الصوتي.
+- `gemini-tts-preview`: التعليق الصوتي بالأصوات الجاهزة.
+- صوت خاص اختياري عبر خدمة SILMA منفصلة بمفتاح خاص لكل جلسة؛ يحتاج تشغيل الخدمة قبل استخدامه. [إعداد الخدمة وحدودها](services/private-voice/README.md).
 - `pexels-search-preview`: البحث عن الوسائط.
 
 بعض أدوات الواجهة القديمة تستدعي دوال `gemini-studio` و`gemini-tts`

@@ -273,12 +273,23 @@
                 <p class="text-[10px] text-gray-500 font-tajawal">يقسّم السرد الطويل إلى لقطات أقصر، ويضبط المدة والحركة والانتقال قبل توليد الصوت.</p>
                 <div class="grid grid-cols-2 gap-2">
                     <label class="text-[10px] text-gray-400 font-cairo">صوت AI
-                        <select id="ai-tts-voice" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option value="Charon">صحفي واضح</option><option value="Rasalgethi">إخباري</option><option value="Gacrux">ناضج</option><option value="Kore">حازم</option><option value="Sulafat">دافئ</option><option value="Aoede">خفيف</option></select>
+                        <select id="ai-tts-voice" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option id="private-owner-option" value="private-owner" disabled>صوتي الخاص — مولّد</option><option value="Charon">صحفي واضح</option><option value="Rasalgethi">إخباري</option><option value="Gacrux">ناضج</option><option value="Kore">حازم</option><option value="Sulafat">دافئ</option><option value="Aoede">خفيف</option></select>
                     </label>
                     <label class="text-[10px] text-gray-400 font-cairo">أسلوب القراءة
                         <select id="ai-tts-style" class="mt-1 w-full bg-navy-card border border-navy-light rounded p-2 text-xs text-white"><option value="صحفي وثائقي هادئ وواضح، بالعربية الفصحى الطبيعية، سرعة متوسطة، بلا مبالغة درامية">وثائقي</option><option value="مذيع أخبار عربي واضح ورصين، سرعة متوسطة">إخباري</option><option value="سرد استقصائي جاد، هادئ، مع وقفات طبيعية">استقصائي</option></select>
                     </label>
                 </div>
+                <details class="border border-navy-light rounded p-2 text-xs font-cairo">
+                    <summary class="cursor-pointer text-gray-300">ربط صوتي الخاص</summary>
+                    <div class="space-y-2 mt-2">
+                        <p class="text-gray-400">قراءة مولّدة من تسجيلك. تحتاج خدمة صوت خاصة تعمل؛ الاتصال يبقى لهذه الجلسة فقط.</p>
+                        <label class="block">عنوان الخدمة<input id="private-voice-url" type="url" value="http://127.0.0.1:7861" dir="ltr" class="w-full bg-navy-card border border-navy-light rounded p-2"></label>
+                        <label class="block">مفتاح الاتصال<input id="private-voice-token" type="password" autocomplete="off" class="w-full bg-navy-card border border-navy-light rounded p-2"></label>
+                        <button type="button" onclick="StudioPrivateVoice.connect()" class="border border-emerald-500 rounded p-2">اتصال واختيار صوتي</button>
+                        <button type="button" onclick="StudioPrivateVoice.disconnect()" class="border border-navy-light rounded p-2">قطع الاتصال</button>
+                        <p id="private-voice-status" role="status" class="text-gray-400">غير متصل. إعداد الاتصال لا يُحفظ مع المشاريع.</p>
+                    </div>
+                </details>
                 <button id="ai-tts-btn" onclick="generateAIVoiceover()" class="w-full py-2.5 bg-navy border border-brandRed/60 hover:bg-brandRed text-white rounded font-cairo font-bold text-xs">مطابقة المدة وتوليد التعليق الصوتي</button>
                 <audio id="ai-tts-preview" controls controlslist="nodownload" aria-label="معاينة التعليق الصوتي فقط" class="hidden w-full"></audio>
                 <p class="text-[10px] text-gray-400 font-tajawal">المشغّل أعلاه للصوت فقط. أنشئ معاينة الفيديو، راجعها ثم نزّل النسخة نفسها بزر التنزيل المستقل.</p>
@@ -1271,7 +1282,7 @@
             if(source==='human'&&!window.humanVoiceoverBlob)return setAIStatus('سجّل تعليقاً بشرياً أولاً.','error');
             if(source==='gemini'&&!window.aiVoiceoverBlob)return setAIStatus('ولّد تعليق Gemini أولاً.','error');
             window.activeVoiceSource=source;
-            const label=document.getElementById('active-voice-source');if(label)label.innerText='المصدر: '+(source==='human'?'التسجيل البشري':'Gemini');
+            const label=document.getElementById('active-voice-source');if(label)label.innerText='المصدر: '+(source==='human'?'التسجيل البشري':generatedVoiceLabel());
             setAIStatus(source==='human'?'سيُستخدم التسجيل البشري في التصدير.':'سيُستخدم صوت Gemini في التصدير.','success');
         }
 
@@ -1307,7 +1318,7 @@
             window.humanVoiceRecorder=null;window.humanVoiceStream=null;window.humanVoiceoverBlob=null;window.humanVoiceoverUrl='';window.humanVoiceoverDuration=0;
             const preview=document.getElementById('human-record-preview');if(preview){preview.pause();preview.removeAttribute('src');preview.classList.add('hidden')}
             document.getElementById('human-record-delete').disabled=true;document.getElementById('human-record-start').disabled=false;document.getElementById('human-record-stop').disabled=true;document.getElementById('human-record-status').innerText='تم حذف التسجيل البشري.';
-            window.activeVoiceSource=window.aiVoiceoverBlob?'gemini':'';const label=document.getElementById('active-voice-source');if(label)label.innerText=window.aiVoiceoverBlob?'المصدر: Gemini':'لا يوجد مصدر صوت';setAIStatus('تم حذف التسجيل البشري.','success');
+            window.activeVoiceSource=window.aiVoiceoverBlob?'gemini':'';const label=document.getElementById('active-voice-source');if(label)label.innerText=window.aiVoiceoverBlob?'المصدر: '+generatedVoiceLabel():'لا يوجد مصدر صوت';setAIStatus('تم حذف التسجيل البشري.','success');
         }
 
         function invalidateGeneratedVoiceover(){
@@ -1795,11 +1806,20 @@
             return Math.max(3,Math.ceil(seconds));
         }
 
+        function generatedVoiceLabel(){return window.aiVoiceEngine==='private-owner'?'صوتي الخاص — مولّد':'Gemini';}
+
         async function requestNarrationTts(text,performanceHint=''){
+            if(document.getElementById('ai-tts-voice')?.value==='private-owner'){
+                const parent=window.StudioProduction?.state.abort?.signal,controller=new AbortController(),cancel=()=>controller.abort();
+                parent?.addEventListener('abort',cancel,{once:true});if(parent?.aborted)controller.abort();
+                const timer=setTimeout(cancel,600000);
+                try{const result=await StudioPrivateVoice.speech(text,controller.signal);window.aiVoiceEngine='private-owner';return result;}
+                finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}
+            }
             let data;
             for(let attempt=0;attempt<3;attempt++){
                 const parent=window.StudioProduction?.state.abort?.signal,controller=new AbortController(),cancel=()=>controller.abort();parent?.addEventListener('abort',cancel,{once:true});if(parent?.aborted)controller.abort();const timer=setTimeout(cancel,130000);let r;
-                try{r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts-preview',{method:'POST',headers:{'Content-Type':'application/json',apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey},signal:controller.signal,body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:narrationStyle()+performanceHint})});data=await r.json();}catch(error){if(controller.signal.aborted)throw new Error(parent?.aborted?'أُلغي الطلب.':'تأخرت خدمة الصوت؛ النص محفوظ. أعد تجهيز الإنتاج.');throw error;}finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}if(r.ok)return data;
+                try{r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-tts-preview',{method:'POST',headers:{'Content-Type':'application/json',apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey},signal:controller.signal,body:JSON.stringify({text,voice:document.getElementById('ai-tts-voice')?.value||'Charon',style:narrationStyle()+performanceHint})});data=await r.json();}catch(error){if(controller.signal.aborted)throw new Error(parent?.aborted?'أُلغي الطلب.':'تأخرت خدمة الصوت؛ النص محفوظ. أعد تجهيز الإنتاج.');throw error;}finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}if(r.ok){window.aiVoiceEngine='gemini';return data;}
                 const message=String(data.error||'فشل توليد الصوت'),retryMatch=message.match(/retry in\s+([\d.]+)s/i),limited=r.status===429||/quota|rate.?limit|high demand/i.test(message);const waitSeconds=generationRetryDelay(r.status,message,attempt);if(waitSeconds===null)throw new Error(message);
                 for(let remaining=waitSeconds;remaining>0;remaining--){setAIStatus(`حصة الصوت ممتلئة مؤقتاً. إعادة المحاولة تلقائياً بعد ${remaining} ثانية…`,'busy');await new Promise(resolve=>setTimeout(resolve,1000));if(window.StudioProduction?.state.abort?.signal.aborted)throw new Error('أُلغي الطلب.');}
             }
@@ -1840,7 +1860,7 @@
                     if(syncMode!=='fit-audio'||duration<=target||pass===2)break;if(!await fitNarrationToDuration(slides,target,Math.min(.95,target/duration*.92)))break;
                 }
                 if(window.aiVoiceoverUrl)URL.revokeObjectURL(window.aiVoiceoverUrl);(window.aiSceneVoiceovers||[]).forEach(x=>{if(x?.url)URL.revokeObjectURL(x.url)});window.aiSceneVoiceovers=[];window.aiVoiceoverBlob=blob;window.aiVoiceoverUrl=URL.createObjectURL(blob);window.aiVoiceoverDuration=duration;
-                window.activeVoiceSource='gemini';const sourceLabel=document.getElementById('active-voice-source');if(sourceLabel)sourceLabel.innerText='المصدر: Gemini';
+                window.activeVoiceSource='gemini';const sourceLabel=document.getElementById('active-voice-source');if(sourceLabel)sourceLabel.innerText='المصدر: '+generatedVoiceLabel();
                 const audio=document.getElementById('ai-tts-preview');audio.src=window.aiVoiceoverUrl;audio.classList.remove('hidden');audio.load();setAIStatus('تم توليد الصوت. جاري مطابقة الوقفات مع انتقالات المشاهد…','busy');
                 window.aiSceneDurations=await detectNarrationSceneDurations(blob,texts,duration);window.aiTimelineApproximate=true;
                 window.aiSceneDurations.forEach((value,index)=>{if(slides[index])slides[index].duration=Number(value.toFixed(2))});if(syncMode==='extend-visuals')document.getElementById('video-total-duration').value=duration.toFixed(1);
@@ -1876,7 +1896,7 @@
         }
         async function saveStudioProject(){const status=document.getElementById('project-save-status');status.textContent='جاري حفظ النص والوسائط والصوت…';try{
             const topic=await packProjectValue(topics[activeTikTokTopic]);const news=await captureNewsProject();const controls={};for(const id of ['video-total-duration','video-sync-mode','ai-tts-voice','ai-tts-style','video-quality'])controls[id]=document.getElementById(id)?.value;
-            await projectStore('readwrite',store=>store.put({id:crypto.randomUUID(),version:1,savedAt:Date.now(),title:String(topic.title||topic.label||'مشروع الاستوديو'),topicKey:activeTikTokTopic,topic,controls,news,social:JSON.parse(JSON.stringify(socialDrafts)),voice:{source:window.activeVoiceSource,ai:window.aiVoiceoverBlob,human:window.humanVoiceoverBlob,aiDuration:window.aiVoiceoverDuration,humanDuration:window.humanVoiceoverDuration,sceneDurations:window.aiSceneDurations,approximate:window.aiTimelineApproximate,narrationText:window.aiNarrationText,alignmentMethod:window.aiAlignmentMethod,fitNote:window.aiScriptFitNote}}));
+            await projectStore('readwrite',store=>store.put({id:crypto.randomUUID(),version:1,savedAt:Date.now(),title:String(topic.title||topic.label||'مشروع الاستوديو'),topicKey:activeTikTokTopic,topic,controls,news,social:JSON.parse(JSON.stringify(socialDrafts)),voice:{engine:window.aiVoiceEngine,source:window.activeVoiceSource,ai:window.aiVoiceoverBlob,human:window.humanVoiceoverBlob,aiDuration:window.aiVoiceoverDuration,humanDuration:window.humanVoiceoverDuration,sceneDurations:window.aiSceneDurations,approximate:window.aiTimelineApproximate,narrationText:window.aiNarrationText,alignmentMethod:window.aiAlignmentMethod,fitNote:window.aiScriptFitNote}}));
             status.textContent='حُفظت نسخة محلية جديدة بالنص والوسائط والصوت. الروابط الخارجية محفوظة كرابط؛ الحفظ على هذا الجهاز والمتصفح فقط.';await refreshSavedProjects();
         }catch(error){status.textContent='لم يكتمل الحفظ؛ العمل الحالي باقٍ: '+error.message;}}
         async function restoreStudioProject(){const status=document.getElementById('project-save-status'),id=document.getElementById('saved-studio-projects').value;if(!id){status.textContent='لا توجد نسخة محفوظة.';return;}try{
@@ -1886,7 +1906,7 @@
             for(const [id,value] of Object.entries(snapshot.controls||{})){const element=document.getElementById(id);if(element&&value!==undefined)element.value=value;}
             for(const [key,draft] of Object.entries(snapshot.social||{})){const restoredKey=key.replace('alnuqta-social-draft:'+snapshot.topicKey+':','alnuqta-social-draft:customScript:');socialDrafts[restoredKey]=draft;}const voice=snapshot.voice||{};
             for(const [kind,blob] of [['ai',voice.ai],['human',voice.human]])if(blob instanceof Blob){window[kind+'VoiceoverBlob']=blob;window[kind+'VoiceoverUrl']=URL.createObjectURL(blob);window[kind+'VoiceoverDuration']=Number(voice[kind+'Duration'])||0;const audio=document.getElementById(kind==='ai'?'ai-tts-preview':'human-record-preview');audio.src=window[kind+'VoiceoverUrl'];audio.classList.remove('hidden');audio.load();if(kind==='human')document.getElementById('human-record-delete').disabled=false;}
-            window.activeVoiceSource=voice.source;window.aiSceneDurations=voice.sceneDurations||[];window.aiTimelineApproximate=voice.approximate!==false;window.aiNarrationText=voice.narrationText||'';window.aiAlignmentMethod=voice.alignmentMethod||'estimated';window.aiScriptFitNote=voice.fitNote||'';await restoreNewsProject(snapshot.news);document.getElementById('active-voice-source').textContent='المصدر: '+(voice.source==='human'?'التسجيل البشري':voice.source==='gemini'?'Gemini':'لا يوجد');
+            window.aiVoiceEngine=voice.engine||'gemini';window.activeVoiceSource=voice.source;window.aiSceneDurations=voice.sceneDurations||[];window.aiTimelineApproximate=voice.approximate!==false;window.aiNarrationText=voice.narrationText||'';window.aiAlignmentMethod=voice.alignmentMethod||'estimated';window.aiScriptFitNote=voice.fitNote||'';await restoreNewsProject(snapshot.news);document.getElementById('active-voice-source').textContent='المصدر: '+(voice.source==='human'?'التسجيل البشري':voice.source==='gemini'?generatedVoiceLabel():'لا يوجد');
             initTikTokSlideButtons();updateTikTokInputs();switchTab('tiktok');renderCanvas();status.textContent='استُعيد المشروع والصوت والوسائط؛ لم يُنشر شيء.';
         }catch(error){status.textContent='تعذر الاسترجاع: '+error.message;}}
         document.addEventListener('DOMContentLoaded',()=>{const panel=document.createElement('div');panel.className='border border-navy-light rounded p-3 space-y-2';panel.innerHTML='<button type="button" onclick="saveStudioProject()" class="w-full bg-brandRed rounded p-2 text-xs">حفظ نسخة داخل هذا المتصفح</button><a href="project-backup.html" target="_blank" rel="noopener" class="block w-full border rounded p-2 text-xs text-center">تنزيل نسخة المشروع كملف ZIP</a><select id="saved-studio-projects" class="w-full bg-navy rounded p-2 text-xs"></select><button type="button" onclick="restoreStudioProject()" class="w-full border rounded p-2 text-xs">استرجاع النسخة المحددة</button><p id="project-save-status" class="text-[10px] text-gray-400">يحفظ الوسائط المحلية والصوت؛ لا يغني عن نسخة احتياطية مستقلة.</p>';document.getElementById('video-total-duration').parentElement.parentElement.before(panel);refreshSavedProjects();});
@@ -2546,7 +2566,8 @@ function newsDownload(){
 <script src="public/editorial-geography.js?v=20261022-illustration-r7"></script>
 <script src="public/illustrated-scenes.js?v=20261022-illustration-r7"></script>
 <script src="public/ffmpeg-export.js?v=20261022-illustration-r7"></script>
-<script src="public/studio-production.js?v=20261022-illustration-r7"></script>
+<script src="public/private-voice.js?v=20261023-1"></script>
+<script src="public/studio-production.js?v=20261023-private-voice"></script>
 </body>
 </html>
 
