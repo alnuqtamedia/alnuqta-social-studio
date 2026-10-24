@@ -13,3 +13,9 @@ console.log('Soundscape: automatic genre, opt-outs, bounded levels, protected ev
 const quiet=S.speechEnvelope({duration:1,sampleRate:1000,numberOfChannels:1,getChannelData:()=>new Float32Array(1000).fill(.002)});assert(quiet.values[5]<.02,'Quiet narration must still duck the background');
 
 assert.equal(S.fromCommand('وثائقي اقتصادي مع موسيقى هادئة').style,'finance');assert.equal(S.fromCommand('فيديو سينمائي بموسيقى هادئة').style,'cinematic');assert.equal(S.fromCommand('وثائقي بموسيقى هادئة').style,'documentary');
+
+const followEvents=S.events([{broadcast:{cta:true}}],[8],S.normalize({style:'documentary'}));
+assert.equal(followEvents.filter(e=>e.kind==='bell').length,1);
+assert.equal(followEvents.find(e=>e.kind==='bell').at,2.1);
+assert.equal(S.events([{broadcast:{cta:true}}],[3],S.normalize({style:'documentary'})).filter(e=>e.kind==='bell').length,0);
+assert.equal(S.events([{broadcast:{cta:true}}],[8],S.normalize({style:'documentary',sfx:false})).length,0);

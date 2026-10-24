@@ -210,3 +210,10 @@ console.log('Filmed report contract: actual media coverage, required video, fail
  assert.equal(topic.slides[0].voiceover,'النص محفوظ');
 }
 console.log('Broadcast direction: varied motion, restrained cuts, single bounded CTA, logo accent timing and source preservation passed.');
+
+{
+ const slide={visualType:'illustrative',cinema:{look:'cinematic',motion:'zoom-in',transition:'dip-black'}},topic={productionContract:{version:1},slides:[slide]},original={...slide.cinema};
+ ctx.StudioProduction.applyBroadcastDirection(topic,'تقرير',new Map([[slide,original]]));
+ assert.equal(JSON.stringify(slide.cinema),JSON.stringify(original));
+}
+console.log('Broadcast defaults preserve explicit scene direction.');

@@ -18,6 +18,7 @@ function events(slides,durations,value){
  slides.forEach((slide,i)=>{const d=durations[i];if(!Number.isFinite(d)||d<=0)throw Error('توقيت المؤثرات غير صالح');
   if(i)add(time,s.style==='documentary'?'sweep':s.style==='ambient'?'close':'whoosh',i);else if(['action','cinematic'].includes(s.style))add(.1,s.style==='action'?'subdrop':'impact',i);
   if(d>2.5)add(time+1.1,slide.visualType==='data'?({documentary:'tick',investigation:'tick',cinematic:'soft-hit'}[s.style]||'data'):({documentary:'paper',investigation:'paper',cinematic:'reveal',action:'soft-hit',ambient:'title'}[s.style]||'title'),i);
+  if(slide.broadcast?.cta&&d>3.3)add(time+2.1,'bell',i);
   if(i===slides.length-1&&d>4&&s.style==='cinematic')add(time+2.2,'shimmer',i);
   if(s.style==='action'&&d>6)add(time+d-1,'riser',i);
   time+=d;
@@ -33,6 +34,7 @@ function applyVisuals(slides,value){
  });
 }
 const synth={
+ bell:[.35,0,880,.005,.02,.45,0,1,0,0,0,0,0,0,0,0,.1,.5],
  impact:[1,0,65,.004,.08,.85,0,1,-.18,0,0,0,0,.3,0,0,.12,.5,.12,0,500],
  whoosh:[.8,0,200,.12,.03,.24,4,1,2,0,0,0,0,1,0,0,0,.7,0,0,1800],
  riser:[.6,0,100,.6,.03,.14,4,1,3,0,0,0,0,.75,0,0,0,.5,0,0,2000],
