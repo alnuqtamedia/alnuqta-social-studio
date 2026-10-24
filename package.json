@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-pages.mjs",
-    "test": "node scripts/validate-studio.mjs && node scripts/test-export-timing.mjs && node scripts/test-production-core.mjs && node scripts/test-production-controller.mjs && node scripts/test-media-review.mjs && node scripts/test-illustrated-scenes.mjs && node scripts/test-motion-graphics.mjs && node scripts/test-creative-overlays.mjs && node scripts/test-cinematic-effects.mjs && node scripts/test-design-pack.mjs && node scripts/test-auto-direction.mjs && node scripts/test-flash-speech.mjs && node scripts/test-soundscape.mjs && npm run build && node scripts/inspect-pages-bundle.mjs"
+    "test": "node scripts/validate-studio.mjs && node scripts/test-export-timing.mjs && node scripts/test-production-core.mjs && node scripts/test-generator-timeout.mjs && node scripts/test-production-controller.mjs && node scripts/test-media-review.mjs && node scripts/test-media-library.mjs && node scripts/test-illustrated-scenes.mjs && node scripts/test-motion-graphics.mjs && node scripts/test-creative-overlays.mjs && node scripts/test-cinematic-effects.mjs && node scripts/test-design-pack.mjs && node scripts/test-auto-direction.mjs && node scripts/test-flash-speech.mjs && node scripts/test-soundscape.mjs && npm run build && node scripts/inspect-pages-bundle.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "0.12.10",

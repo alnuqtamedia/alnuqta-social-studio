@@ -50,6 +50,8 @@ jobs:
         run: node scripts/test-creative-browser.mjs
       - name: Verify geographic graphics and local FFmpeg export
         run: node scripts/test-illustrated-browser.mjs
+      - name: Verify persistent library and real mixed-media export
+        run: node scripts/test-media-browser.mjs
       - name: Verify 45-second portrait export
         run: node scripts/test-creative-browser.mjs
         env:
@@ -67,5 +69,6 @@ jobs:
           path: |
             artifacts/creative-browser/
             artifacts/illustrated-browser/
+            artifacts/media-browser/
           retention-days: 7
           if-no-files-found: ignore

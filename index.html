@@ -650,14 +650,22 @@
                 const explicitDuration=commandVideoDuration(command);if(explicitDuration!==null&&explicitDuration<=0)throw new Error('مدة الفيديو يجب أن تكون أكبر من صفر');
                 const currentContent=getCurrentStudioContent();if(explicitDuration!==null)currentContent.durationTarget=explicitDuration;
                 let result;
-                for(let attempt=0;attempt<5;attempt++){
-                    const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio-preview', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json', apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey, Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey }, signal:window.StudioProduction?.state.abort?.signal,
-                        body: JSON.stringify({ command: command+"\n"+STUDIO_EDITORIAL_RULES, currentContent, schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
-                    });
-                    const contentType = response.headers.get('content-type') || '';
-                    if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
-                    const raw = await response.text();
+                for(let attempt=0;attempt<3;attempt++){
+                    const parent=window.StudioProduction?.state.abort?.signal,request=new AbortController(),cancel=()=>request.abort();
+                    parent?.addEventListener('abort',cancel,{once:true});if(parent?.aborted)request.abort();
+                    const timer=setTimeout(()=>request.abort(),90000);let response,raw;
+                    try{
+                        response=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio-preview', {
+                            method:'POST',headers:{'Content-Type':'application/json',apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey},signal:request.signal,
+                            body:JSON.stringify({command:command+"\n"+STUDIO_EDITORIAL_RULES,currentContent,schemaVersion:STUDIO_SCHEMA_VERSION,responseSchema:STUDIO_OUTPUT_SCHEMA})
+                        });
+                        const contentType=response.headers.get('content-type')||'';
+                        if(!contentType.includes('application/json'))throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
+                        raw=await response.text();
+                    }catch(error){
+                        if(request.signal.aborted)throw new Error(parent?.aborted?'أُلغي الأمر؛ العمل السابق محفوظ.':'تأخر تخطيط المشاهد أكثر من 90 ثانية؛ العمل السابق محفوظ.');
+                        throw error;
+                    }finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}
                     if (!raw.trim()) throw new Error('خدمة Gemini لم تُرجع بيانات. أعد المحاولة.');
                     try { result = JSON.parse(raw); }
                     catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
@@ -1378,7 +1386,7 @@
             container.appendChild(createTextareaField('نص التعليق الصوتي للمشهد', slide.voiceover || '', v => { slide.voiceover=v; }));
             const mediaWrap=document.createElement('div'); mediaWrap.className='flex flex-col gap-2'; mediaWrap.innerHTML='<label class="text-[11px] font-cairo font-bold text-gray-400">مواد المشهد — صور أو فيديوهات متعددة</label>';const mediaActions=document.createElement('div');mediaActions.className='grid grid-cols-2 gap-1';const makeMediaBtn=(label,disabled,title)=>{const b=document.createElement('button');b.type='button';b.className='py-1.5 rounded border border-navy-light text-[9px] font-cairo '+(disabled?'opacity-45 cursor-not-allowed':'hover:border-brandRed');b.innerText=label;if(title)b.title=title;return b};const aiBtn=makeMediaBtn('Gemini Image',false,'إضافة صورة توضيحية من Gemini');const pollinationsBtn=makeMediaBtn('Pollinations',false,'مولد صور احتياطي مجاني بلا مفتاح داخل الاستوديو');const mediaStatus=document.createElement('div');mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-gray-400';mediaStatus.innerText='';const searchBtn=makeMediaBtn('بحث B-roll',false,'إضافة صور أو فيديوهات Pexels');const uploadBtn=makeMediaBtn('رفع مواد',false,'يمكن اختيار عدة صور وفيديوهات');mediaActions.append(aiBtn,pollinationsBtn,searchBtn,uploadBtn);mediaWrap.appendChild(mediaActions);mediaWrap.appendChild(mediaStatus);
             aiBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري الاتصال بـ Gemini وتوليد الصورة…';try{const added=await generateSceneAIImage(slide,aiBtn);if(!added)throw new Error('تعذر توليد الصورة؛ راجع رسالة الخطأ التفصيلية.');mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-emerald-400';mediaStatus.innerText='تمت إضافة الصورة إلى مواد المشهد.'}catch(e){console.error(e);mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-red-400';mediaStatus.innerText='فشل توليد الصورة: '+String(e?.message||e)}};pollinationsBtn.onclick=async()=>{mediaStatus.className='text-[10px] font-tajawal min-h-[18px] text-yellow-300';mediaStatus.innerText='جاري توليد صورة Pollinations…';await generateScenePollinationsImage(slide,pollinationsBtn);};searchBtn.onclick=()=>searchSceneBroll(slide);const mediaInput=document.createElement('input'); mediaInput.type='file'; mediaInput.accept='image/*,video/*';mediaInput.multiple=true; mediaInput.className='hidden';uploadBtn.onclick=()=>mediaInput.click();
-            if(slide.visualType){const type=document.createElement('div');type.className='text-[9px] text-brandRed font-cairo font-bold';type.innerText='نوع المادة المقترح: '+slide.visualType;mediaWrap.appendChild(type);}if(slide.visualQuery){const hint=document.createElement('div');hint.className='text-[10px] text-gray-500 font-tajawal';hint.innerText='اقتراح B-roll من Gemini: '+slide.visualQuery;mediaWrap.appendChild(hint);} mediaInput.onchange=e=>{Array.from(e.target.files||[]).forEach(file=>{const url=URL.createObjectURL(file);addSceneMedia(slide,{url,preview:url,kind:file.type.startsWith('video/')?'video':'image',credit:file.name,generated:false,local:true})});e.target.value='';}; mediaWrap.appendChild(mediaInput);
+            const mode=document.createElement('select');mode.className='bg-navy p-1 text-xs';mode.setAttribute('aria-label','نوع الوسائط المطلوب');for(const [value,label] of [['mixed','صورة أو فيديو'],['video','فيديو مصوّر'],['image','صورة'],['graphics','جرافيك مقصود'],['data','إنفوغرافيك من الأرقام']]){const o=document.createElement('option');o.value=value;o.textContent=label;mode.append(o);}mode.value=slide.explicitGraphics?'graphics':(slide.requestedVisualType||slide.visualType)==='data'?'data':(slide.requestedVisualType||slide.visualType)==='broll'?'video':(slide.requestedVisualType||slide.visualType)==='image'?'image':'mixed';mode.onchange=()=>window.StudioProduction?.setVisualMode(slide,mode.value);mediaWrap.append(mode);if(slide.visualType){const type=document.createElement('div');type.className='text-[9px] text-brandRed font-cairo font-bold';type.innerText='نوع المادة المقترح: '+slide.visualType;mediaWrap.appendChild(type);}if(slide.visualQuery){const hint=document.createElement('div');hint.className='text-[10px] text-gray-500 font-tajawal';hint.innerText='اقتراح B-roll من Gemini: '+slide.visualQuery;mediaWrap.appendChild(hint);} mediaInput.onchange=e=>{Array.from(e.target.files||[]).forEach(file=>{const url=URL.createObjectURL(file);addSceneMedia(slide,{url,preview:url,kind:file.type.startsWith('video/')?'video':'image',credit:file.name,generated:false,local:true})});e.target.value='';}; mediaWrap.appendChild(mediaInput);
             const mediaItems=getSceneMedia(slide);if(mediaItems.length){const list=document.createElement('div');list.className='flex flex-col gap-1';mediaItems.forEach((item,itemIndex)=>{const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded border border-navy-light bg-black/20 px-2 py-1';const name=document.createElement('span');name.className='text-[9px] text-gray-300 truncate';name.innerText=`${itemIndex+1}. ${item.kind==='video'?'فيديو':'صورة'}${item.credit?' — '+item.credit:''}`;const remove=document.createElement('button');remove.type='button';remove.className='text-[9px] text-brandRed shrink-0';remove.innerText='إزالة';remove.onclick=()=>removeSceneMedia(slide,itemIndex);row.append(name,remove);list.appendChild(row)});mediaWrap.appendChild(list);const distribution=document.createElement('div');distribution.className='text-[9px] text-emerald-400 font-tajawal';distribution.innerText=slide.mediaLayout==='grid'?`تظهر ${mediaItems.length} مواد معًا داخل المشهد.`:`سيتم تبديل ${mediaItems.length} مواد تلقائياً داخل مدة المشهد.`;mediaWrap.appendChild(distribution);} container.appendChild(mediaWrap);
 
             if (slide.points) {
@@ -1943,7 +1951,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-22-illustration-r7';
+        const STUDIO_BUILD='2026-10-24-media-r15';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2536,17 +2544,18 @@ function newsDownload(){
 }
 </script>
 <script src="public/preview-config.js"></script>
-<script src="public/production-core.js?v=20261022-illustration-r7"></script>
-<script src="public/design-pack.js?v=20261022-illustration-r7"></script>
+<script src="public/production-core.js?v=20261024-media-r15"></script>
+<script src="public/design-pack.js?v=20261024-media-r15"></script>
 <script src="public/motion-graphics.js"></script>
-<script src="public/cinematic-effects.js?v=20261022-illustration-r7"></script>
+<script src="public/cinematic-effects.js?v=20261024-media-r15"></script>
 <script src="public/vendor/zzfx-samples.js"></script>
-<script src="public/soundscape.js?v=20261022-illustration-r7"></script>
+<script src="public/soundscape.js?v=20261024-media-r15"></script>
 <script src="public/vendor/lottie_canvas.min.js"></script>
-<script src="public/editorial-geography.js?v=20261022-illustration-r7"></script>
-<script src="public/illustrated-scenes.js?v=20261022-illustration-r7"></script>
-<script src="public/ffmpeg-export.js?v=20261022-illustration-r7"></script>
-<script src="public/studio-production.js?v=20261022-illustration-r7"></script>
+<script src="public/editorial-geography.js?v=20261024-media-r15"></script>
+<script src="public/illustrated-scenes.js?v=20261024-media-r15"></script>
+<script src="public/ffmpeg-export.js?v=20261024-media-r15"></script>
+<script src="public/media-library.js?v=20261024-media-r15"></script>
+<script src="public/studio-production.js?v=20261024-media-r15"></script>
 </body>
 </html>
 
