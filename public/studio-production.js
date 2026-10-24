@@ -109,11 +109,11 @@ async function checkMediaItem(item){
  let asset;try{asset=await loadExportMedia(item);if(asset.kind==='video')await primeVideo({...asset,meta:item});item.loadStatus='ready';delete item.loadError;}catch(e){item.loadStatus='failed';item.loadError=e.message;throw e;}finally{if(asset?.kind==='video'){asset.element.pause();asset.element.removeAttribute('src');asset.element.load();}}
 }
 async function acceptCandidate(s,item,country){
- if(state.busy)throw Error('انتظر انتهاء الإنتاج أولاً.');
+ if(state.busy)throw Error('انتظر انتهاء الإنتاج أولاً.');const project=topics[activeTikTokTopic];if(!project?.slides?.includes(s))throw Error('المشهد لم يعد مفتوحاً؛ أعد تجهيز الوسائط.');
  if(!(s.editorialGeography?.countries||[]).some(c=>c.country===country))throw Error('اختر بلد المشهد.');
  const meta={url:item.mediaUrl,preview:item.preview,kind:item.type==='video'?'video':'image',credit:item.creator+' / Pexels',sourceUrl:item.pageUrl,licenseUrl:'https://www.pexels.com/license/'};
  if(!C.safePexels(item))throw Error('رابط مصدر غير صالح.');await checkMediaItem(meta);
- const record=await window.StudioMediaLibrary.addRemote(meta,{country,tags:[s.title,s.visualQuery].join(' ')});invalidatePreview();delete s.illustration;addSceneMedia(s,window.StudioMediaLibrary.materialize(record));s.productionMediaReview={status:'editor-reviewed',note:'أكّد المحرر البلد وملاءمة اللقطة؛ حُفظت في المكتبة لإعادة الاستخدام.'};productionReport();
+ const record=await window.StudioMediaLibrary.addRemote(meta,{country,tags:[s.title,s.visualQuery].join(' ')});if(topics[activeTikTokTopic]!==project||!project.slides.includes(s))throw Error('حُفظت المادة في المكتبة؛ المشروع المفتوح تغيّر.');invalidatePreview();delete s.illustration;addSceneMedia(s,window.StudioMediaLibrary.materialize(record));s.productionMediaReview={status:'editor-reviewed',note:'أكّد المحرر البلد وملاءمة اللقطة؛ حُفظت في المكتبة لإعادة الاستخدام.'};productionReport();
 }
 async function mediaFor(slides,video){
  if(slides.some(s=>!s.editorialGeography))window.StudioGeography?.apply(slides,source());
@@ -142,7 +142,7 @@ async function mediaFor(slides,video){
    pending.push({i,s,query,items:allowed});d.status='review';
   }catch(error){check();d.status='failed';d.error=error.message;s.productionMediaReview={status:'failed',note:error.message};}finally{d.elapsedMs=Date.now()-begin;}
  }
- let cursor=0;await Promise.all(Array.from({length:Math.min(3,slides.length)},async()=>{while(cursor<slides.length)await prepare(cursor++);}));
+ let cursor=0;const workers=await Promise.allSettled(Array.from({length:Math.min(3,slides.length)},async()=>{while(cursor<slides.length)await prepare(cursor++);}));const rejected=workers.find(x=>x.status==='rejected');if(rejected)throw rejected.reason;
  let accepted=new Map();try{if(pending.length)accepted=await reviewCandidates(pending);}catch(e){check();for(const row of pending){diagnostics[row.i].status='review-failed';row.s.productionMediaReview={status:'failed',note:e.message};}}
  for(const row of pending){
   check();const s=row.s,d=diagnostics[row.i],items=(accepted.get(row.i)||[]).filter(x=>!used.has(String(x.id)+':'+x.type));

@@ -168,3 +168,10 @@ ctx.loadExportMedia=async()=>{throw Error('ملف غير قابل للتحميل
 const failedResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(failedResult.missing,1);assert.equal(iraqi.productionMediaReview.status,'failed');assert.equal(iraqi.mediaItems[0].url,'blob:approved');
 assert(ctx.StudioProduction.visualReadinessError([iraqi]));
 console.log('Media regression: geography rejects unreviewed footage, library reuse avoids search, decode failure remains missing without destroying the source.');
+
+// Drain every worker before releasing a cancelled job; no background scene mutates the next job.
+ctx.StudioMediaLibrary=undefined;ctx.StudioProduction.state.mediaCache.clear();ctx.StudioProduction.state.abort=new AbortController();let abortedWorkers=0;
+ctx.fetch=(url,o)=>new Promise((resolve,reject)=>o.signal.addEventListener('abort',()=>{abortedWorkers++;reject(Error('aborted'));},{once:true}));
+const cancelledScenes=Array.from({length:3},(_,i)=>({title:'Test '+i,visualQuery:'query '+i,visualType:'broll',mediaItems:[]}));
+const cancelledWork=ctx.StudioProduction.mediaFor(cancelledScenes,true);await new Promise(r=>setTimeout(r,0));ctx.StudioProduction.state.abort.abort();await assert.rejects(cancelledWork,/أُلغي/);assert.equal(abortedWorkers,3);assert(cancelledScenes.every(s=>!s.illustration&&!s.mediaItems.length));ctx.StudioProduction.state.abort=null;
+console.log('Cancellation drains all bounded media workers before returning.');
