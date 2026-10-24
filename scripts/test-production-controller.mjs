@@ -194,3 +194,19 @@ console.log('Cancellation drains all bounded media workers before returning.');
  assert.equal(topic.productionContract,undefined);
 }
 console.log('Filmed report contract: actual media coverage, required video, failed assets and explicit graphics opt-out passed.');
+
+{
+ const api=ctx.StudioProduction,topic={productionContract:{version:1},slides:Array.from({length:5},()=>({visualType:'illustrative',voiceover:'النص محفوظ',mediaItems:[{kind:'video',local:true,url:'blob:source'}]}))};
+ api.applyBroadcastDirection(topic,'تقرير اقتصادي');
+ assert.equal(topic.slides.filter(s=>s.broadcast.cta).length,1);
+ assert.equal(new Set(topic.slides.map(s=>s.cinema.motion)).size,4);
+ assert.equal(topic.slides.filter(s=>s.cinema.transition==='cut').length,4);
+ assert.equal(api.broadcastTiming(topic.slides[3],0,9).cta,0);
+ assert.equal(api.broadcastTiming(topic.slides[3],3,9).cta,1);
+ assert.equal(api.broadcastTiming(topic.slides[3],7,9).cta,0);
+ assert.equal(api.broadcastTiming(topic.slides[0],3,9).cta,0);
+ assert.equal(api.broadcastTiming(topic.slides[0],.9,9).pulse,1);
+ assert.equal(topic.slides[0].mediaItems[0].url,'blob:source');
+ assert.equal(topic.slides[0].voiceover,'النص محفوظ');
+}
+console.log('Broadcast direction: varied motion, restrained cuts, single bounded CTA, logo accent timing and source preservation passed.');
