@@ -55,7 +55,7 @@ try{
  let searches=0;await page.route('**/functions/v1/pexels-search-preview',async route=>{searches++;const q=route.request().postDataJSON().query;assert.match(q,/Iraq/);await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[{id:123,type:'photo',creator:'fixture',mediaUrl:'https://images.pexels.com/photos/123/x.jpg',preview:'https://images.pexels.com/photos/123/x.jpg',pageUrl:'https://www.pexels.com/photo/china-123/'}]})});});
  const policy=await page.evaluate(async()=>{
   document.getElementById('studio-source-text').value='الازدحام في العراق';
-  const slides=[{title:'السيارات في العراق',voiceover:'السيارات في العراق كثيرة والزحام يستهلك الوقت',visualType:'broll',visualQuery:'traffic',duration:3}];
+  const slides=[{title:'السيارات في العراق',voiceover:'السيارات في العراق كثيرة والزحام يستهلك الوقت',visualType:'broll',visualQuery:'Baghdad traffic street',duration:3}];
   await StudioProduction.mediaFor(slides,true);if(getSceneMedia(slides[0]).length||slides[0].illustration||!StudioProduction.missingVisuals(slides).length)throw Error('Unverified stock bypassed geographic gate');
   topics.customScript={title:'اختبار العراق',soundscape:StudioSoundscape.fromCommand('سينمائي'),slides};activeTopic=activeTikTokTopic='customScript';activeTab='tiktok';
   document.getElementById('production-correction').value='حوّل جميع المشاهد إلى جرافيك وإنفوغرافيك';const before=slides[0].voiceover;await StudioProduction.correctCurrent();if(slides[0].voiceover!==before)throw Error('Graphic correction changed narration');
