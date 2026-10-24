@@ -175,3 +175,22 @@ ctx.fetch=(url,o)=>new Promise((resolve,reject)=>o.signal.addEventListener('abor
 const cancelledScenes=Array.from({length:3},(_,i)=>({title:'Test '+i,visualQuery:'query '+i,visualType:'broll',mediaItems:[]}));
 const cancelledWork=ctx.StudioProduction.mediaFor(cancelledScenes,true);await new Promise(r=>setTimeout(r,0));ctx.StudioProduction.state.abort.abort();await assert.rejects(cancelledWork,/أُلغي/);assert.equal(abortedWorkers,3);assert(cancelledScenes.every(s=>!s.illustration&&!s.mediaItems.length));ctx.StudioProduction.state.abort=null;
 console.log('Cancellation drains all bounded media workers before returning.');
+
+// Filmed reports cannot satisfy the delivery contract with repeated graphics.
+{
+ const api=ctx.StudioProduction;
+ const topic={slides:Array.from({length:5},(_,i)=>({title:'scene '+i,visualType:'data',points:['معلومة'],voiceover:'تعليق',duration:9}))};
+ api.applyReportBaseline(topic,'أنشئ تقريراً بفيديوهات وصور وجرافيك');
+ assert.equal(topic.slides.filter(s=>s.requestedVisualType==='data').length,1);
+ assert.equal(topic.slides.filter(s=>s.requestedVisualType==='broll').length,1);
+ assert.match(api.reportBaselineError(topic.slides,topic),/75%/);
+ for(const s of topic.slides.slice(1))s.mediaItems=[{kind:'image',local:true,url:'blob:photo'}];
+ assert.match(api.reportBaselineError(topic.slides,topic),/فيديو فعلي/);
+ topic.slides[1].mediaItems=[{kind:'video',local:true,url:'blob:video'}];
+ assert.equal(api.reportBaselineError(topic.slides,topic),'');
+ topic.slides[1].mediaItems[0].loadStatus='failed';
+ assert.match(api.reportBaselineError(topic.slides,topic),/75%/);
+ api.applyReportBaseline(topic,'إنفوغرافيك فقط');
+ assert.equal(topic.productionContract,undefined);
+}
+console.log('Filmed report contract: actual media coverage, required video, failed assets and explicit graphics opt-out passed.');
