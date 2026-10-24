@@ -262,7 +262,7 @@ async function produce(){
  const baseline=reportBaselineError(slides);if(baseline)return status(baseline,'info');
  if(getActiveVoiceover()?.source==='human')status('التسجيل البشري محفوظ؛ سيُفحص طوله عند التصدير.','info');
  else if(!(getActiveVoiceover()&&window.aiNarrationText===slides.map(s=>String(s.voiceover||'').trim()).join('\n\n')&&Math.abs(Number(getActiveVoiceover().duration)-requestedVideoSeconds())<=Math.max(1,requestedVideoSeconds()*.03)))await narration(slides,requestedVideoSeconds());
- productionReport();status(`تجهيز الإنتاج مكتمل؛ صوت ${Number(getActiveVoiceover()?.duration||0).toFixed(1)} ثانية من مدة ${requestedVideoSeconds()} ثانية. راجع الوسائط والصوت ثم صدّر الفيديو.`,'success');
+ productionReport();if($('video-sync-mode')?.value==='fit-audio'&&Math.abs(Number(getActiveVoiceover()?.duration||0)-requestedVideoSeconds())>Math.max(1,requestedVideoSeconds()*.03))return status('الوسائط والصوت محفوظة؛ مدة التعليق لا تطابق المدة المطلوبة. راجع تقرير المدة قبل التصدير.','info');status(`تجهيز الإنتاج مكتمل؛ صوت ${Number(getActiveVoiceover()?.duration||0).toFixed(1)} ثانية من مدة ${requestedVideoSeconds()} ثانية. راجع الوسائط والصوت ثم صدّر الفيديو.`,'success');
 }
 
 function applyCreativeCommand(command){
