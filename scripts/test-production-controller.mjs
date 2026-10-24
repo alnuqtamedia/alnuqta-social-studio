@@ -217,3 +217,17 @@ console.log('Broadcast direction: varied motion, restrained cuts, single bounded
  assert.equal(JSON.stringify(slide.cinema),JSON.stringify(original));
 }
 console.log('Broadcast defaults preserve explicit scene direction.');
+
+{
+ let spent=0;ctx.StudioProduction.state.mediaCache.clear();ctx.fetch=async()=>({ok:true,json:async()=>({items:[]})});ctx.requestNarrationTts=async()=>{spent++;throw Error('TTS must wait for media');};ctx.getActiveVoiceover=()=>null;ctx.StudioMediaLibrary={find:async()=>[],candidates(){}};
+ ctx.topics.customScript.slides=[{title:'مادة ناقصة',visualType:'broll',visualQuery:'coffee',voiceover:'نص محفوظ',duration:10,mediaItems:[]}];
+ await ctx.StudioProduction.produce();assert.equal(spent,0);assert.equal(ctx.topics.customScript.slides[0].voiceover,'نص محفوظ');
+}
+console.log('Missing footage stops before TTS spending while retaining the scene and narration text.');
+
+assert(Math.abs(ctx.StudioProduction.boundedOutroSeconds(27.68,30,true)-2.32)<1e-9);
+assert.equal(ctx.StudioProduction.boundedOutroSeconds(26,30,true),0);
+assert.equal(ctx.StudioProduction.boundedOutroSeconds(6,9,true),0);
+assert.equal(ctx.StudioProduction.boundedOutroSeconds(31,30,true),0);
+assert.equal(ctx.StudioProduction.boundedOutroSeconds(27.68,30,false),0);
+console.log('Musical ending is bounded to three seconds and ten percent, never trims speech or changes uncontracted projects.');

@@ -14,6 +14,8 @@ await page.route('**/*',r=>{const u=r.request().url();if(u.startsWith(origin)||u
 try{
  await page.goto(origin,{waitUntil:'load'});await page.waitForFunction(()=>window.StudioProduction&&window.StudioMediaLibrary&&window.StudioFFmpeg);
  await page.evaluate(()=>StudioDesignPack.load());
+ await page.evaluate(()=>{const ac=new OfflineAudioContext(1,24000,24000),buffer=ac.createBuffer(1,24000,24000);buffer.getChannelData(0).fill(.1);const padded=StudioProduction.withMusicalEnding({buffer},.5);if(padded.buffer.duration!==1.5||padded.buffer.getChannelData(0)[23999]!==buffer.getChannelData(0)[23999]||padded.buffer.getChannelData(0)[24000]!==0)throw Error('Musical ending changed speech samples');});
+
  // Upload through the real library UI, then verify both DB persistence and matching.
  await page.locator('summary').filter({hasText:'مكتبة الصور والفيديوهات'}).click();
  await page.locator('#media-library-tags').fill('hospital pharmacy مستشفى صيدلية');
