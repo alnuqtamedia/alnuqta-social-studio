@@ -248,3 +248,13 @@ console.log('Musical ending is bounded to three seconds and ten percent, never t
  ctx.addSceneMedia(scenes[2],{local:true,kind:'video',url:'blob:original-event',loadStatus:'ready'});assert.equal(ctx.StudioProduction.missingVisuals(scenes).length,0);
 }
 console.log('Five-scene Iraq regression: four relevant illustrations pass, specific event stays protected, source upload completes it, no TTS requests.');
+
+// Refine only a rejected general shot once; successful scenes never spend a second search/review.
+{
+ ctx.StudioProduction.state.mediaCache.clear();ctx.StudioProduction.state.reviewCache.clear();let searches=0;const batches=[];
+ ctx.StudioMediaLibrary={find:async()=>[],candidates(){}};
+ ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='review-media'){batches.push(b.reviews.map(r=>r.scene));return {ok:true,json:async()=>({reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',alternativeQuery:r.scene===2&&!r.query.includes('precise')?'precise hands vial label':'',candidates:r.candidates.map(c=>({id:c.id,safe:r.scene!==2||r.query.includes('precise'),score:.9,reason:'type and action matching'}))}))})};}searches++;const id=800+searches;return {ok:true,json:async()=>({items:[{id,type:'video',mediaUrl:'https://videos.pexels.com/video-files/'+id+'/clip.mp4',preview:'https://images.pexels.com/videos/'+id+'/poster.jpg',pageUrl:'https://www.pexels.com/video/'+id+'/',creator:'fixture'}]})};};
+ const scenes=[{title:'حقنة',visualQuery:'needle preparation',visualType:'broll',duration:3,mediaItems:[]},{title:'فحص عبوة',visualQuery:'medicine packaging',visualType:'broll',duration:3,mediaItems:[]}];ctx.topics.customScript={title:'فحص مواد تجميل حقنية',slides:scenes};el('studio-source-text').value='التجميل في العراق؛ فحص مواد حقن لا حبوب.';
+ const result=await ctx.StudioProduction.mediaFor(scenes,true);assert.equal(result.missing,0);assert.equal(searches,3);assert.equal(JSON.stringify(batches),'[[1,2],[2]]');assert.equal(scenes[0].mediaItems[0].providerId,'801:video');assert.equal(scenes[1].searchRecovery.attempts,1);
+}
+console.log('Only the rejected general shot gets one improved query; completed scenes and voice remain intact.');

@@ -149,10 +149,10 @@ async function correctCurrent(){
  if(!visualOnly&&activeTab==='tiktok')await narration(staged,requestedVideoSeconds());check();invalidatePreview();slides.splice(0,slides.length,...staged);updateTikTokInputs();renderCanvas();productionReport();status('طُبّق التصحيح على المشاهد '+targets.map(i=>i+1).join('، ')+' مع حفظ البقية؛ أنشئ معاينة جديدة.','success');}
 
 async function reviewCandidates(rows){
- const reviewed=new Map();for(let offset=0;offset<rows.length;offset+=6){const batch=rows.slice(offset,offset+6),request=batch.map(r=>({scene:r.i+1,requireOriginal:Boolean(window.StudioGeography?.requiresOriginal(r.s)),text:[r.s.title,r.s.subtitle,r.s.voiceover].filter(Boolean).join(' ').slice(0,1600),query:r.query,candidates:r.items.map(x=>({id:String(x.id)+':'+x.type,preview:x.preview}))})),key=JSON.stringify(request);let answer=state.reviewCache.get(key);
+ const reviewed=new Map();reviewed.retryQueries=new Map();for(let offset=0;offset<rows.length;offset+=6){const batch=rows.slice(offset,offset+6),request=batch.map(r=>({scene:r.i+1,requireOriginal:Boolean(window.StudioGeography?.requiresOriginal(r.s)),text:['سياق التقرير: '+[topics[activeTikTokTopic]?.title,source().slice(0,650)].filter(Boolean).join(' ').slice(0,750),'المشهد المطلوب: '+[r.s.title,r.s.subtitle,r.s.voiceover].filter(Boolean).join(' ').slice(0,800)].join('\n').slice(0,1600),query:r.query,candidates:r.items.map(x=>({id:String(x.id)+':'+x.type,preview:x.preview}))})),key=JSON.stringify(request);let answer=state.reviewCache.get(key);
   if(!answer){status('فحص صلة معاينات اللقطات بمعنى المشاهد عبر Gemini…');answer=await json('gemini-studio-preview',{action:'review-media',reviews:request},30000);state.reviewCache.set(key,answer);}
   if(!Array.isArray(answer.reviews)||answer.reviews.length!==batch.length)throw Error('الفحص البصري لم يرجع جميع المشاهد؛ لم تُعتمد لقطات غير مفحوصة.');
-  for(const r of batch){const verdicts=answer.reviews.filter(x=>x.scene===r.i+1);if(verdicts.length!==1||!Array.isArray(verdicts[0].candidates))throw Error('الفحص البصري غير مكتمل.');const scores=verdicts[0].candidates;
+  for(const r of batch){const verdicts=answer.reviews.filter(x=>x.scene===r.i+1);if(verdicts.length!==1||!Array.isArray(verdicts[0].candidates))throw Error('الفحص البصري غير مكتمل.');const scores=verdicts[0].candidates;if(verdicts[0].intent==='illustrative'&&!window.StudioGeography?.requiresOriginal(r.s)&&/^[A-Za-z0-9 ,().'-]{3,180}$/.test(verdicts[0].alternativeQuery||''))reviewed.retryQueries.set(r.i,verdicts[0].alternativeQuery);
    const accepted=r.items.map(item=>{const id=String(item.id)+':'+item.type,v=scores.find(x=>x.id===id);return v?.safe===true&&Number.isFinite(v.score)&&v.score>=.7&&v.score<=1?{...item,review:{score:v.score,reason:String(v.reason||'').slice(0,300),scope:'poster-only',intent:verdicts[0].intent==='illustrative'&&!window.StudioGeography?.requiresOriginal(r.s)?'illustrative':'specific'}}:null;}).filter(Boolean).sort((a,b)=>b.review.score-a.review.score);reviewed.set(r.i,accepted);
   }
  }return reviewed;
@@ -167,12 +167,12 @@ async function acceptCandidate(s,item,country){
  if(!C.safePexels(item))throw Error('رابط مصدر غير صالح.');await checkMediaItem(meta);
  const record=await window.StudioMediaLibrary.addRemote(meta,{country,tags:[s.title,s.visualQuery].join(' ')});if(topics[activeTikTokTopic]!==project||!project.slides.includes(s))throw Error('حُفظت المادة في المكتبة؛ المشروع المفتوح تغيّر.');invalidatePreview();delete s.illustration;addSceneMedia(s,window.StudioMediaLibrary.materialize(record));s.productionMediaReview={status:'editor-reviewed',note:'أكّد المحرر البلد وملاءمة اللقطة؛ حُفظت في المكتبة لإعادة الاستخدام.'};productionReport();
 }
-async function mediaFor(slides,video){
+async function mediaFor(slides,video,recoveryRound=0,recovery={}){
  if(slides.some(s=>!s.editorialGeography))window.StudioGeography?.apply(slides,source());
- const started=Date.now(),used=new Set(),pending=[],candidates=[],diagnostics=slides.map((_,i)=>({scene:i+1,stages:[],status:'pending'}));state.mediaDiagnostics=diagnostics;
+ const started=recovery.started||Date.now(),used=new Set(),pending=[],candidates=[...(recovery.candidates||[])],diagnostics=slides.map((_,i)=>({scene:i+1,stages:[],status:'pending'}));state.mediaDiagnostics=diagnostics;
  for(const s of slides)for(const m of getSceneMedia(s))used.add(m.providerId||m.url);
  async function prepare(i){
-  check();const s=slides[i],d=diagnostics[i],begin=Date.now();
+  check();if(recoveryRound&&!recovery.indices.has(i)){diagnostics[i]=recovery.diagnostics[i];return;}const s=slides[i],d=diagnostics[i],begin=Date.now();
   const note=(stage,detail)=>d.stages.push({stage,detail,elapsedMs:Date.now()-begin});
   try{
    prepareLocalVisual(s);if(!needsMedia(s)){d.status='intentional-graphics';return;}
@@ -203,6 +203,7 @@ async function mediaFor(slides,video){
   }catch(e){d.error=e.message;d.status='load-failed';s.productionMediaReview={status:'failed',note:e.message};}
   if(!getSceneMedia(s).length&&!items.length&&!held.length){d.status='rejected';s.productionMediaReview={status:'rejected',note:'لم يعتمد الفحص المرشحات؛ المشهد يحتاج مادة.'};}
  }
+ if(!recoveryRound&&accepted.retryQueries){const indices=new Set();for(const [i,query] of accepted.retryQueries){const s=slides[i];if(getSceneMedia(s).length||window.StudioGeography?.requiresOriginal(s)||query.trim().toLowerCase()===visualSearchQuery(s).trim().toLowerCase())continue;s.searchRecovery={originalQuery:s.visualQuery||'',query,attempts:1};s.visualQuery=query;s.visualQueryOverride=true;indices.add(i);}if(indices.size){status('تحسين بحث المشاهد غير المناسبة مرة واحدة؛ المشاهد المكتملة والصوت محفوظة.');return mediaFor(slides,video,1,{indices,candidates,diagnostics,started});}}
  window.StudioMediaLibrary?.candidates(candidates.sort((a,b)=>a.i-b.i));
  const missing=missingVisuals(slides).length,clips=slides.filter(s=>getSceneMedia(s).some(m=>m.kind==='video')).length,photos=slides.filter(s=>getSceneMedia(s).some(m=>m.kind==='image')).length;
  state.mediaElapsedMs=Date.now()-started;updateTikTokInputs();renderCanvas();productionReport();status(`مشاهد بفيديو: ${clips}، بصور: ${photos}، تحتاج وسائط: ${missing}.`+(candidates.length?' افتح مكتبة المواد لمراجعة المرشحات وحفظها مرة واحدة.':''),missing?'info':'success');return {clips,photos,missing};
