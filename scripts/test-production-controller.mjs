@@ -158,7 +158,7 @@ ctx.StudioDesignPack=undefined;ctx.URL=URL;
 // Required footage must never silently turn into a diagram, including failed/geo-blocked searches.
 vm.runInContext(fs.readFileSync('public/editorial-geography.js','utf8'),ctx);
 ctx.StudioProduction.state.mediaCache.clear();
-let geoSearches=0;ctx.fetch=async()=>{geoSearches++;return {ok:true,json:async()=>({items:[{id:77,type:'video',mediaUrl:'https://videos.pexels.com/test.mp4',preview:'https://images.pexels.com/test.jpg',pageUrl:'https://www.pexels.com/video/77/',creator:'Editor'}]})}};
+let geoSearches=0;ctx.fetch=async(url,options)=>{if(JSON.parse(options.body).action==='review-media')return {ok:true,json:async()=>({reviews:[{scene:1,intent:'specific',candidates:[{id:'77:video',safe:true,score:.9,reason:'معاينة تحتاج موقعها'}]}]})};geoSearches++;return {ok:true,json:async()=>({items:[{id:77,type:'video',mediaUrl:'https://videos.pexels.com/test.mp4',preview:'https://images.pexels.com/test.jpg',pageUrl:'https://www.pexels.com/video/77/',creator:'Editor'}]})}};
 const iraqi={title:'مستشفى في العراق',visualType:'broll',voiceover:'مليون مراجع',mediaItems:[]};
 const geoResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(geoResult.missing,1);assert.equal(iraqi.visualType,'broll');assert.equal(iraqi.illustration,undefined);assert.equal(iraqi.productionMediaReview.status,'location-review');assert.equal(geoSearches,1);
 const libraryRecords=[{id:'approved',kind:'video',local:true,url:'blob:approved'}];ctx.StudioMediaLibrary={find:async()=>libraryRecords,candidates(){}};
@@ -231,3 +231,30 @@ assert.equal(ctx.StudioProduction.boundedOutroSeconds(6,9,true),0);
 assert.equal(ctx.StudioProduction.boundedOutroSeconds(31,30,true),0);
 assert.equal(ctx.StudioProduction.boundedOutroSeconds(27.68,30,false),0);
 console.log('Musical ending is bounded to three seconds and ten percent, never trims speech or changes uncontracted projects.');
+// The actual five-scene Iraq report: general details pass review; an official action needs its source.
+{
+ ctx.StudioProduction.state.mediaCache.clear();ctx.StudioProduction.state.reviewCache.clear();ctx.StudioMediaLibrary={find:async()=>[],candidates(rows){ctx.heldScopeRows=rows;}};
+ ctx.loadExportMedia=async m=>({kind:m.kind,element:{duration:20,play:async()=>{},pause(){},removeAttribute(){},load(){}}});
+ let serial=200,ttsRequests=0;ctx.requestNarrationTts=async()=>{ttsRequests++;throw Error('No speech spending in media test');};
+ ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='review-media')return {ok:true,json:async()=>({reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:true,score:.9,reason:'تفصيل عام مناسب'}))}))})};const id=serial++;return {ok:true,json:async()=>({items:[{id,type:'video',mediaUrl:'https://videos.pexels.com/video-files/'+id+'/clip.mp4',preview:'https://images.pexels.com/videos/'+id+'/poster.jpg',pageUrl:'https://www.pexels.com/video/'+id+'/',creator:'Fixture'}]})};};
+ const scenes=[['حقنة مجهولة','close up syringe preparation'],['فحص المواد','hands checking vial expiry label'],['تحرك صحي','health inspection team Baghdad'],['سلسلة الرقابة','medical supplies distribution'],['خاتمة المحاسبة','doctor patient consultation']].map(([title,visualQuery])=>({title,visualQuery,visualType:'broll',voiceover:'تفاصيل تقرير التجميل في العراق',duration:10,mediaItems:[]}));
+ el('studio-source-text').value='تقرير عن التجميل في العراق';ctx.topics.customScript={slides:scenes};
+ const result=await ctx.StudioProduction.mediaFor(scenes,true);
+ assert.equal(result.missing,1);assert.deepEqual(Array.from(ctx.StudioProduction.missingVisuals(scenes),x=>x.scene),[3]);
+ for(const i of [0,1,3,4]){const m=scenes[i].mediaItems[0];assert.equal(m.kind,'video');assert.equal(m.illustrative,true);assert.equal(m.editorialReview.intent,'illustrative');assert.equal(m.locationEvidence,undefined);assert(ctx.StudioGeography.check(scenes[i],m).allowed);}
+ assert.equal(scenes[2].productionMediaReview.status,'location-review');assert.equal(ctx.heldScopeRows.length,1);assert.equal(ttsRequests,0);
+ const unrelated={...scenes[0].mediaItems[0],editorialReview:{intent:'illustrative',scope:'poster-only',score:.1}};assert.equal(ctx.StudioGeography.check(scenes[0],unrelated).allowed,false);
+ const forged={...scenes[0].mediaItems[0],generated:true};assert.equal(ctx.StudioGeography.check(scenes[0],forged).allowed,false);
+ ctx.addSceneMedia(scenes[2],{local:true,kind:'video',url:'blob:original-event',loadStatus:'ready'});assert.equal(ctx.StudioProduction.missingVisuals(scenes).length,0);
+}
+console.log('Five-scene Iraq regression: four relevant illustrations pass, specific event stays protected, source upload completes it, no TTS requests.');
+
+// Refine only a rejected general shot once; successful scenes never spend a second search/review.
+{
+ ctx.StudioProduction.state.mediaCache.clear();ctx.StudioProduction.state.reviewCache.clear();let searches=0;const batches=[];
+ ctx.StudioMediaLibrary={find:async()=>[],candidates(){}};
+ ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='review-media'){batches.push(b.reviews.map(r=>r.scene));return {ok:true,json:async()=>({reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',alternativeQuery:r.scene===2&&!r.query.includes('precise')?'precise hands vial label':'',candidates:r.candidates.map(c=>({id:c.id,safe:r.scene!==2||r.query.includes('precise'),score:.9,reason:'type and action matching'}))}))})};}searches++;const id=800+searches;return {ok:true,json:async()=>({items:[{id,type:'video',mediaUrl:'https://videos.pexels.com/video-files/'+id+'/clip.mp4',preview:'https://images.pexels.com/videos/'+id+'/poster.jpg',pageUrl:'https://www.pexels.com/video/'+id+'/',creator:'fixture'}]})};};
+ const scenes=[{title:'حقنة',visualQuery:'needle preparation',visualType:'broll',duration:3,mediaItems:[]},{title:'فحص عبوة',visualQuery:'medicine packaging',visualType:'broll',duration:3,mediaItems:[]}];ctx.topics.customScript={title:'فحص مواد تجميل حقنية',slides:scenes};el('studio-source-text').value='التجميل في العراق؛ فحص مواد حقن لا حبوب.';
+ const result=await ctx.StudioProduction.mediaFor(scenes,true);assert.equal(result.missing,0);assert.equal(searches,3);assert.equal(JSON.stringify(batches),'[[1,2],[2]]');assert.equal(scenes[0].mediaItems[0].providerId,'801:video');assert.equal(scenes[1].searchRecovery.attempts,1);
+}
+console.log('Only the rejected general shot gets one improved query; completed scenes and voice remain intact.');

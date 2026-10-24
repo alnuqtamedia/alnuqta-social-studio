@@ -7,3 +7,13 @@ const verdict={reviews:[{scene:1,candidates:[{id:'12:photo',safe:true,score:.8,r
 const input=await reviewInputs(rows,async(url,options)=>{assert.equal(options.redirect,'error');return new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/jpeg'}});});assert.equal(input.at(-1).type,'image');assert.equal(input.at(-1).data,'AQID');
 await assert.rejects(reviewInputs(rows,async()=>new Response(new Uint8Array(250001),{headers:{'content-type':'image/jpeg'}})),/large/);
 console.log('Thumbnail review: provider-only URLs, capped bytes, image input and candidate identity checked.');
+
+const generic={reviews:[{scene:1,intent:'illustrative',candidates:[{id:'12:photo',safe:true,score:.9,reason:'يد تفحص عبوة'}]}]};
+assert.equal(validateVerdicts(generic,rows).reviews[0].intent,'illustrative');
+assert.equal(validateVerdicts(generic,[{...rows[0],requireOriginal:true}]).reviews[0].intent,'specific');
+assert.equal(validateVerdicts(verdict,rows).reviews[0].intent,'specific');
+assert.throws(()=>validateReviews([{...rows[0],requireOriginal:'false'}]));
+
+assert.equal(validateVerdicts({reviews:[{...generic.reviews[0],alternativeQuery:'gloved hands vial label'}]},rows).reviews[0].alternativeQuery,'gloved hands vial label');
+assert.equal(validateVerdicts({reviews:[{...generic.reviews[0],alternativeQuery:'https://example.org'}]},rows).reviews[0].alternativeQuery,'');
+assert.equal(validateVerdicts({reviews:[{...generic.reviews[0],alternativeQuery:'gloved hands vial label'}]},[{...rows[0],requireOriginal:true}]).reviews[0].alternativeQuery,'');

@@ -52,6 +52,8 @@ jobs:
         run: node scripts/test-illustrated-browser.mjs
       - name: Verify persistent library and real mixed-media export
         run: node scripts/test-media-browser.mjs
+      - name: Verify scoped illustrative footage and protected specific event
+        run: node scripts/test-scope-browser.mjs
       - name: Verify 45-second portrait export
         run: node scripts/test-creative-browser.mjs
         env:
@@ -70,5 +72,6 @@ jobs:
             artifacts/creative-browser/
             artifacts/illustrated-browser/
             artifacts/media-browser/
+            artifacts/scoped-media/
           retention-days: 7
           if-no-files-found: ignore
