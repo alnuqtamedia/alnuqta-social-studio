@@ -16,7 +16,7 @@ function check(slide,item){
  // Never trust model-created verifiedGeo fields or location guesses in a thumbnail verdict.
  const evidence=item?.locationEvidence;
  const known=evidence?.reviewedByEditor===true&&/^https:\/\//.test(evidence.sourceUrl||'')&&countries.some(x=>x.country===evidence.country);
- return {allowed:Boolean(known),reason:known?'editor-confirmed-location':'بلد اللقطة غير موثق؛ يُستخدم جرافيك توضيحي بدلاً منها'};
+ return {allowed:Boolean(known),reason:known?'editor-confirmed-location':'بلد اللقطة غير موثق؛ تحتاج مراجعة الموقع قبل الاستخدام'};
 }
 root.StudioGeography={detect,context,apply,query,check};
 })(typeof window==='undefined'?globalThis:window);

@@ -26,7 +26,7 @@ assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:
 assert.equal(ctx.StudioProduction.mediaIndexAt([{kind:'video',element:{duration:4},meta:{}},{kind:'video',element:{duration:5},meta:{}}],10,15),0);
 console.log('Pipeline checks passed: correction targets, numeric cards, clip cycling.');
 // Numeric cards are an explicit local visual, while footage/document scenes still require media.
-let searches=0;ctx.URL=URL;ctx.STUDIO_PREVIEW_PUBLIC={anonKey:'test'};ctx.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(body.action==='review-media')return {ok:true,json:async()=>({reviews:[{scene:1,candidates:[{id:'91:video',safe:true,score:.9,reason:'ملائم'}]}]})};searches++;return {ok:true,json:async()=>({items:[{id:91,type:'video',mediaUrl:'https://videos.pexels.com/finance.mp4',preview:'https://images.pexels.com/videos/91/free-photo.jpg',pageUrl:'https://www.pexels.com/video/finance-91/',creator:'Test',duration:30}]})};};ctx.addSceneMedia=(s,m)=>{s.mediaItems=[...(s.mediaItems||[]),m];};
+let searches=0;ctx.URL=URL;ctx.STUDIO_PREVIEW_PUBLIC={anonKey:'test'};ctx.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(body.action==='review-media')return {ok:true,json:async()=>({reviews:[{scene:1,candidates:[{id:'91:video',safe:true,score:.9,reason:'ملائم'}]}]})};searches++;return {ok:true,json:async()=>({items:[{id:91,type:'video',mediaUrl:'https://videos.pexels.com/finance.mp4',preview:'https://images.pexels.com/videos/91/free-photo.jpg',pageUrl:'https://www.pexels.com/video/finance-91/',creator:'Test',duration:30}]})};};ctx.loadExportMedia=async m=>({kind:m.kind,element:{muted:true,duration:30,play:async()=>{},pause(){},removeAttribute(){},load(){}}});ctx.addSceneMedia=(s,m)=>{s.mediaItems=[...(s.mediaItems||[]),m];};
 const numericScene={title:'تكلفة القرض',visualType:'data',visualQuery:'finance calculator infographic',voiceover:'القرض 20 مليون دينار',duration:12};
 await ctx.StudioProduction.mediaFor([numericScene],true);assert.equal(searches,0);assert.equal(numericScene.mediaItems,undefined);ctx.topics.customScript.slides=[numericScene];assert(ctx.StudioProduction.productionReport().join('\n').includes('إنفوغرافيك محلي'));
 assert(ctx.StudioProduction.localDataReady(numericScene));assert(!ctx.StudioProduction.needsMedia(numericScene));
@@ -140,16 +140,31 @@ const spelled={visualType:'data',voiceover:'النقل مئة ألف دينار.
 
 // Preflight recovers misclassified numeric scenes while preserving evidence requirements.
 const missingNumeric={title:'بداية الراتب',visualType:'illustrative',voiceover:'الراتب مليون دينار. الإيجار ثلاثمئة ألف دينار.',mediaItems:[]};
-const originalNarration=missingNumeric.voiceover;assert(ctx.StudioProduction.prepareLocalVisual(missingNumeric));assert.equal(missingNumeric.visualType,'data');assert.equal(missingNumeric.voiceover,originalNarration);assert(!ctx.StudioProduction.needsMedia(missingNumeric));
+const originalNarration=missingNumeric.voiceover;assert(!ctx.StudioProduction.prepareLocalVisual(missingNumeric));assert.equal(missingNumeric.visualType,'illustrative');assert.equal(missingNumeric.voiceover,originalNarration);assert(ctx.StudioProduction.needsMedia(missingNumeric));
 for(const type of ['document','portrait','real','archive','map']){const scene={...missingNumeric,visualType:type};assert(!ctx.StudioProduction.prepareLocalVisual(scene));assert.equal(scene.visualType,type);}
 const actualFootage={visualType:'broll',voiceover:'مليون دينار',mediaItems:[{url:'blob:existing'}]};assert(!ctx.StudioProduction.prepareLocalVisual(actualFootage));assert.equal(actualFootage.visualType,'broll');
-const noFacts={title:'وثيقة مطلوبة',visualType:'document',mediaItems:[]};const issues=ctx.StudioProduction.missingVisuals([missingNumeric,noFacts]);assert.equal(issues.length,1);assert.equal(issues[0].scene,2);assert(ctx.StudioProduction.visualReadinessError([missingNumeric,noFacts]).includes('وثيقة مطلوبة'));assert(!ctx.StudioProduction.visualReadinessError([missingNumeric]));
+const noFacts={title:'وثيقة مطلوبة',visualType:'document',mediaItems:[]};const issues=ctx.StudioProduction.missingVisuals([missingNumeric,noFacts]);assert.equal(issues.length,2);assert.equal(issues[1].scene,2);assert(ctx.StudioProduction.visualReadinessError([missingNumeric,noFacts]).includes('وثيقة مطلوبة'));assert(ctx.StudioProduction.visualReadinessError([missingNumeric]));
 // Match the legacy media fallback used by the real editor, not just mediaItems.
 ctx.getSceneMedia=s=>s.mediaItems?.length?s.mediaItems:s.mediaVideoUrl||s.mediaUrl?[{url:s.mediaVideoUrl||s.mediaUrl}]:[];
 ctx.topics.customScript.slides=[{title:'النفقات',visualType:'data',voiceover:'النقل مئة ألف دينار',points:['النقل 100 ألف'],mediaUrl:'https://legacy.invalid/old.jpg',mediaItems:[]}];el('production-correction').value='حوّل المشهد 1 إلى إنفوغرافيك اقتصادي';await ctx.StudioProduction.correctCurrent();assert.equal(ctx.getSceneMedia(ctx.topics.customScript.slides[0]).length,0);
-console.log('Automatic numeric fallback, named missing scenes, protected evidence and legacy media clearing passed.');
+console.log('Footage intent retained, named missing scenes, protected evidence and legacy media clearing passed.');
 
 // Motion-text fallback is explicit in the report, opt-in to the graphic pack, and never replaces evidence.
-ctx.StudioDesignPack={normalize:s=>s.design?.pack==='press-v1'?s.design:null};const explainer={title:'مثال تدريبي',visualType:'illustrative',voiceover:'هذا مثال توضيحي وليس متوسطاً وطنياً',design:{pack:'press-v1',preset:'finance'},mediaItems:[]};assert(!ctx.StudioProduction.prepareLocalVisual(explainer));assert(ctx.StudioProduction.prepareLocalVisual(explainer,true));assert.equal(explainer.visualType,'text-only');assert.equal(explainer.productionVisual.kind,'motion-text');assert(explainer.productionMediaReview.note.includes('ليس فيديو مصوراً'));const evidence={...explainer,visualType:'document'};assert(!ctx.StudioProduction.prepareLocalVisual(evidence,true));
+ctx.StudioDesignPack={normalize:s=>s.design?.pack==='press-v1'?s.design:null};const explainer={title:'مثال تدريبي',visualType:'illustrative',voiceover:'هذا مثال توضيحي وليس متوسطاً وطنياً',design:{pack:'press-v1',preset:'finance'},mediaItems:[]};assert(!ctx.StudioProduction.prepareLocalVisual(explainer));assert(!ctx.StudioProduction.prepareLocalVisual(explainer,true));assert.equal(explainer.visualType,'illustrative');assert(ctx.StudioProduction.needsMedia(explainer));
 
-const decimal={visualType:'illustrative',voiceover:'التكلفة 3.5 مليون دينار. العائد ٤.٢ مليون دينار.'};ctx.StudioProduction.prepareLocalVisual(decimal);assert.equal(decimal.points.length,2);assert(decimal.points[0].includes('3.5'));assert(decimal.points[1].includes('٤.٢'));
+const decimal={visualType:'illustrative',voiceover:'التكلفة 3.5 مليون دينار. العائد ٤.٢ مليون دينار.'};assert(!ctx.StudioProduction.prepareLocalVisual(decimal));assert.equal(decimal.points,undefined);ctx.StudioProduction.prepareDataScene(decimal);assert.equal(decimal.points.length,2);assert(decimal.points[0].includes('3.5'));assert(decimal.points[1].includes('٤.٢'));
+
+ctx.StudioDesignPack=undefined;ctx.URL=URL;
+// Required footage must never silently turn into a diagram, including failed/geo-blocked searches.
+vm.runInContext(fs.readFileSync('public/editorial-geography.js','utf8'),ctx);
+ctx.StudioProduction.state.mediaCache.clear();
+let geoSearches=0;ctx.fetch=async()=>{geoSearches++;return {ok:true,json:async()=>({items:[{id:77,type:'video',mediaUrl:'https://videos.pexels.com/test.mp4',preview:'https://images.pexels.com/test.jpg',pageUrl:'https://www.pexels.com/video/77/',creator:'Editor'}]})}};
+const iraqi={title:'مستشفى في العراق',visualType:'broll',voiceover:'مليون مراجع',mediaItems:[]};
+const geoResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(geoResult.missing,1);assert.equal(iraqi.visualType,'broll');assert.equal(iraqi.illustration,undefined);assert.equal(iraqi.productionMediaReview.status,'location-review');assert.equal(geoSearches,1);
+const libraryRecords=[{id:'approved',kind:'video',local:true,url:'blob:approved'}];ctx.StudioMediaLibrary={find:async()=>libraryRecords,candidates(){}};
+const readyResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(readyResult.missing,0);assert.equal(geoSearches,1);assert.equal(iraqi.mediaItems[0].url,'blob:approved');
+const searchesBefore=geoSearches;await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(geoSearches,searchesBefore);
+ctx.loadExportMedia=async()=>{throw Error('ملف غير قابل للتحميل')};
+const failedResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(failedResult.missing,1);assert.equal(iraqi.productionMediaReview.status,'failed');assert.equal(iraqi.mediaItems[0].url,'blob:approved');
+assert(ctx.StudioProduction.visualReadinessError([iraqi]));
+console.log('Media regression: geography rejects unreviewed footage, library reuse avoids search, decode failure remains missing without destroying the source.');

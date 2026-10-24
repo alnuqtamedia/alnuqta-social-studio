@@ -23,7 +23,7 @@ const server=http.createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin='http://127.0.0.1:'+server.address().port;
-const browser=await chromium.launch({...(process.env.PW_HEADLESS_SHELL?{}:{channel:'chromium'}),headless:true,args:['--autoplay-policy=no-user-gesture-required']});
+const browser=await chromium.launch({...(process.env.STUDIO_CHROMIUM_EXECUTABLE?{executablePath:process.env.STUDIO_CHROMIUM_EXECUTABLE}:process.env.PW_HEADLESS_SHELL?{}:{channel:'chromium'}),headless:true,args:['--autoplay-policy=no-user-gesture-required']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const errors=[];
 // The external Tailwind CDN is intentionally blocked; supply only its configuration namespace.
@@ -56,7 +56,7 @@ try{
  const policy=await page.evaluate(async()=>{
   document.getElementById('studio-source-text').value='الازدحام في العراق';
   const slides=[{title:'السيارات في العراق',voiceover:'السيارات في العراق كثيرة والزحام يستهلك الوقت',visualType:'broll',visualQuery:'traffic',duration:3}];
-  await StudioProduction.mediaFor(slides,true);if(getSceneMedia(slides[0]).length||slides[0].illustration?.preset!=='traffic')throw Error('Unverified stock bypassed geographic gate');
+  await StudioProduction.mediaFor(slides,true);if(getSceneMedia(slides[0]).length||slides[0].illustration||!StudioProduction.missingVisuals(slides).length)throw Error('Unverified stock bypassed geographic gate');
   topics.customScript={title:'اختبار العراق',soundscape:StudioSoundscape.fromCommand('سينمائي'),slides};activeTopic=activeTikTokTopic='customScript';activeTab='tiktok';
   document.getElementById('production-correction').value='حوّل جميع المشاهد إلى جرافيك وإنفوغرافيك';const before=slides[0].voiceover;await StudioProduction.correctCurrent();if(slides[0].voiceover!==before)throw Error('Graphic correction changed narration');
   return {preset:slides[0].illustration.preset,country:slides[0].editorialGeography.countries[0].country};
