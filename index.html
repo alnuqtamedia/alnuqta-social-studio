@@ -650,14 +650,22 @@
                 const explicitDuration=commandVideoDuration(command);if(explicitDuration!==null&&explicitDuration<=0)throw new Error('مدة الفيديو يجب أن تكون أكبر من صفر');
                 const currentContent=getCurrentStudioContent();if(explicitDuration!==null)currentContent.durationTarget=explicitDuration;
                 let result;
-                for(let attempt=0;attempt<5;attempt++){
-                    const response = await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio-preview', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json', apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey, Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey }, signal:window.StudioProduction?.state.abort?.signal,
-                        body: JSON.stringify({ command: command+"\n"+STUDIO_EDITORIAL_RULES, currentContent, schemaVersion: STUDIO_SCHEMA_VERSION, responseSchema: STUDIO_OUTPUT_SCHEMA })
-                    });
-                    const contentType = response.headers.get('content-type') || '';
-                    if (!contentType.includes('application/json')) throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
-                    const raw = await response.text();
+                for(let attempt=0;attempt<3;attempt++){
+                    const parent=window.StudioProduction?.state.abort?.signal,request=new AbortController(),cancel=()=>request.abort();
+                    parent?.addEventListener('abort',cancel,{once:true});if(parent?.aborted)request.abort();
+                    const timer=setTimeout(()=>request.abort(),90000);let response,raw;
+                    try{
+                        response=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-studio-preview', {
+                            method:'POST',headers:{'Content-Type':'application/json',apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey},signal:request.signal,
+                            body:JSON.stringify({command:command+"\n"+STUDIO_EDITORIAL_RULES,currentContent,schemaVersion:STUDIO_SCHEMA_VERSION,responseSchema:STUDIO_OUTPUT_SCHEMA})
+                        });
+                        const contentType=response.headers.get('content-type')||'';
+                        if(!contentType.includes('application/json'))throw new Error('خدمة Gemini أعادت استجابة غير صالحة.');
+                        raw=await response.text();
+                    }catch(error){
+                        if(request.signal.aborted)throw new Error(parent?.aborted?'أُلغي الأمر؛ العمل السابق محفوظ.':'تأخر تخطيط المشاهد أكثر من 90 ثانية؛ العمل السابق محفوظ.');
+                        throw error;
+                    }finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}
                     if (!raw.trim()) throw new Error('خدمة Gemini لم تُرجع بيانات. أعد المحاولة.');
                     try { result = JSON.parse(raw); }
                     catch { throw new Error('خدمة Gemini أعادت بيانات غير مكتملة. أعد المحاولة.'); }
@@ -1943,7 +1951,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-10-24-media-r11';
+        const STUDIO_BUILD='2026-10-24-media-r12';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2536,18 +2544,18 @@ function newsDownload(){
 }
 </script>
 <script src="public/preview-config.js"></script>
-<script src="public/production-core.js?v=20261024-media-r11"></script>
-<script src="public/design-pack.js?v=20261024-media-r11"></script>
+<script src="public/production-core.js?v=20261024-media-r12"></script>
+<script src="public/design-pack.js?v=20261024-media-r12"></script>
 <script src="public/motion-graphics.js"></script>
-<script src="public/cinematic-effects.js?v=20261024-media-r11"></script>
+<script src="public/cinematic-effects.js?v=20261024-media-r12"></script>
 <script src="public/vendor/zzfx-samples.js"></script>
-<script src="public/soundscape.js?v=20261024-media-r11"></script>
+<script src="public/soundscape.js?v=20261024-media-r12"></script>
 <script src="public/vendor/lottie_canvas.min.js"></script>
-<script src="public/editorial-geography.js?v=20261024-media-r11"></script>
-<script src="public/illustrated-scenes.js?v=20261024-media-r11"></script>
-<script src="public/ffmpeg-export.js?v=20261024-media-r11"></script>
-<script src="public/media-library.js?v=20261024-media-r11"></script>
-<script src="public/studio-production.js?v=20261024-media-r11"></script>
+<script src="public/editorial-geography.js?v=20261024-media-r12"></script>
+<script src="public/illustrated-scenes.js?v=20261024-media-r12"></script>
+<script src="public/ffmpeg-export.js?v=20261024-media-r12"></script>
+<script src="public/media-library.js?v=20261024-media-r12"></script>
+<script src="public/studio-production.js?v=20261024-media-r12"></script>
 </body>
 </html>
 
