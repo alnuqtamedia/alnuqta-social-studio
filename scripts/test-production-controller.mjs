@@ -3,6 +3,12 @@ const elements=new Map();const el=id=>{if(!elements.has(id))elements.set(id,{val
 const saved=[{title:'Saved original',source:'preserved'}],revoked=[];let consent=false,savedCalls=0;
 const ctx=vm.createContext({console,URL:{revokeObjectURL:url=>revoked.push(url)},document:{readyState:'complete',getElementById:el,createElement:()=>({appendChild(){}}),addEventListener(){}},confirm:()=>consent,getCurrentStudioContent:()=>({title:'old'}),runGeminiStudioCommand:async()=>{},saveStudioProject:async()=>{savedCalls++;},restoreStudioProject:async()=>{},setAIStatus:()=>{},topics:{customScript:{title:'Open work',slides:[{mediaItems:[{local:true,url:'blob:open'}]}]}},activeTikTokTopic:'customScript',activeTopic:'customScript',activeTab:'tiktok',currentSlideIndex:0,activeTikTokSlide:0,getSceneMedia:s=>s.mediaItems||[],invalidateGeneratedVoiceover(){},deleteHumanVoiceRecording(){},socialVideo:null,newsImg:null,newsCaptionDirty:false,socialDrafts:{x:'draft'},restoredProjectUrls:[],newsInput(){},initSlideButtons(){},initTikTokSlideButtons(){},updateTikTokInputs(){},renderCanvas(){}});ctx.window=ctx;ctx.AbortController=AbortController;ctx.setTimeout=setTimeout;ctx.clearTimeout=clearTimeout;
 vm.runInContext(fs.readFileSync('public/production-core.js','utf8'),ctx);vm.runInContext(fs.readFileSync('public/soundscape.js','utf8'),ctx);vm.runInContext(fs.readFileSync('public/studio-production.js','utf8'),ctx);
+let fixtureFetch;
+Object.defineProperty(ctx,'fetch',{configurable:true,set(value){fixtureFetch=value;},get(){return async(url,options)=>{
+ const body=JSON.parse(options.body);if(!body.searches)return fixtureFetch(url,options);
+ const results=await Promise.all(body.searches.map(search=>fixtureFetch(url,{...options,body:JSON.stringify(search)}).then(r=>r.json())));
+ return {ok:true,json:async()=>({results})};
+}}});
 el('studio-source-text').value='Source material';el('production-orientation').value='landscape';el('news-handle').value='@brand';
 assert.equal(ctx.getCurrentStudioContent().sourceMaterial,'Source material');ctx.StudioProduction.state.replaceFromSource=true;assert.equal(ctx.getCurrentStudioContent().title,undefined);assert.equal(ctx.getCurrentStudioContent().mode,'new-from-source');ctx.StudioProduction.state.replaceFromSource=false;await ctx.saveStudioProject();assert.equal(savedCalls,1);assert.equal(ctx.topics.customScript.productionSource.orientation,'landscape');
 el('studio-source-text').value='';assert.equal(ctx.getCurrentStudioContent().sourceMaterial,'');
@@ -170,10 +176,10 @@ assert(ctx.StudioProduction.visualReadinessError([iraqi]));
 console.log('Media regression: geography rejects unreviewed footage, library reuse avoids search, decode failure remains missing without destroying the source.');
 
 // Drain every worker before releasing a cancelled job; no background scene mutates the next job.
-ctx.StudioMediaLibrary=undefined;ctx.StudioProduction.state.mediaCache.clear();ctx.StudioProduction.state.abort=new AbortController();let abortedWorkers=0;
-ctx.fetch=(url,o)=>new Promise((resolve,reject)=>o.signal.addEventListener('abort',()=>{abortedWorkers++;reject(Error('aborted'));},{once:true}));
+ctx.StudioMediaLibrary=undefined;ctx.StudioProduction.state.mediaCache.clear();ctx.StudioProduction.state.abort=new AbortController();let abortedWorkers=0,startedWorkers=0;
+ctx.fetch=(url,o)=>new Promise((resolve,reject)=>{startedWorkers++;o.signal.addEventListener('abort',()=>{abortedWorkers++;reject(Error('aborted'));},{once:true});});
 const cancelledScenes=Array.from({length:3},(_,i)=>({title:'Test '+i,visualQuery:'query '+i,visualType:'broll',mediaItems:[]}));
-const cancelledWork=ctx.StudioProduction.mediaFor(cancelledScenes,true);await new Promise(r=>setTimeout(r,0));ctx.StudioProduction.state.abort.abort();await assert.rejects(cancelledWork,/أُلغي/);assert.equal(abortedWorkers,3);assert(cancelledScenes.every(s=>!s.illustration&&!s.mediaItems.length));ctx.StudioProduction.state.abort=null;
+const cancelledWork=ctx.StudioProduction.mediaFor(cancelledScenes,true);for(let i=0;i<20&&startedWorkers<3;i++)await new Promise(r=>setTimeout(r,5));assert.equal(startedWorkers,3);ctx.StudioProduction.state.abort.abort();await assert.rejects(cancelledWork,/أُلغي/);assert.equal(abortedWorkers,3);assert(cancelledScenes.every(s=>!s.illustration&&!s.mediaItems.length));ctx.StudioProduction.state.abort=null;
 console.log('Cancellation drains all bounded media workers before returning.');
 
 // Filmed reports cannot satisfy the delivery contract with repeated graphics.
@@ -258,3 +264,23 @@ console.log('Five-scene Iraq regression: four relevant illustrations pass, speci
  const result=await ctx.StudioProduction.mediaFor(scenes,true);assert.equal(result.missing,0);assert.equal(searches,3);assert.equal(JSON.stringify(batches),'[[1,2],[2]]');assert.equal(scenes[0].mediaItems[0].providerId,'801:video');assert.equal(scenes[1].searchRecovery.attempts,1);
 }
 console.log('Only the rejected general shot gets one improved query; completed scenes and voice remain intact.');
+
+// Exercise all automatic search stages and multiple later-ranked clips.
+{
+ const api=ctx.StudioProduction;api.state.mediaCache.clear();api.state.reviewCache.clear();
+ const requests=[];let next=1000;
+ ctx.StudioMediaLibrary={find:async()=>[],candidates(){}};
+ ctx.loadExportMedia=async m=>({kind:m.kind,element:{duration:20,play:async()=>{},pause(){},removeAttribute(){},load(){}}});
+ ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);
+  if(b.action==='review-media')return {ok:true,json:async()=>({reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:Number(c.id.split(':')[0])>=1003,score:.9,reason:'reviewed motion'}))}))})};
+  requests.push(b);return {ok:true,json:async()=>({items:Array.from({length:6},()=>{const id=next++;return {id,type:'video',mediaUrl:'https://videos.pexels.com/video-files/'+id+'/clip.mp4',preview:'https://images.pexels.com/videos/'+id+'/poster.jpg',pageUrl:'https://www.pexels.com/video/'+id+'/',creator:'fixture'};})})};
+ };
+ const scenes=[{title:'تفصيل عمل',visualQuery:'hands working',visualType:'broll',duration:12,mediaItems:[]}];ctx.topics.customScript={slides:scenes};el('studio-source-text').value='العمل في العراق';
+ const result=await api.mediaFor(scenes,true);assert.equal(result.missing,0);assert.equal(requests.length,1);assert.equal(scenes[0].mediaItems.length,3);assert.equal(new Set(scenes[0].mediaItems.map(m=>m.providerId)).size,3);assert.equal(scenes[0].mediaItems[0].providerId,'1003:video');
+ const before=requests.length;await api.mediaFor(scenes,true);assert.equal(requests.length,before);
+ api.state.mediaCache.clear();api.state.reviewCache.clear();requests.length=0;
+ ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='review-media')return {ok:true,json:async()=>({reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:true,score:.9,reason:'generic detail'}))}))})};requests.push(b);return {ok:true,json:async()=>({items:b.provider==='commons'?[{id:'commons-5',provider:'Commons',type:'photo',license:'Public domain',mediaUrl:'https://upload.wikimedia.org/wikipedia/commons/a/ab/Test.jpg',preview:'https://upload.wikimedia.org/wikipedia/commons/a/ab/Test.jpg',pageUrl:'https://commons.wikimedia.org/wiki/File:Test.jpg',creator:'fixture'}]:[]})};};
+ const missing=[{title:'تفصيل عام',visualQuery:'worker hands',visualType:'illustrative',duration:4,mediaItems:[]}];ctx.topics.customScript={slides:missing};
+ const recovered=await api.mediaFor(missing,true);assert.equal(recovered.missing,0);assert.equal(JSON.stringify(requests.map(b=>[b.provider,b.type,b.orientation])),JSON.stringify([['pexels','video','portrait'],['pexels','video','any'],['pexels','photo','any'],['commons','photo','any']]));assert.equal(missing[0].mediaItems[0].kind,'image');assert.equal(missing[0].mediaItems[0].locationEvidence,undefined);assert(missing[0].mediaItems[0].licenseUrl.includes('pexels')===false,'Commons metadata must keep its own license');
+}
+console.log('Automatic recovery: later-ranked clips, distinct shot coverage, reuse, unrestricted orientation, photo fallback and Commons.');

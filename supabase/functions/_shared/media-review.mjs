@@ -1,11 +1,13 @@
 // Public provider thumbnails only; never fetch user uploads or arbitrary URLs.
 export function thumbnailUrl(value){
- const u=new URL(value);if(u.protocol!=='https:'||u.hostname!=='images.pexels.com'||u.port||u.username||u.password||!/^\/(photos|videos)\/[0-9]+\//.test(u.pathname))throw Error('invalid_thumbnail');
+ const u=new URL(value);if(u.protocol!=='https:'||u.port||u.username||u.password)throw Error('invalid_thumbnail');
+ if(u.hostname==='upload.wikimedia.org'&&/^\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\//.test(u.pathname)&&/\.(jpe?g|png|webp)$/i.test(u.pathname))return u.href;
+ if(u.hostname!=='images.pexels.com'||!/^\/(photos|videos)\/[0-9]+\//.test(u.pathname))throw Error('invalid_thumbnail');
  u.search='auto=compress&cs=tinysrgb&w=320&h=240&fit=crop';return u.href;
 }
 export function validateReviews(rows){
  if(!Array.isArray(rows)||!rows.length||rows.length>6)throw Error('invalid_media_review');const seen=new Set();
- for(const r of rows){if(!Number.isInteger(r.scene)||r.scene<1||seen.has(r.scene)||typeof r.text!=='string'||r.text.length>1600||typeof r.query!=='string'||r.query.length>500||!Array.isArray(r.candidates)||!r.candidates.length||r.candidates.length>3)throw Error('invalid_media_review');seen.add(r.scene);if(r.requireOriginal!==undefined&&typeof r.requireOriginal!=='boolean')throw Error('invalid_media_review');const ids=new Set();for(const c of r.candidates){if(typeof c.id!=='string'||!/^\d+:(photo|video)$/.test(c.id)||ids.has(c.id))throw Error('invalid_media_candidate');ids.add(c.id);thumbnailUrl(c.preview);}}
+ for(const r of rows){if(!Number.isInteger(r.scene)||r.scene<1||seen.has(r.scene)||typeof r.text!=='string'||r.text.length>1600||typeof r.query!=='string'||r.query.length>500||!Array.isArray(r.candidates)||!r.candidates.length||r.candidates.length>3)throw Error('invalid_media_review');seen.add(r.scene);if(r.requireOriginal!==undefined&&typeof r.requireOriginal!=='boolean')throw Error('invalid_media_review');const ids=new Set();for(const c of r.candidates){if(typeof c.id!=='string'||! /^(?:\d+:(?:photo|video)|commons-\d+:photo)$/.test(c.id)||ids.has(c.id))throw Error('invalid_media_candidate');ids.add(c.id);thumbnailUrl(c.preview);}}
  return rows;
 }
 export async function reviewInputs(rows,fetcher=fetch){

@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {commonsItems,searchCommons} from '../backend/_shared/commons-search.mjs';
+import {thumbnailUrl,validateReviews} from '../supabase/functions/_shared/media-review.mjs';
+const image=(license='Public domain',url='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Test.jpg/1280px-Test.jpg')=>({pageid:1,title:'File:Test.jpg',imageinfo:[{mime:'image/jpeg',thumburl:url,extmetadata:{LicenseShortName:{value:license},Artist:{value:'<a>Photographer</a>'}}}]});
+const fixture={query:{pages:{1:image(),2:{...image('CC BY-SA 4.0'),pageid:2},3:{...image('Public domain','https://evil.example/test.jpg'),pageid:3}}}};
+const items=commonsItems(fixture);assert.equal(items.length,1);assert.equal(items[0].creator,'Photographer');assert(items[0].preview.includes('320px-'));
+const ctx=vm.createContext({URL});vm.runInContext(fs.readFileSync('public/production-core.js','utf8'),ctx);
+assert(ctx.StudioProductionCore.safeMedia(items[0]));
+for(const patch of [{mediaUrl:'https://upload.wikimedia.org.evil.com/wikipedia/commons/a.jpg'},{license:'unknown'},{pageUrl:'https://commons.wikimedia.org.evil.com/wiki/File:a.jpg'},{type:'video'}])assert.equal(ctx.StudioProductionCore.safeMedia({...items[0],...patch}),false);
+assert.equal(thumbnailUrl(items[0].preview),items[0].preview);
+assert.throws(()=>thumbnailUrl('https://upload.wikimedia.org/private/a.jpg'));
+validateReviews([{scene:1,text:'تفصيل عام',query:'work',candidates:[{id:'commons-1:photo',preview:items[0].preview}]}]);
+let calls=0;const result=await searchCommons('Baghdad work',async(url,options)=>{calls++;const u=new URL(url);assert.equal(u.hostname,'commons.wikimedia.org');assert.equal(u.searchParams.get('gsrsearch'),'Baghdad work');assert.equal(options.redirect,'error');return new Response(JSON.stringify(fixture));});
+assert.equal(calls,1);assert.equal(result.length,1);
+await assert.rejects(searchCommons('x',async()=>new Response('',{status:503})),/503/);
+console.log('Commons: fixed upstream, public-domain subset, safe metadata/URLs, small review preview, failure propagation.');

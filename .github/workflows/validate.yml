@@ -50,6 +50,8 @@ jobs:
         run: node scripts/test-creative-browser.mjs
       - name: Verify geographic graphics and local FFmpeg export
         run: node scripts/test-illustrated-browser.mjs
+      - name: Verify automatic reviewed-media download and persistence
+        run: node scripts/test-media-cache-browser.mjs
       - name: Verify persistent library and real mixed-media export
         run: node scripts/test-media-browser.mjs
       - name: Verify scoped illustrative footage and protected specific event
