@@ -52,7 +52,7 @@ try{
  });
  for(const f of frames)await fs.writeFile(path.join(out,f.preset+'-'+f.W+'.png'),Buffer.from(f.png,'base64'));
  // Rejected country material must not enter media or the rendered scene.
- let searches=0;await page.route('**/functions/v1/pexels-search-preview',async route=>{searches++;const q=route.request().postDataJSON().query;assert.match(q,/Iraq/);await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[{id:123,type:'photo',creator:'fixture',mediaUrl:'https://images.pexels.com/photos/123/x.jpg',preview:'https://images.pexels.com/photos/123/x.jpg',pageUrl:'https://www.pexels.com/photo/china-123/'}]})});});
+ let searches=0;await page.route('**/functions/v1/pexels-search-preview',async route=>{searches++;const batch=route.request().postDataJSON().searches;assert(Array.isArray(batch)&&batch.length<=3);for(const q of batch)assert.match(q.query,/Iraq/);await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({results:batch.map(()=>({items:[{id:123,type:'photo',creator:'fixture',mediaUrl:'https://images.pexels.com/photos/123/x.jpg',preview:'https://images.pexels.com/photos/123/x.jpg',pageUrl:'https://www.pexels.com/photo/china-123/'}]}))})});});
  const policy=await page.evaluate(async()=>{
   document.getElementById('studio-source-text').value='الازدحام في العراق';
   const slides=[{title:'السيارات في العراق',voiceover:'السيارات في العراق كثيرة والزحام يستهلك الوقت',visualType:'broll',visualQuery:'Baghdad traffic street',duration:3}];

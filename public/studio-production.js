@@ -1,4 +1,4 @@
-/* Local production controller. No Cloud Run, persistent media uploads, or new provider. */
+/* Production controller with bounded automatic media recovery. */
 (function(){
 'use strict';
 const C=window.StudioProductionCore,$=id=>document.getElementById(id),API='https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/';
@@ -10,6 +10,22 @@ function projectSignature(){return JSON.stringify({slides:topics[activeTikTokTop
 function invalidatePreview(){state.ffmpegInput=null;if($('production-ffmpeg'))$('production-ffmpeg').disabled=true;state.soundMixReport=null;state.previewSignature=null;state.previewPassed=false;state.lastReport={};state.renderedMedia=null;if($('production-report'))$('production-report').textContent='';if($('production-download'))$('production-download').disabled=true;const preview=$('production-video-preview');preview?.pause?.();preview?.removeAttribute('src');preview?.load?.();preview?.classList.add('hidden');}
 function check(){if(state.abort?.signal.aborted)throw Error('أُلغي الإنتاج؛ النص والمواد المجهزة محفوظة.');}
 async function json(endpoint,body,timeoutMs=90000){check();const controller=new AbortController(),parent=state.abort?.signal,onAbort=()=>controller.abort();parent?.addEventListener('abort',onAbort,{once:true});const timeout=setTimeout(()=>controller.abort(),timeoutMs);try{const r=await fetch(API+endpoint,{method:'POST',headers:{'Content-Type':'application/json',...(endpoint.endsWith('-preview')?{apikey:window.STUDIO_PREVIEW_PUBLIC.anonKey,Authorization:'Bearer '+window.STUDIO_PREVIEW_PUBLIC.anonKey}:{})},body:JSON.stringify(body),signal:controller.signal});let d;try{d=await r.json()}catch{throw Error('الخدمة أعادت جواباً غير مكتمل؛ العمل الحالي محفوظ.');}if(!r.ok)throw Error(d.error||`الخدمة ${r.status}`);return d;}catch(e){check();if(controller.signal.aborted)throw Error('انتهت مهلة الخدمة؛ العمل الحالي محفوظ. أعد المحاولة لاحقاً.');throw e;}finally{clearTimeout(timeout);parent?.removeEventListener('abort',onAbort);}}
+
+const mediaSearchQueue=[];let mediaSearchTimer=null;
+function searchMedia(body){
+ check();return new Promise((resolve,reject)=>{
+  mediaSearchQueue.push({body,resolve,reject});
+  if(mediaSearchTimer===null)mediaSearchTimer=setTimeout(flushMediaSearch,0);
+ });
+}
+async function flushMediaSearch(){
+ mediaSearchTimer=null;const batch=mediaSearchQueue.splice(0,3);
+ try{check();const data=await json('pexels-search-preview',{searches:batch.map(x=>x.body)},15000);check();
+  if(!Array.isArray(data.results)||data.results.length!==batch.length)throw Error('خدمة الوسائط تحتاج إصدار البحث المجمع.');
+  batch.forEach((job,i)=>data.results[i].error?job.reject(Error(data.results[i].error)):job.resolve(data.results[i]));
+ }catch(e){batch.forEach(job=>job.reject(e));}
+ if(mediaSearchQueue.length&&mediaSearchTimer===null)mediaSearchTimer=setTimeout(flushMediaSearch,0);
+}
 
 function clearSource(){studioSourceText='';studioSourceName='';$('studio-source-file').value='';$('studio-source-text').value='';$('studio-source-status').textContent='المادة تبقى محلياً حتى تنفيذ الأمر عبر Gemini.';}
 async function loadSource(input){const file=input.files?.[0];if(!file)return;if(file.size>15*1024*1024)return status('حد الملف 15MB.','error');try{
@@ -66,7 +82,7 @@ function prepareLocalVisual(s){
  if(type==='data'){s.visualType='data';s.requestedVisualType='data';s.explicitGraphics=false;delete s.illustration;prepareDataScene(s);return localDataReady(s);}
  return false;
 }
-function missingVisuals(slides){return slides.flatMap((s,i)=>{const m=getSceneMedia(s),kinds=mediaKinds(s),missing=needsMedia(s)&&!m.some(x=>kinds.includes(x.kind)&&x.loadStatus!=='failed'&&(x.local||!window.StudioGeography||window.StudioGeography.check(s,x).allowed));return missing?[{scene:i+1,title:String(s.title||s.header||'بلا عنوان'),type:requestedVisual(s)}]:[];});}
+function missingVisuals(slides){return slides.flatMap((s,i)=>{const m=getSceneMedia(s),kinds=mediaKinds(s),missing=needsMedia(s)&&!m.some(x=>kinds.includes(x.kind)&&x.loadStatus!=='failed'&&!(x.autoCached&&window.StudioGeography?.requiresOriginal(s))&&((x.local&&!x.autoCached)||!window.StudioGeography||window.StudioGeography.check(s,x).allowed));return missing?[{scene:i+1,title:String(s.title||s.header||'بلا عنوان'),type:requestedVisual(s)}]:[];});}
 function applyReportBaseline(topic,command){
  const slides=topic?.slides||[],text=String(command||'');
  // Explicit all-graphics work remains available. A normal filmed report requires real assets.
@@ -149,6 +165,23 @@ async function correctCurrent(){
  if(!visualOnly&&activeTab==='tiktok')await narration(staged,requestedVideoSeconds());check();invalidatePreview();slides.splice(0,slides.length,...staged);updateTikTokInputs();renderCanvas();productionReport();status('طُبّق التصحيح على المشاهد '+targets.map(i=>i+1).join('، ')+' مع حفظ البقية؛ أنشئ معاينة جديدة.','success');}
 
 async function reviewCandidates(rows){
+ const combined=new Map();combined.retryQueries=new Map();const batches=[];
+ // Keep the service's three-thumbnail limit per scene; inspect later candidates
+ // in at most three parallel batches instead of serial 30-second waits.
+ for(let offset=0;offset<8;offset+=3){
+  const batch=rows.map(r=>({...r,items:r.items.slice(offset,offset+3)})).filter(r=>r.items.length);
+  if(batch.length)batches.push(batch);
+ }
+ const results=await Promise.allSettled(batches.map(reviewCandidateBatch));check();
+ const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;
+ for(const {value:result} of results){
+  for(const [i,items] of result)combined.set(i,[...(combined.get(i)||[]),...items]);
+  for(const [i,q] of result.retryQueries)combined.retryQueries.set(i,q);
+ }
+ for(const [i,items] of combined)combined.set(i,items.sort((a,b)=>b.review.score-a.review.score));
+ return combined;
+}
+async function reviewCandidateBatch(rows){
  const reviewed=new Map();reviewed.retryQueries=new Map();for(let offset=0;offset<rows.length;offset+=6){const batch=rows.slice(offset,offset+6),request=batch.map(r=>({scene:r.i+1,requireOriginal:Boolean(window.StudioGeography?.requiresOriginal(r.s)),text:['سياق التقرير: '+[topics[activeTikTokTopic]?.title,source().slice(0,650)].filter(Boolean).join(' ').slice(0,750),'المشهد المطلوب: '+[r.s.title,r.s.subtitle,r.s.voiceover].filter(Boolean).join(' ').slice(0,800)].join('\n').slice(0,1600),query:r.query,candidates:r.items.map(x=>({id:String(x.id)+':'+x.type,preview:x.preview}))})),key=JSON.stringify(request);let answer=state.reviewCache.get(key);
   if(!answer){status('فحص صلة معاينات اللقطات بمعنى المشاهد عبر Gemini…');answer=await json('gemini-studio-preview',{action:'review-media',reviews:request},30000);state.reviewCache.set(key,answer);}
   if(!Array.isArray(answer.reviews)||answer.reviews.length!==batch.length)throw Error('الفحص البصري لم يرجع جميع المشاهد؛ لم تُعتمد لقطات غير مفحوصة.');
@@ -163,13 +196,13 @@ async function checkMediaItem(item){
 async function acceptCandidate(s,item,country){
  if(state.busy)throw Error('انتظر انتهاء الإنتاج أولاً.');const project=topics[activeTikTokTopic];if(!project?.slides?.includes(s))throw Error('المشهد لم يعد مفتوحاً؛ أعد تجهيز الوسائط.');
  if(!(s.editorialGeography?.countries||[]).some(c=>c.country===country))throw Error('اختر بلد المشهد.');
- const meta={url:item.mediaUrl,preview:item.preview,kind:item.type==='video'?'video':'image',credit:item.creator+' / Pexels',sourceUrl:item.pageUrl,licenseUrl:'https://www.pexels.com/license/'};
- if(!C.safePexels(item))throw Error('رابط مصدر غير صالح.');await checkMediaItem(meta);
+ const meta={url:item.mediaUrl,preview:item.preview,kind:item.type==='video'?'video':'image',credit:item.creator+' / '+(item.provider||'Pexels'),sourceUrl:item.pageUrl,licenseUrl:item.licenseUrl||(item.provider==='Commons'?'https://commons.wikimedia.org/wiki/Commons:Public_domain':'https://www.pexels.com/license/')};
+ if(!C.safeMedia(item))throw Error('رابط مصدر غير صالح.');await checkMediaItem(meta);
  const record=await window.StudioMediaLibrary.addRemote(meta,{country,tags:[s.title,s.visualQuery].join(' ')});if(topics[activeTikTokTopic]!==project||!project.slides.includes(s))throw Error('حُفظت المادة في المكتبة؛ المشروع المفتوح تغيّر.');invalidatePreview();delete s.illustration;addSceneMedia(s,window.StudioMediaLibrary.materialize(record));s.productionMediaReview={status:'editor-reviewed',note:'أكّد المحرر البلد وملاءمة اللقطة؛ حُفظت في المكتبة لإعادة الاستخدام.'};productionReport();
 }
 async function mediaFor(slides,video,recoveryRound=0,recovery={}){
  if(slides.some(s=>!s.editorialGeography))window.StudioGeography?.apply(slides,source());
- const started=recovery.started||Date.now(),used=new Set(),pending=[],candidates=[...(recovery.candidates||[])],diagnostics=slides.map((_,i)=>({scene:i+1,stages:[],status:'pending'}));state.mediaDiagnostics=diagnostics;
+ const started=recovery.started||Date.now(),used=new Set(),pending=[],candidates=[...(recovery.candidates||[])],diagnostics=slides.map((_,i)=>recovery.diagnostics?.[i]||({scene:i+1,stages:[],status:'pending'}));state.mediaDiagnostics=diagnostics;
  for(const s of slides)for(const m of getSceneMedia(s))used.add(m.providerId||m.url);
  async function prepare(i){
   check();if(recoveryRound&&!recovery.indices.has(i)){diagnostics[i]=recovery.diagnostics[i];return;}const s=slides[i],d=diagnostics[i],begin=Date.now();
@@ -177,18 +210,22 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
   try{
    prepareLocalVisual(s);if(!needsMedia(s)){d.status='intentional-graphics';return;}
    const kinds=mediaKinds(s);let existing=getSceneMedia(s);
-   const valid=existing.filter(x=>kinds.includes(x.kind)&&(x.local||!window.StudioGeography||window.StudioGeography.check(s,x).allowed));if(valid.length!==existing.length){s.unusedMedia=[...(s.unusedMedia||[]),...existing.filter(x=>!valid.includes(x))];s.mediaItems=valid;s.mediaUrl='';s.mediaVideoUrl='';}
+   const valid=existing.filter(x=>kinds.includes(x.kind)&&!(x.autoCached&&window.StudioGeography?.requiresOriginal(s))&&((x.local&&!x.autoCached)||!window.StudioGeography||window.StudioGeography.check(s,x).allowed));if(valid.length!==existing.length){s.unusedMedia=[...(s.unusedMedia||[]),...existing.filter(x=>!valid.includes(x))];s.mediaItems=valid;s.mediaUrl='';s.mediaVideoUrl='';}
    if(valid.length){for(const m of valid)await checkMediaItem(m);if(s.illustration)delete s.illustration;d.status='ready';note('reuse','existing');return;}
    if(existing.length){d.status='needs-media';note('existing','المادة لا تطابق النوع المطلوب أو البلد؛ بقيت محفوظة');}
    const local=await window.StudioMediaLibrary?.find(s,kinds,used)||[];
    if(local.length){let added=0;for(const m of local){if(used.has(m.providerId))continue;used.add(m.providerId);try{await checkMediaItem(m);delete s.illustration;addSceneMedia(s,m);added++;if(added>=Math.min(3,Math.max(1,Math.ceil((Number(s.duration)||4)/4))))break;}catch(e){note('library-load',e.message);}}if(added){d.status='ready';note('library','approved local source');s.productionMediaReview={status:'library',note:'مادة مطابقة من مكتبة الجهاز؛ فُحص تحميلها.'};return;}}
    const query=window.StudioGeography?.query(s,visualSearchQuery(s))||visualSearchQuery(s);if(!query){d.status='missing-query';return;}
-   status(`تجهيز وسائط المشهد ${i+1}/${slides.length}…`);let items=[];
-   for(const type of video&&kinds.includes('video')?(kinds.includes('image')?['video','photo']:['video']):['photo']){
-    const key=type+':'+query+':'+$('production-orientation').value;let data=state.mediaCache.get(key);
-    if(!data){const request=json('pexels-search-preview',{query,type,orientation:$('production-orientation').value},15000);state.mediaCache.set(key,request);try{data=await request;state.mediaCache.set(key,data);}catch(e){state.mediaCache.delete(key);throw e;}}else data=await data;
-    items=(data.items||[]).filter(C.safePexels).filter(x=>x.preview&&!(s.excludedMedia||[]).includes(String(x.id)+':'+x.type)).slice(0,3);note('search',type+': '+items.length);if(items.length)break;
-   }
+   status(`تجهيز وسائط المشهد ${i+1}/${slides.length} — محاولة ${recoveryRound+1}…`);let items=[];
+   const orientation=recoveryRound? 'any':$('production-orientation').value;
+   const provider=recoveryRound>=3?'commons':'pexels';
+   const type=provider==='commons'||(recoveryRound>=2&&kinds.includes('image'))?'photo':video&&kinds.includes('video')?'video':'photo';
+   if(provider==='commons'&&!kinds.includes('image')){d.status='exhausted';return;}
+   const key=provider+':'+type+':'+query+':'+orientation;let data=state.mediaCache.get(key);
+   try{
+    if(!data){const request=searchMedia({query,type,orientation,provider});state.mediaCache.set(key,request);try{data=await request;state.mediaCache.set(key,data);}catch(e){state.mediaCache.delete(key);throw e;}}else data=await data;
+    items=(data.items||[]).filter(C.safeMedia).filter(x=>x.preview&&!(s.excludedMedia||[]).includes(String(x.id)+':'+x.type)).slice(0,8);note('search',provider+' '+type+' '+orientation+': '+items.length);
+   }catch(e){check();note('search-failed',provider+': '+e.message);d.error=e.message;}
    if(!items.length){d.status='no-results';s.productionMediaReview={status:d.status,note:'لم يرجع البحث مواد مناسبة؛ المشهد محفوظ دون استبدال.'};return;}
    pending.push({i,s,query,items});d.status='review';
   }catch(error){check();d.status='failed';d.error=error.message;s.productionMediaReview={status:'failed',note:error.message};}finally{d.elapsedMs=Date.now()-begin;}
@@ -198,12 +235,33 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
  for(const row of pending){
   check();if(!accepted.has(row.i))continue;const s=row.s,d=diagnostics[row.i],reviewed=(accepted.get(row.i)||[]).filter(x=>!used.has(String(x.id)+':'+x.type)),items=reviewed.filter(x=>!window.StudioGeography||window.StudioGeography.check(s,{...x,illustrative:x.review.intent==='illustrative',editorialReview:x.review}).allowed);
   const held=reviewed.filter(x=>!items.includes(x));if(held.length){candidates.push({i:row.i,s,query:row.query,items:held});d.status='location-review';s.productionMediaReview={status:'location-review',note:'المشهد يحتاج توثيق المكان أو الواقعة؛ المرشحات محفوظة للمراجعة، وليست دليلاً على الحدث.'};}
-  for(const item of items.slice(0,2))try{
-   const id=String(item.id)+':'+item.type,meta={url:item.mediaUrl,preview:item.preview,kind:item.type==='video'?'video':'image',credit:item.creator+' / Pexels',sourceUrl:item.pageUrl,licenseUrl:'https://www.pexels.com/license/',licenseCheckedAt:new Date().toISOString(),providerId:id,generated:false,local:false,trimStart:0,maxSeconds:6,editorialReview:item.review,illustrative:item.review.intent==='illustrative',locationEvidence:item.locationEvidence};await checkMediaItem(meta);used.add(id);delete s.illustration;addSceneMedia(s,meta);d.status='ready';s.productionMediaReview={status:'reviewed',note:item.review.intent==='illustrative'?'لقطات توضيحية مرتبطة بالسرد؛ فُحص تحميلها، ولا تثبت مكان الواقعة.':'فُحصت المعاينة ونجح تحميل الملف؛ الملاءمة تخص المعاينة فقط.'};break;
-  }catch(e){d.error=e.message;d.status='load-failed';s.productionMediaReview={status:'failed',note:e.message};}
+  let added=0;const wanted=Math.min(3,Math.max(1,Math.ceil((Number(s.duration)||4)/4)));
+  for(const item of items)try{
+   const id=String(item.id)+':'+item.type,meta={url:item.mediaUrl,preview:item.preview,kind:item.type==='video'?'video':'image',credit:item.creator+' / '+(item.provider||'Pexels'),sourceUrl:item.pageUrl,licenseUrl:item.licenseUrl||(item.provider==='Commons'?'https://commons.wikimedia.org/wiki/Commons:Public_domain':'https://www.pexels.com/license/'),licenseCheckedAt:new Date().toISOString(),providerId:id,generated:false,local:false,trimStart:0,maxSeconds:6,editorialReview:item.review,illustrative:item.review.intent==='illustrative',locationEvidence:item.locationEvidence};await checkMediaItem(meta);
+   if(window.StudioMediaLibrary?.cacheReviewed&&meta.illustrative)try{
+    const record=await window.StudioMediaLibrary.cacheReviewed(meta,{query:s.visualQuery,signal:state.abort?.signal});check();
+    if(record){const cached=window.StudioMediaLibrary.materialize(record);await checkMediaItem(cached);Object.assign(meta,cached);d.stages.push({stage:'download',detail:'saved locally',elapsedMs:Date.now()-started});}
+   }catch(e){check();d.stages.push({stage:'cache-unavailable',detail:e.message,elapsedMs:Date.now()-started});}
+   check();used.add(id);delete s.illustration;addSceneMedia(s,meta);added++;d.status='ready';s.productionMediaReview={status:'reviewed',note:item.review.intent==='illustrative'?'لقطات توضيحية مرتبطة بالسرد؛ فُحص تحميلها، ولا تثبت مكان الواقعة.':'فُحصت المعاينة ونجح تحميل الملف؛ الملاءمة تخص المعاينة فقط.'};if(added>=wanted)break;
+  }catch(e){check();d.error=e.message;if(!added){d.status='load-failed';s.productionMediaReview={status:'failed',note:e.message};}}
   if(!getSceneMedia(s).length&&!items.length&&!held.length){d.status='rejected';s.productionMediaReview={status:'rejected',note:'لم يعتمد الفحص المرشحات؛ المشهد يحتاج مادة.'};}
  }
- if(!recoveryRound&&accepted.retryQueries){const indices=new Set();for(const [i,query] of accepted.retryQueries){const s=slides[i];if(getSceneMedia(s).length||window.StudioGeography?.requiresOriginal(s)||query.trim().toLowerCase()===visualSearchQuery(s).trim().toLowerCase())continue;s.searchRecovery={originalQuery:s.visualQuery||'',query,attempts:1};s.visualQuery=query;s.visualQueryOverride=true;indices.add(i);}if(indices.size){status('تحسين بحث المشاهد غير المناسبة مرة واحدة؛ المشاهد المكتملة والصوت محفوظة.');return mediaFor(slides,video,1,{indices,candidates,diagnostics,started});}}
+ // Try every applicable source/type before asking the editor. Reuse completed scenes.
+ if(recoveryRound<3&&Date.now()-started<150000){
+  const indices=new Set();
+  for(let i=0;i<slides.length;i++){
+   const s=slides[i];if(!needsMedia(s)||getSceneMedia(s).some(m=>m.loadStatus==='ready'))continue;
+   // A held specific event needs evidence, not relabelling or another stock query.
+   if(diagnostics[i].status==='location-review')continue;
+   const query=accepted.retryQueries?.get(i);
+   if(!recoveryRound&&query&&!window.StudioGeography?.requiresOriginal(s)&&query.trim().toLowerCase()!==visualSearchQuery(s).trim().toLowerCase()){
+    s.searchRecovery={originalQuery:s.visualQuery||'',query,attempts:1};s.visualQuery=query;s.visualQueryOverride=true;
+   }
+   if(recoveryRound===2&&!mediaKinds(s).includes('image'))continue;
+   indices.add(i);
+  }
+  if(indices.size){status('إكمال البحث تلقائياً للمشاهد المتعطلة؛ المواد السليمة والصوت محفوظة.');return mediaFor(slides,video,recoveryRound+1,{indices,candidates,diagnostics,started});}
+ }
  window.StudioMediaLibrary?.candidates(candidates.sort((a,b)=>a.i-b.i));
  const missing=missingVisuals(slides).length,clips=slides.filter(s=>getSceneMedia(s).some(m=>m.kind==='video')).length,photos=slides.filter(s=>getSceneMedia(s).some(m=>m.kind==='image')).length;
  state.mediaElapsedMs=Date.now()-started;updateTikTokInputs();renderCanvas();productionReport();status(`مشاهد بفيديو: ${clips}، بصور: ${photos}، تحتاج وسائط: ${missing}.`+(candidates.length?' افتح مكتبة المواد لمراجعة المرشحات وحفظها مرة واحدة.':''),missing?'info':'success');return {clips,photos,missing};
