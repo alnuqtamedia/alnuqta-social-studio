@@ -1,12 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { authorizeStudioOrigin, enforceStudioRateLimit } from "../_shared/studio-security.ts";
-import { searchCommons } from "../_shared/commons-search.mjs";
+import { searchCommons, resolveCommonsReference } from "../_shared/commons-search.mjs";
 
 async function searchOne(body: any){
     const query = String(body?.query || "").trim();
     const type = body?.type === "video" ? "video" : "photo";
     if (!query) throw Error("invalid_query");
     if(query.length>200)throw Error("query_too_long");
+    if(body?.provider==='commons-reference')return {items:await resolveCommonsReference(body.referenceUrl),provider:'Commons'};
     if(body?.provider==='commons')return {items:type==='photo'?await searchCommons(query):[],provider:'Commons'};
     const key = Deno.env.get("PEXELS_API_KEY");
     if (!key) throw Error("PEXELS_API_KEY غير مفعّل في Supabase Secrets.");

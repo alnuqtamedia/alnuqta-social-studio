@@ -1,0 +1,20 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+import {commonsReferenceTitle,resolveCommonsReference,commonsItems} from '../backend/_shared/commons-search.mjs';
+import {validateReframeRequest,validateReframeResult} from '../supabase/functions/_shared/media-reframe.mjs';
+const c=vm.createContext({URL});for(const f of ['editorial-assets','editorial-geography'])vm.runInContext(fs.readFileSync('public/'+f+'.js','utf8'),c);
+const A=c.StudioEditorialAssets,G=c.StudioGeography,doc={title:'اللوح الطيني الحقيقي',visualType:'illustrative'};
+assert(A.identityRequired(doc));assert.equal(G.check(doc,{}).allowed,false);assert.equal(G.check(doc,{editorialReview:{intent:'specific',identityMatch:true,score:.99}}).allowed,false);
+const referenceUrl=A.referenceUrl(doc,'قصة ناني وإيا ناصر ونحاسه');assert(referenceUrl.includes('transparent'));
+const m={referenceEvidence:{kind:'commons-file',referenceUrl},editorialReview:{intent:'specific',identityMatch:true,score:.9}};assert(G.check(doc,m).allowed);
+const museum={title:'المتحف البريطاني',visualType:'illustrative',editorialGeography:{countries:[{country:'GB'}]},editorialReframe:{referenceScene:4}};assert(G.check(museum,{...m,reusedReference:true}).allowed);assert.equal(G.check({...museum,visualQuery:'actual footage raid'},m).allowed,false);
+for(const url of ['https://evil.com/wiki/File:X.png','http://commons.wikimedia.org/wiki/File:X.png','https://commons.wikimedia.org@evil.com/wiki/File:X.png','https://commons.wikimedia.org/wiki/File:X.svg','https://commons.wikimedia.org/wiki/File:X.png?redirect=evil'])assert.throws(()=>commonsReferenceTitle(url));
+let requested;const items=await resolveCommonsReference(referenceUrl,async url=>{requested=new URL(url);return Response.json({query:{pages:{1:{pageid:1,title:'File:Complaint tablet.png',imageinfo:[{mime:'image/png',url:'https://upload.wikimedia.org/wikipedia/commons/a/ab/Tablet.png',extmetadata:{LicenseShortName:{value:'CC BY 4.0'},LicenseUrl:{value:'https://creativecommons.org/licenses/by/4.0/'},Artist:{value:'<a>Photographer</a>'},ImageDescription:{value:'Complaint tablet to Ea-Nasir'}}}]}}}});});
+assert.equal(requested.hostname,'commons.wikimedia.org');assert(requested.searchParams.get('titles').includes('Ea-Nasir'));assert.equal(items.length,1);assert(items[0].requiresAttribution);assert.equal(items[0].referenceEvidence.kind,'commons-file');
+const body={scenes:[{scene:2,text:'ناني اشترى نحاساً',query:'ancient people Ur'},{scene:5,text:'اللوح محفوظ بالمتحف البريطاني',query:'British museum'}],references:[{scene:4,title:'لوح ناني'}]};validateReframeRequest(body);
+const result={scenes:[{scene:2,query:'close up copper pieces balance scale',referenceScene:0,reason:'تفصيل نحاس'},{scene:5,query:'',referenceScene:4,reason:'اعرض اللوح نفسه'}]};assert.equal(validateReframeResult(result,body).scenes[1].referenceScene,4);
+assert.throws(()=>validateReframeResult({scenes:[{...result.scenes[0],query:'https://evil.com'},result.scenes[1]]},body));assert.throws(()=>validateReframeResult({scenes:[result.scenes[0],{...result.scenes[1],referenceScene:99}]},body));
+console.log('Original identity guard, reference resolver, licensing metadata, bounded reframe and protected evidence verified.');
+
+const thumbData={query:{pages:{5:{pageid:5,title:'File:Tablet.png',imageinfo:[{mime:'image/png',thumburl:'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tablet.png/1280px-Tablet.png',extmetadata:{LicenseShortName:{value:'Public domain'}}}]}}}};
+assert.equal(commonsItems(thumbData).length,1);assert.equal(commonsItems({...thumbData,query:{pages:{5:{...thumbData.query.pages[5],imageinfo:[{...thumbData.query.pages[5].imageinfo[0],thumburl:'https://thumb.wikimedia.org.evil.com/wikipedia/commons/thumb/a/ab/Tablet.png/1280px-Tablet.png'}]}}}}).length,0);
+console.log('Current Wikimedia thumbnail host accepted; lookalike hosts rejected.');

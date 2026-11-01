@@ -295,3 +295,22 @@ console.log('Automatic recovery: later-ranked clips, distinct shot coverage, reu
  const result=await api.mediaFor(scenes,true);assert.equal(result.missing,0);assert.equal(downloads,4);assert.equal(peak,3);assert.equal(new Set(scenes.map(s=>s.mediaItems[0].providerId)).size,4);
 }
 console.log('Reviewed media cache transfers run in three bounded workers without duplicate clips.');
+
+// Reproduce the six-scene Nanni report: two held illustrations, one named artifact.
+{
+ vm.runInContext(fs.readFileSync('public/editorial-assets.js','utf8'),ctx);const api=ctx.StudioProduction;api.state.mediaCache.clear();api.state.reviewCache.clear();
+ el('studio-source-text').value='قصة ناني وإيا ناصر، النحاس واللوح المحفوظ في المتحف البريطاني';ctx.StudioMediaLibrary={find:async()=>[],candidates(){}};
+ ctx.loadExportMedia=async m=>({kind:m.kind,element:{duration:20,play:async()=>{},pause(){},removeAttribute(){},load(){}}});
+ const referenceUrl='https://commons.wikimedia.org/wiki/File:Complaint_tablet_to_Ea-Nasir,_2023_(transparent).png';let reframeCalls=0,referenceCalls=0;const stockQueries=[];let next=7000;
+ ctx.fetch=async(url,o)=>{const b=JSON.parse(o.body);let result;
+ if(b.action==='reframe-media'){reframeCalls++;assert.deepEqual(Array.from(b.scenes,r=>r.scene),[2,5]);assert.equal(b.references[0].scene,4);result={scenes:[{scene:2,query:'close up copper pieces balance scale',referenceScene:0,reason:'تفصيل نحاس'},{scene:5,query:'',referenceScene:4,reason:'اعرض اللوح عند ذكر مكان حفظه'}]};}
+ else if(b.action==='review-media')result={reviews:b.reviews.map(r=>({scene:r.scene,intent:r.requireIdentity||(!/copper pieces/.test(r.query)&&[2,5].includes(r.scene))?'specific':'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:true,identityMatch:r.requireIdentity===true,score:.95,reason:'fixture source match'}))}))};
+ else if(b.provider==='commons-reference'){referenceCalls++;result={items:[{id:'commons-500',type:'photo',provider:'Commons',mediaUrl:'https://upload.wikimedia.org/wikipedia/commons/a/ab/Tablet.png',preview:'https://upload.wikimedia.org/wikipedia/commons/a/ab/Tablet.png',pageUrl:referenceUrl,creator:'Photographer',license:'CC BY 4.0',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',requiresAttribution:true,referenceEvidence:{kind:'commons-file',referenceUrl,sourceTitle:'Complaint tablet to Ea-Nasir',description:'Nanni complaint tablet'}}]};}
+ else{stockQueries.push(b.query);const id=next++;result={items:[{id,type:'video',mediaUrl:'https://videos.pexels.com/video-files/'+id+'/clip.mp4',preview:'https://images.pexels.com/videos/'+id+'/a.jpg',pageUrl:'https://www.pexels.com/video/'+id+'/',creator:'fixture'}]};}
+ return {ok:true,json:async()=>result};};
+ const titles=['شكوى عبر التاريخ','قصة ناني وإيا ناصر','معاملة الرسول','اللوح الطيني الحقيقي','المتحف البريطاني','التقييم بقى'];
+ const scenes=titles.map((title,i)=>({title,visualType:i===3?'document':'illustrative',visualQuery:['message phone','ancient traders Ur','hands copper','actual tablet','British Museum building','review phone'][i],voiceover:'تعليق محفوظ '+i,duration:4,mediaItems:[]}));
+ scenes[3].mediaItems=[{kind:'image',url:'https://images.pexels.com/photos/1/old.jpg',editorialReview:{intent:'specific',score:.99},loadStatus:'ready'}];ctx.topics.customScript={slides:scenes};const voices=scenes.map(s=>s.voiceover);
+ const result=await api.mediaFor(scenes,true);assert.equal(result.missing,0);assert.equal(reframeCalls,1);assert.equal(referenceCalls,1);assert(!stockQueries.includes('actual tablet'));assert.equal(scenes[3].mediaItems[0].referenceEvidence.referenceUrl,referenceUrl);assert.equal(scenes[4].mediaItems[0].reusedReference,true);assert.equal(scenes[1].visualQuery,'close up copper pieces balance scale');assert.deepEqual(scenes.map(s=>s.voiceover),voices);assert(scenes[3].unusedMedia.length);assert(!api.visualReadinessError(scenes));
+}
+console.log('Six-scene regression: wrong stock artifact removed, exact reference bound, held scenes reframed once, narration preserved, missing=0.');
