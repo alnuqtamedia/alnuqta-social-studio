@@ -132,6 +132,20 @@ ctx.requestNarrationTts=async text=>{ordered.push('tts');return {audio:'AA==',mi
 ctx.AudioContext=class {async decodeAudioData(){return {duration:40};}async close(){}};
 ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration'){ordered.push('fit');assert.equal(b.wordBudget,80);return {ok:true,json:async()=>({slides:[{voiceover:Array(80).fill('كلمة').join(' ')}]})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
 const overlong=[{voiceover:Array(120).fill('كلمة').join(' ')}];await ctx.StudioProduction.narration(overlong,40);assert.deepEqual(ordered,['fit','tts']);assert.equal(overlong[0].voiceover.split(' ').length,80);assert.equal(el('studio-source-text').value,'المصدر الكامل يبقى محفوظاً');
+// Reproduce 91 returned words for an 80-word estimate: measured 40s audio decides acceptance.
+ctx.StudioProduction.state.audioCache.clear();const relaxedOrder=[];
+ctx.requestNarrationTts=async text=>{relaxedOrder.push('tts:'+text.split(' ').length);return {audio:'AA==',mimeType:'audio/wav'};};
+ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration'){relaxedOrder.push('fit');return {ok:true,json:async()=>({slides:[{voiceover:Array(91).fill('كلمة').join(' ')}]})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
+const ninetyOne=[{voiceover:Array(120).fill('كلمة').join(' ')}];await ctx.StudioProduction.narration(ninetyOne,40);assert.deepEqual(relaxedOrder,['fit','tts:91']);assert.equal(ctx.aiVoiceoverDuration,40);assert.equal(ninetyOne[0].voiceover.split(' ').length,91);assert.equal(ctx.aiScriptFitNote,'');
+// A failed advisory rewrite must not prevent a complete original reading; no rejected text is committed.
+ctx.StudioProduction.state.audioCache.clear();let fallbackTts='';
+ctx.requestNarrationTts=async text=>{fallbackTts=text;return {audio:'AA==',mimeType:'audio/wav'};};
+ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration')return {ok:true,json:async()=>({slides:[{voiceover:'خسر الرقم 4'}]})};return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
+const originalText='3 '+Array(120).fill('ملف').join(' '),fallback=[{voiceover:originalText}];await ctx.StudioProduction.narration(fallback,40);assert.equal(fallbackTts,originalText);assert.equal(fallback[0].voiceover,originalText);assert.equal(ctx.aiVoiceoverDuration,40);assert.equal(ctx.aiScriptFitNote,'');assert.equal(el('studio-source-text').value,'المصدر الكامل يبقى محفوظاً');
+// Continuing after a rewrite failure cannot make a genuinely overlong recording pass the export duration check.
+ctx.StudioProduction.state.audioCache.clear();ctx.AudioContext=class {async decodeAudioData(){return {duration:52};}async close(){}};
+await ctx.StudioProduction.narration([{voiceover:originalText}],40);assert.equal(ctx.aiVoiceoverDuration,52);assert.equal(ctx.StudioProduction.durationResult(52,52,40,true).passed,false);
+console.log('Narration regression: 91/80 budget mismatch continues to measured audio; rejected rewrites preserve original numbers/text; real duration remains enforced.');
 // An explicit duration cannot silently inherit the previous preserve-text mode.
 el('ai-command-input').value='حوّل إلى ريلز 45 ثانية';el('video-sync-mode').value='extend-visuals';await ctx.runGeminiStudioCommand();assert.equal(el('video-total-duration').value,'45');assert.equal(el('video-sync-mode').value,'fit-audio');assert.equal(el('ai-command-input').value,'حوّل إلى ريلز 45 ثانية');
 console.log('Pre-speech budget and explicit command duration preserve source material and reset fitting mode.');
