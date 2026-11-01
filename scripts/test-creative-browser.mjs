@@ -133,7 +133,7 @@ try{
   ctx.fillStyle='#dae4e8';ctx.fillRect(60,180,600,650);ctx.fillStyle='#1a2631';ctx.font='28px sans-serif';
   for(let i=0;i<10;i++)ctx.fillText('SYNTHETIC TEST DOCUMENT '+i,90,230+i*50);
   const image=canvas.toDataURL('image/png');
-  const media=()=>[{url:image,preview:image,kind:'image',local:false,credit:'Synthetic test fixture'}];
+  const media=()=>[{url:image,preview:image,kind:'image',local:true,credit:'Synthetic editor-uploaded test fixture'}];
   topics.customScript={title:'اختبار إبداعي اصطناعي',soundscape:StudioSoundscape.fromCommand('وثائقي اقتصادي'),slides:[
    {id:1,type:'cover',title:'الاقتباس',subtitle:'نص اختبار',voiceover:'هذا اقتباس حرفي موجود في التعليق',duration:2,visualType:'illustrative',mediaItems:media()},
    {id:2,type:'content',title:'المقارنة',subtitle:'بيانات اختبار اصطناعية',voiceover:'هذه مقارنة بين أرقام اصطناعية للاختبار',duration:2,visualType:'data',mediaItems:media()},

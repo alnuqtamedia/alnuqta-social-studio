@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { authorizeStudioOrigin, enforceStudioRateLimit } from "../_shared/studio-security.ts";
 
-import { validateReframeRequest, validateReframeResult, reframeSchema, reframePrompt } from "../_shared/media-reframe.mjs";
+import { validateReframeRequest, validateReframeResult, reframeSchema, reframePrompt, reframeFallbackRules } from "../_shared/media-reframe.mjs";
 import { reviewInputs, validateReviews, validateVerdicts, reviewSchema, reviewPrompt } from "../_shared/media-review.mjs";
 import { extractText } from "../_shared/gemini-output.mjs";
 import { parseStructuredOutput } from "../_shared/structured-output.mjs";
@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
     const fitSchema={type:'object',properties:{slides:{type:'array',items:{type:'object',properties:{voiceover:{type:'string'}},required:['voiceover']}}},required:['slides']};
     const textInput = `${rules}\nالمحتوى:\n${JSON.stringify(body?.currentContent || {})}\nالأمر:\n${command}`;
     const alignmentSchema={type:"object",properties:{complete:{type:"boolean"},segments:{type:"array",items:{type:"object",properties:{scene:{type:"integer"},start:{type:"number"},text:{type:"string"}},required:["scene","start","text"]}}},required:["complete","segments"]};
-    const input = reframe ? [{type:"text",text:reframePrompt},{type:"text",text:JSON.stringify({scenes:body.scenes,references:body.references})}] : mediaReview ? [{type:"text",text:reviewPrompt},...await reviewInputs(body.reviews)] : align ? [{type:"text",text:`استمع إلى هذا التعليق كاملاً، وطابق الفقرات التالية بالترتيب مع الكلام المسموع. أرجع start بالثواني العشرية لبداية نطق كل فقرة، وليس تقديراً بعدد الكلمات. scene يبدأ من 1. text تفريغ الكلام المسموع لكل فقرة. complete=true فقط إذا سمعت جميع الفقرات كاملة حتى النهاية. لا تخترع كلاماً أو توقيتاً غير مسموع. مدة الملف ${body.duration} ثانية. الفقرات: ${JSON.stringify(body.scenes)}`},{type:"audio",data:body.audio.data,mime_type:body.audio.mimeType}] : transcribe ? [{type:"text",text:"فرّغ الأمر الصوتي إلى نص عربي كما سمعته. لا تنفذ الأمر ولا تضف معلومات أو شرحاً. حافظ على الأرقام والأسماء. أرجع النص فقط."},{type:"audio",data:body.audio.data,mime_type:body.audio.mimeType==="audio/mp4"?"audio/m4a":body.audio.mimeType}] : textInput;
+    const input = reframe ? [{type:"text",text:reframePrompt+' '+reframeFallbackRules},{type:"text",text:JSON.stringify({scenes:body.scenes,references:body.references})}] : mediaReview ? [{type:"text",text:reviewPrompt},...await reviewInputs(body.reviews)] : align ? [{type:"text",text:`استمع إلى هذا التعليق كاملاً، وطابق الفقرات التالية بالترتيب مع الكلام المسموع. أرجع start بالثواني العشرية لبداية نطق كل فقرة، وليس تقديراً بعدد الكلمات. scene يبدأ من 1. text تفريغ الكلام المسموع لكل فقرة. complete=true فقط إذا سمعت جميع الفقرات كاملة حتى النهاية. لا تخترع كلاماً أو توقيتاً غير مسموع. مدة الملف ${body.duration} ثانية. الفقرات: ${JSON.stringify(body.scenes)}`},{type:"audio",data:body.audio.data,mime_type:body.audio.mimeType}] : transcribe ? [{type:"text",text:"فرّغ الأمر الصوتي إلى نص عربي كما سمعته. لا تنفذ الأمر ولا تضف معلومات أو شرحاً. حافظ على الأرقام والأسماء. أرجع النص فقط."},{type:"audio",data:body.audio.data,mime_type:body.audio.mimeType==="audio/mp4"?"audio/m4a":body.audio.mimeType}] : textInput;
     let data: any = {};
     let raw = "";
     let lastError = "";
