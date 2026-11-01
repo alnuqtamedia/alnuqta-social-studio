@@ -1,0 +1,66 @@
+name: Render Social Post
+
+on:
+  workflow_dispatch:
+    inputs:
+      design_json:
+        description: 'Design JSON with unique jobId, headline, summary, imageUrl and caption'
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths: ['scripts/fixtures/automation-demo.json']
+  pull_request:
+    paths:
+      - '.github/workflows/render-social-post.yml'
+      - 'scripts/render-social-post.mjs'
+      - 'scripts/test-post-automation.mjs'
+      - 'scripts/test-post-store-handler.mjs'
+      - 'scripts/fixtures/automation-demo.json'
+      - 'supabase/functions/studio-store-post/**'
+      - 'supabase/functions/_shared/studio-post-contract.mjs'
+      - 'supabase/functions/_shared/studio-runner-auth.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  render-post:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned runner tools
+        run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.56.1 jose@5.9.6
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify request validation and runner identity
+        run: |
+          node scripts/test-post-automation.mjs
+          node scripts/test-post-store-handler.mjs
+      - run: npm run build
+      - name: Render and store the post
+        run: node scripts/render-social-post.mjs
+        env:
+          TZ: Asia/Baghdad
+          STUDIO_DESIGN_JSON: ${{ github.event.inputs.design_json || '' }}
+          STUDIO_VERIFY_IDEMPOTENCY: ${{ github.event_name == 'push' && '1' || '0' }}
+          STUDIO_AUTOMATION_UPLOAD: ${{ github.event_name != 'pull_request' && '1' || '0' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: automated-post-proof
+          overwrite: true
+          path: artifacts/automated-post/
+          retention-days: 7
+          if-no-files-found: ignore
