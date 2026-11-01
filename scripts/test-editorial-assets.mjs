@@ -18,3 +18,6 @@ console.log('Original identity guard, reference resolver, licensing metadata, bo
 const thumbData={query:{pages:{5:{pageid:5,title:'File:Tablet.png',imageinfo:[{mime:'image/png',thumburl:'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tablet.png/1280px-Tablet.png',extmetadata:{LicenseShortName:{value:'Public domain'}}}]}}}};
 assert.equal(commonsItems(thumbData).length,1);assert.equal(commonsItems({...thumbData,query:{pages:{5:{...thumbData.query.pages[5],imageinfo:[{...thumbData.query.pages[5].imageinfo[0],thumburl:'https://thumb.wikimedia.org.evil.com/wikipedia/commons/thumb/a/ab/Tablet.png/1280px-Tablet.png'}]}}}}).length,0);
 console.log('Current Wikimedia thumbnail host accepted; lookalike hosts rejected.');
+
+assert.equal(G.check({visualType:'illustrative'},{editorialReview:{intent:'specific',score:.99}}).allowed,false);
+console.log('Specific use cannot bypass evidence checks when the report country is absent or ambiguous.');

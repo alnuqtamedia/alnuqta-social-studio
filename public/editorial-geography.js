@@ -37,6 +37,7 @@ function query(slide,value){const countries=slide.editorialGeography?.countries|
 function check(slide,item){
  if(root.StudioEditorialAssets?.identityRequired(slide))return {allowed:Boolean(root.StudioEditorialAssets.bound(item)),reason:'exact-reference-required'};
  if(item?.reusedReference&&slide.editorialReframe?.referenceScene&&root.StudioEditorialAssets?.canReframe(slide)&&root.StudioEditorialAssets.bound(item))return {allowed:true,reason:'verified-reference-detail-not-location-footage'};
+ if(item?.editorialReview?.intent==='specific'&&item?.locationEvidence?.reviewedByEditor!==true)return {allowed:false,reason:'specific-use-needs-source-evidence'};
  const countries=slide.editorialGeography?.countries||[];
  if(!countries.length)return {allowed:true,reason:'general-topic'};
  if(item?.autoCached&&(item.contextScope||'')!==cacheScope(slide))return {allowed:false,reason:'cached-context-mismatch'};
