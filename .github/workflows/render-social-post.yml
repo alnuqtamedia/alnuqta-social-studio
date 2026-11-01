@@ -54,11 +54,13 @@ jobs:
         env:
           TZ: Asia/Baghdad
           STUDIO_DESIGN_JSON: ${{ github.event.inputs.design_json || '' }}
+          STUDIO_VERIFY_IDEMPOTENCY: ${{ github.event_name == 'push' && '1' || '0' }}
           STUDIO_AUTOMATION_UPLOAD: ${{ github.event_name != 'pull_request' && '1' || '0' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: automated-post-proof
+          overwrite: true
           path: artifacts/automated-post/
           retention-days: 7
           if-no-files-found: ignore
