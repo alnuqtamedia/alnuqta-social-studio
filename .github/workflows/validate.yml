@@ -56,6 +56,8 @@ jobs:
         run: node scripts/test-media-browser.mjs
       - name: Verify scoped illustrative footage and protected specific event
         run: node scripts/test-scope-browser.mjs
+      - name: Verify exact reference import and automatic scene reframing
+        run: node scripts/test-evidence-browser.mjs
       - name: Verify 45-second portrait export
         run: node scripts/test-creative-browser.mjs
         env:
@@ -75,5 +77,6 @@ jobs:
             artifacts/illustrated-browser/
             artifacts/media-browser/
             artifacts/scoped-media/
+            artifacts/evidence-media/
           retention-days: 7
           if-no-files-found: ignore

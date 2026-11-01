@@ -5,7 +5,7 @@ import {commonsItems,searchCommons} from '../backend/_shared/commons-search.mjs'
 import {thumbnailUrl,validateReviews} from '../supabase/functions/_shared/media-review.mjs';
 const image=(license='Public domain',url='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Test.jpg/1280px-Test.jpg')=>({pageid:1,title:'File:Test.jpg',imageinfo:[{mime:'image/jpeg',thumburl:url,extmetadata:{LicenseShortName:{value:license},Artist:{value:'<a>Photographer</a>'}}}]});
 const fixture={query:{pages:{1:image(),2:{...image('CC BY-SA 4.0'),pageid:2},3:{...image('Public domain','https://evil.example/test.jpg'),pageid:3}}}};
-const items=commonsItems(fixture);assert.equal(items.length,1);assert.equal(items[0].creator,'Photographer');assert(items[0].preview.includes('320px-'));
+const items=commonsItems(fixture);assert.equal(items.length,1);assert.equal(items[0].creator,'Photographer');assert(items[0].preview.includes('250px-'));
 const ctx=vm.createContext({URL});vm.runInContext(fs.readFileSync('public/production-core.js','utf8'),ctx);
 assert(ctx.StudioProductionCore.safeMedia(items[0]));
 for(const patch of [{mediaUrl:'https://upload.wikimedia.org.evil.com/wikipedia/commons/a.jpg'},{license:'unknown'},{pageUrl:'https://commons.wikimedia.org.evil.com/wiki/File:a.jpg'},{type:'video'}])assert.equal(ctx.StudioProductionCore.safeMedia({...items[0],...patch}),false);

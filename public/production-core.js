@@ -27,7 +27,7 @@ function safePexels(item){
 }
 function safeMedia(item){
  if(safePexels(item))return true;
- try{const u=new URL(item.mediaUrl),p=new URL(item.pageUrl);return item.provider==='Commons'&&/^commons-\d+$/.test(String(item.id))&&item.type==='photo'&&['CC0','CC0 1.0','Public domain'].includes(item.license)&&u.protocol==='https:'&&u.hostname==='upload.wikimedia.org'&&!u.username&&!u.password&&!u.port&&u.pathname.startsWith('/wikipedia/commons/')&&p.protocol==='https:'&&p.hostname==='commons.wikimedia.org'&&!p.username&&!p.password&&!p.port&&p.pathname.startsWith('/wiki/File:')&&Boolean(item.creator);}catch{return false;}
+ try{const u=new URL(item.mediaUrl),p=new URL(item.pageUrl);return item.provider==='Commons'&&/^commons-\d+$/.test(String(item.id))&&item.type==='photo'&&(['CC0','CC0 1.0','Public domain'].includes(item.license)||(item.license==='CC BY 4.0'&&item.requiresAttribution===true&&item.referenceEvidence?.kind==='commons-file'&&item.licenseUrl==='https://creativecommons.org/licenses/by/4.0/'))&&u.protocol==='https:'&&['upload.wikimedia.org','thumb.wikimedia.org'].includes(u.hostname)&&!u.username&&!u.password&&!u.port&&u.pathname.startsWith('/wikipedia/commons/')&&p.protocol==='https:'&&p.hostname==='commons.wikimedia.org'&&!p.username&&!p.password&&!p.port&&p.pathname.startsWith('/wiki/File:')&&Boolean(item.creator);}catch{return false;}
 }
 function choose(items,used,seconds){return items.filter(safePexels).filter(x=>!used.has(String(x.id)+':'+x.type)).map((x,i)=>({x,score:10-i+(x.type==='video'?4:0)+(Number(x.duration)>=seconds?2:0)})).sort((a,b)=>b.score-a.score)[0]?.x||null;}
 function requestedDuration(command){

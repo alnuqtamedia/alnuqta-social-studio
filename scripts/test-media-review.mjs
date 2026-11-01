@@ -17,3 +17,9 @@ assert.throws(()=>validateReviews([{...rows[0],requireOriginal:'false'}]));
 assert.equal(validateVerdicts({reviews:[{...generic.reviews[0],alternativeQuery:'gloved hands vial label'}]},rows).reviews[0].alternativeQuery,'gloved hands vial label');
 assert.equal(validateVerdicts({reviews:[{...generic.reviews[0],alternativeQuery:'https://example.org'}]},rows).reviews[0].alternativeQuery,'');
 assert.equal(validateVerdicts({reviews:[{...generic.reviews[0],alternativeQuery:'gloved hands vial label'}]},[{...rows[0],requireOriginal:true}]).reviews[0].alternativeQuery,'');
+
+const identityRows=[{...rows[0],requireOriginal:true,requireIdentity:true}];
+assert.equal(validateVerdicts({reviews:[{scene:1,intent:'specific',candidates:[{id:'12:photo',safe:true,identityMatch:true,score:.9,reason:'looks similar'}]}]},identityRows).reviews[0].candidates[0].safe,false);
+const withRef=[{...identityRows[0],candidates:[{...rows[0].candidates[0],referenceUrl:'https://commons.wikimedia.org/wiki/File:Tablet.png'}]}];
+assert.equal(validateVerdicts({reviews:[{scene:1,intent:'specific',candidates:[{id:'12:photo',safe:true,identityMatch:true,score:.9,reason:'source and preview match'}]}]},withRef).reviews[0].candidates[0].identityMatch,true);
+console.log('A stock image cannot become a named original artifact on visual resemblance alone.');
