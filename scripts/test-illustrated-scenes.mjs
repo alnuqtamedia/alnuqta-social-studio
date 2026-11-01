@@ -11,3 +11,16 @@ for(const s of [{visualType:'document',voiceover:'وثيقة'},{visualType:'port
 for(const key of Object.keys(I.names)){const animation=I.data(key);assert.equal(animation.w,1000);assert(animation.layers.length>1);assert(animation.layers.some(l=>l.ks.p.a===1));assert.equal(animation.assets.length,0);}
 assert.equal(I.select({voiceover:'ضعف المواصلات والحافلات'}),'transit');assert.equal(I.select({voiceover:'خط إنتاج في مصنع'}),'industry');
 console.log('Geography rejects unverified/foreign location and model guesses; seven animated illustration presets without fabricated data.');
+
+const comparison=[{title:'التجارة في كندا',voiceover:'متاجر كندا',visualType:'illustrative',visualQuery:'shop worker serving customer'},{title:'التجارة في الصين',voiceover:'أسواق الصين',visualType:'illustrative',visualQuery:'shop worker serving customer'}];
+G.apply(comparison,'مقارنة بين كندا والصين');
+assert.equal(G.cacheScope(comparison[0]),'CA');assert.equal(G.cacheScope(comparison[1]),'CN');
+assert.equal(G.query(comparison[0],comparison[0].visualQuery),'Canada shop worker serving customer');
+assert.equal(G.query(comparison[1],comparison[1].visualQuery),'China shop worker serving customer');
+const iraqi={title:'شاب يبحث عن عمل',visualType:'illustrative',visualQuery:'young job applicant'};G.apply([iraqi],'فرص العمل في العراق');
+assert.equal(G.query(iraqi,iraqi.visualQuery),'Iraq young job applicant');
+assert.equal(G.query(iraqi,'close up copper on scale'),'close up copper on scale');
+const cached={autoCached:true,contextScope:'CA',illustrative:true,editorialReview:{intent:'illustrative',scope:'poster-only',score:.9}};
+assert.equal(G.check(iraqi,cached).allowed,false);assert.equal(G.check(comparison[0],cached).allowed,true);
+assert.equal(G.requiresOriginal({visualType:'document',visualQuery:'complaint tablet'}),true);
+console.log('Editorial context: Canada/China isolated per scene, Iraq people queries scoped, neutral objects unforced, foreign cached footage rejected.');
