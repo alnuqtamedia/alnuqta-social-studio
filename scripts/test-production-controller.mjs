@@ -284,3 +284,14 @@ console.log('Only the rejected general shot gets one improved query; completed s
  const recovered=await api.mediaFor(missing,true);assert.equal(recovered.missing,0);assert.equal(JSON.stringify(requests.map(b=>[b.provider,b.type,b.orientation])),JSON.stringify([['pexels','video','portrait'],['pexels','video','any'],['pexels','photo','any'],['commons','photo','any']]));assert.equal(missing[0].mediaItems[0].kind,'image');assert.equal(missing[0].mediaItems[0].locationEvidence,undefined);assert(missing[0].mediaItems[0].licenseUrl.includes('pexels')===false,'Commons metadata must keep its own license');
 }
 console.log('Automatic recovery: later-ranked clips, distinct shot coverage, reuse, unrestricted orientation, photo fallback and Commons.');
+
+// Cache transfers are bounded to three scenes and share the duplicate reservation.
+{
+ const api=ctx.StudioProduction;api.state.mediaCache.clear();api.state.reviewCache.clear();let active=0,peak=0,downloads=0;
+ ctx.StudioMediaLibrary={find:async()=>[],candidates(){},cacheReviewed:async()=>{active++;peak=Math.max(peak,active);downloads++;await new Promise(r=>setTimeout(r,10));active--;return null;}};
+ ctx.loadExportMedia=async m=>({kind:m.kind,element:{duration:20,play:async()=>{},pause(){},removeAttribute(){},load(){}}});
+ let id=5000;ctx.fetch=async(url,o)=>{const b=JSON.parse(o.body);return {ok:true,json:async()=>b.action==='review-media'?{reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:true,score:.9,reason:'generic detail'}))}))}:{items:[{id:id++,type:'video',mediaUrl:'https://videos.pexels.com/video-files/1/clip.mp4',preview:'https://images.pexels.com/videos/1/a.jpg',pageUrl:'https://www.pexels.com/video/1/',creator:'fixture'}]}};};
+ const scenes=Array.from({length:4},(_,i)=>({title:'تفصيل '+i,visualQuery:'hands writing '+i,visualType:'illustrative',duration:4,mediaItems:[]}));ctx.topics.customScript={slides:scenes};
+ const result=await api.mediaFor(scenes,true);assert.equal(result.missing,0);assert.equal(downloads,4);assert.equal(peak,3);assert.equal(new Set(scenes.map(s=>s.mediaItems[0].providerId)).size,4);
+}
+console.log('Reviewed media cache transfers run in three bounded workers without duplicate clips.');

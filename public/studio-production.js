@@ -182,7 +182,7 @@ async function reviewCandidates(rows){
  return combined;
 }
 async function reviewCandidateBatch(rows){
- const reviewed=new Map();reviewed.retryQueries=new Map();for(let offset=0;offset<rows.length;offset+=6){const batch=rows.slice(offset,offset+6),request=batch.map(r=>({scene:r.i+1,requireOriginal:Boolean(window.StudioGeography?.requiresOriginal(r.s)),text:['سياق التقرير: '+[topics[activeTikTokTopic]?.title,source().slice(0,650)].filter(Boolean).join(' ').slice(0,750),'المشهد المطلوب: '+[r.s.title,r.s.subtitle,r.s.voiceover].filter(Boolean).join(' ').slice(0,800)].join('\n').slice(0,1600),query:r.query,candidates:r.items.map(x=>({id:String(x.id)+':'+x.type,preview:x.preview}))})),key=JSON.stringify(request);let answer=state.reviewCache.get(key);
+ const reviewed=new Map();reviewed.retryQueries=new Map();for(let offset=0;offset<rows.length;offset+=6){const batch=rows.slice(offset,offset+6),request=batch.map(r=>({scene:r.i+1,requireOriginal:Boolean(window.StudioGeography?.requiresOriginal(r.s)),text:['سياق التقرير: '+[topics[activeTikTokTopic]?.title,source().slice(0,650)].filter(Boolean).join(' ').slice(0,750),'بلد المشهد: '+(r.s.editorialGeography?.countries||[]).map(c=>c.label).join('، ')+'؛ لا تستنتج جنسية الأشخاص من مظهرهم.\nالمشهد المطلوب: '+[r.s.title,r.s.subtitle,r.s.voiceover].filter(Boolean).join(' ').slice(0,800)].join('\n').slice(0,1600),query:r.query,candidates:r.items.map(x=>({id:String(x.id)+':'+x.type,preview:x.preview}))})),key=JSON.stringify(request);let answer=state.reviewCache.get(key);
   if(!answer){status('فحص صلة معاينات اللقطات بمعنى المشاهد عبر Gemini…');answer=await json('gemini-studio-preview',{action:'review-media',reviews:request},30000);state.reviewCache.set(key,answer);}
   if(!Array.isArray(answer.reviews)||answer.reviews.length!==batch.length)throw Error('الفحص البصري لم يرجع جميع المشاهد؛ لم تُعتمد لقطات غير مفحوصة.');
   for(const r of batch){const verdicts=answer.reviews.filter(x=>x.scene===r.i+1);if(verdicts.length!==1||!Array.isArray(verdicts[0].candidates))throw Error('الفحص البصري غير مكتمل.');const scores=verdicts[0].candidates;if(verdicts[0].intent==='illustrative'&&!window.StudioGeography?.requiresOriginal(r.s)&&/^[A-Za-z0-9 ,().'-]{3,180}$/.test(verdicts[0].alternativeQuery||''))reviewed.retryQueries.set(r.i,verdicts[0].alternativeQuery);
@@ -201,7 +201,7 @@ async function acceptCandidate(s,item,country){
  const record=await window.StudioMediaLibrary.addRemote(meta,{country,tags:[s.title,s.visualQuery].join(' ')});if(topics[activeTikTokTopic]!==project||!project.slides.includes(s))throw Error('حُفظت المادة في المكتبة؛ المشروع المفتوح تغيّر.');invalidatePreview();delete s.illustration;addSceneMedia(s,window.StudioMediaLibrary.materialize(record));s.productionMediaReview={status:'editor-reviewed',note:'أكّد المحرر البلد وملاءمة اللقطة؛ حُفظت في المكتبة لإعادة الاستخدام.'};productionReport();
 }
 async function mediaFor(slides,video,recoveryRound=0,recovery={}){
- if(slides.some(s=>!s.editorialGeography))window.StudioGeography?.apply(slides,source());
+ if(slides.some(s=>s.editorialGeography?.version!==2))window.StudioGeography?.apply(slides,source());
  const started=recovery.started||Date.now(),used=new Set(),pending=[],candidates=[...(recovery.candidates||[])],diagnostics=slides.map((_,i)=>recovery.diagnostics?.[i]||({scene:i+1,stages:[],status:'pending'}));state.mediaDiagnostics=diagnostics;
  for(const s of slides)for(const m of getSceneMedia(s))used.add(m.providerId||m.url);
  async function prepare(i){
@@ -232,20 +232,21 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
  }
  let cursor=0;const workers=await Promise.allSettled(Array.from({length:Math.min(3,slides.length)},async()=>{while(cursor<slides.length)await prepare(cursor++);}));const rejected=workers.find(x=>x.status==='rejected');if(rejected)throw rejected.reason;
  let accepted=new Map();try{if(pending.length)accepted=await reviewCandidates(pending);}catch(e){check();for(const row of pending){diagnostics[row.i].status='review-failed';row.s.productionMediaReview={status:'failed',note:e.message};}}
- for(const row of pending){
-  check();if(!accepted.has(row.i))continue;const s=row.s,d=diagnostics[row.i],reviewed=(accepted.get(row.i)||[]).filter(x=>!used.has(String(x.id)+':'+x.type)),items=reviewed.filter(x=>!window.StudioGeography||window.StudioGeography.check(s,{...x,illustrative:x.review.intent==='illustrative',editorialReview:x.review}).allowed);
+ async function attachReviewed(row){
+  check();if(!accepted.has(row.i))return;const s=row.s,d=diagnostics[row.i],reviewed=(accepted.get(row.i)||[]).filter(x=>!used.has(String(x.id)+':'+x.type)),items=reviewed.filter(x=>!window.StudioGeography||window.StudioGeography.check(s,{...x,illustrative:x.review.intent==='illustrative',editorialReview:x.review}).allowed);
   const held=reviewed.filter(x=>!items.includes(x));if(held.length){candidates.push({i:row.i,s,query:row.query,items:held});d.status='location-review';s.productionMediaReview={status:'location-review',note:'المشهد يحتاج توثيق المكان أو الواقعة؛ المرشحات محفوظة للمراجعة، وليست دليلاً على الحدث.'};}
   let added=0;const wanted=Math.min(3,Math.max(1,Math.ceil((Number(s.duration)||4)/4)));
   for(const item of items)try{
-   const id=String(item.id)+':'+item.type,meta={url:item.mediaUrl,preview:item.preview,kind:item.type==='video'?'video':'image',credit:item.creator+' / '+(item.provider||'Pexels'),sourceUrl:item.pageUrl,licenseUrl:item.licenseUrl||(item.provider==='Commons'?'https://commons.wikimedia.org/wiki/Commons:Public_domain':'https://www.pexels.com/license/'),licenseCheckedAt:new Date().toISOString(),providerId:id,generated:false,local:false,trimStart:0,maxSeconds:6,editorialReview:item.review,illustrative:item.review.intent==='illustrative',locationEvidence:item.locationEvidence};await checkMediaItem(meta);
+   const id=String(item.id)+':'+item.type;if(used.has(id))continue;used.add(id);const meta={url:item.mediaUrl,preview:item.preview,kind:item.type==='video'?'video':'image',credit:item.creator+' / '+(item.provider||'Pexels'),sourceUrl:item.pageUrl,licenseUrl:item.licenseUrl||(item.provider==='Commons'?'https://commons.wikimedia.org/wiki/Commons:Public_domain':'https://www.pexels.com/license/'),licenseCheckedAt:new Date().toISOString(),providerId:id,generated:false,local:false,trimStart:0,maxSeconds:6,editorialReview:item.review,illustrative:item.review.intent==='illustrative',locationEvidence:item.locationEvidence};await checkMediaItem(meta);
    if(window.StudioMediaLibrary?.cacheReviewed&&meta.illustrative)try{
-    const record=await window.StudioMediaLibrary.cacheReviewed(meta,{query:s.visualQuery,signal:state.abort?.signal});check();
+    const record=await window.StudioMediaLibrary.cacheReviewed(meta,{query:s.visualQuery,scene:s,signal:state.abort?.signal});check();
     if(record){const cached=window.StudioMediaLibrary.materialize(record);await checkMediaItem(cached);Object.assign(meta,cached);d.stages.push({stage:'download',detail:'saved locally',elapsedMs:Date.now()-started});}
    }catch(e){check();d.stages.push({stage:'cache-unavailable',detail:e.message,elapsedMs:Date.now()-started});}
    check();used.add(id);delete s.illustration;addSceneMedia(s,meta);added++;d.status='ready';s.productionMediaReview={status:'reviewed',note:item.review.intent==='illustrative'?'لقطات توضيحية مرتبطة بالسرد؛ فُحص تحميلها، ولا تثبت مكان الواقعة.':'فُحصت المعاينة ونجح تحميل الملف؛ الملاءمة تخص المعاينة فقط.'};if(added>=wanted)break;
-  }catch(e){check();d.error=e.message;if(!added){d.status='load-failed';s.productionMediaReview={status:'failed',note:e.message};}}
+  }catch(e){used.delete(String(item.id)+':'+item.type);check();d.error=e.message;if(!added){d.status='load-failed';s.productionMediaReview={status:'failed',note:e.message};}}
   if(!getSceneMedia(s).length&&!items.length&&!held.length){d.status='rejected';s.productionMediaReview={status:'rejected',note:'لم يعتمد الفحص المرشحات؛ المشهد يحتاج مادة.'};}
  }
+ let attachCursor=0;const attached=await Promise.allSettled(Array.from({length:Math.min(3,pending.length)},async()=>{while(attachCursor<pending.length)await attachReviewed(pending[attachCursor++]);}));const attachFailure=attached.find(r=>r.status==='rejected');if(attachFailure)throw attachFailure.reason;
  // Try every applicable source/type before asking the editor. Reuse completed scenes.
  if(recoveryRound<3&&Date.now()-started<150000){
   const indices=new Set();

@@ -7,3 +7,9 @@ assert.deepEqual(Array.from(L.ranked(records,scene,['image']),r=>r.id),['iq-phot
 assert.equal(L.ranked(records,{...scene,excludedMedia:['iq-video']},['video']).length,0);
 assert.equal(L.ranked(records,{...scene,title:'مدرسة',visualQuery:'school'},['video']).length,0);
 console.log('Library matching: required country, topic, kind, exclusions and duplicate prevention.');
+
+vm.runInContext(fs.readFileSync('public/editorial-geography.js','utf8'),ctx);
+const query='shop worker',ca={title:'تجارة',visualQuery:query,visualType:'illustrative',editorialGeography:{countries:[{country:'CA'}]}},cachedRecords=[{id:'canada',autoCached:true,query,contextScope:'CA',kind:'video',tags:query},{id:'china',autoCached:true,query,contextScope:'CN',kind:'video',tags:query},{id:'legacy',autoCached:true,query,kind:'video',tags:query}];
+assert.deepEqual(Array.from(L.ranked(cachedRecords,ca,['video']),r=>r.id),['canada']);
+assert.equal(L.ranked(cachedRecords,{...ca,visualType:'document'},['video']).length,0);
+console.log('Identical stock queries cannot reuse China or legacy unscoped cache for Canada.');
