@@ -185,7 +185,7 @@ const libraryRecords=[{id:'approved',kind:'video',local:true,url:'blob:approved'
 const readyResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(readyResult.missing,0);assert.equal(geoSearches,1);assert.equal(iraqi.mediaItems[0].url,'blob:approved');
 const searchesBefore=geoSearches;await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(geoSearches,searchesBefore);
 ctx.loadExportMedia=async()=>{throw Error('ملف غير قابل للتحميل')};
-const failedResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(failedResult.missing,1);assert.equal(iraqi.productionMediaReview.status,'failed');assert.equal(iraqi.mediaItems[0].url,'blob:approved');
+const failedResult=await ctx.StudioProduction.mediaFor([iraqi],true);assert.equal(failedResult.missing,1);assert.equal(iraqi.productionMediaReview.status,'location-review');assert.equal(iraqi.unusedMedia[0].url,'blob:approved');assert(ctx.StudioProduction.state.mediaDiagnostics[0].stages.some(x=>x.stage==='reuse-failed'));
 assert(ctx.StudioProduction.visualReadinessError([iraqi]));
 console.log('Media regression: geography rejects unreviewed footage, library reuse avoids search, decode failure remains missing without destroying the source.');
 
@@ -330,3 +330,20 @@ console.log('Reviewed media cache transfers run in three bounded workers without
  const backup=await api.mediaFor(scenes,true);assert.equal(backup.missing,0);assert.equal(scenes[1].mediaItems[0].reusedReference,true);assert.equal(scenes[1].productionMediaReview.status,'reference-detail');
 }
 console.log('Six-scene regression: wrong stock artifact removed, exact reference bound, held scenes reframed once, narration preserved, missing=0.');
+
+// Named people and artifacts discover references without user-supplied file URLs.
+{
+ const api=ctx.StudioProduction;api.state.mediaCache.clear();api.state.reviewCache.clear();
+ el('studio-source-text').value='Named subjects';ctx.StudioMediaLibrary={find:async()=>[],candidates(){}};
+ const calls=[];let approve=true;
+ ctx.fetch=async(url,o)=>{const b=JSON.parse(o.body);calls.push(b);let result;
+ if(b.action==='review-media')result={reviews:b.reviews.map(r=>({scene:r.scene,intent:'specific',candidates:r.candidates.map(c=>({id:c.id,safe:true,identityMatch:approve,score:.95,reason:'identity fixture'}))}))};
+ else if(b.provider==='commons')result={items:[{pageUrl:'https://commons.wikimedia.org/wiki/File:Subject.jpg'}]};
+ else if(b.provider==='commons-reference')result={items:[{id:'commons-9000',type:'photo',provider:'Commons',mediaUrl:'https://upload.wikimedia.org/wikipedia/commons/a/ab/Subject.jpg',preview:'https://upload.wikimedia.org/wikipedia/commons/a/ab/Subject.jpg',pageUrl:b.referenceUrl,creator:'fixture',referenceEvidence:{kind:'commons-file',referenceUrl:b.referenceUrl,sourceTitle:'Subject'}}]};
+ else result={items:[]};return {ok:true,json:async()=>result};};
+ const scene={title:'Named person',visualType:'portrait',visualQuery:'Named person official portrait',voiceover:'unchanged',duration:4,mediaItems:[]};ctx.topics.customScript={slides:[scene]};
+ const ok=await api.mediaFor([scene],true);assert.equal(ok.missing,0);assert.equal(scene.mediaItems[0].editorialReview.identityMatch,true);assert.equal(scene.voiceover,'unchanged');assert(!calls.some(c=>c.provider==='pexels'));
+ scene.mediaItems=[];scene.mediaUrl='';scene.mediaVideoUrl='';approve=false;api.state.reviewCache.clear();
+ const rejected=await api.mediaFor([scene],true);assert.equal(rejected.missing,1);assert.equal(scene.mediaItems.length,0);
+}
+console.log('Production discovery uses Commons directly; a rejected identity stays missing and cannot become stock.');
