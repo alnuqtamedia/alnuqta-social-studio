@@ -91,7 +91,7 @@ function applyReportBaseline(topic,command){
  topic.productionContract={version:1,minMediaRatio:.75,minVideoScenes:1};
  let graphicsBudget=Math.floor(slides.length/4),videoPlanned=false;
  slides.forEach(s=>{
-  if(s.visualType==='document'||s.creative?.kind==='document-focus')return;
+  if(window.StudioEditorialAssets?.identityRequired(s))return;
   if(s.visualType==='data'&&localDataReady(s)&&graphicsBudget>0){graphicsBudget--;s.requestedVisualType='data';return;}
   s.explicitGraphics=false;delete s.illustration;delete s.productionVisual;
   s.requestedVisualType=s.visualType=!videoPlanned?'broll':'illustrative';videoPlanned=true;
@@ -211,7 +211,12 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
    prepareLocalVisual(s);if(!needsMedia(s)){d.status='intentional-graphics';return;}
    const identity=window.StudioEditorialAssets?.identityRequired(s),kinds=identity?['image']:mediaKinds(s);let existing=getSceneMedia(s);
    const valid=existing.filter(x=>kinds.includes(x.kind)&&!(x.autoCached&&window.StudioGeography?.requiresOriginal(s))&&((x.local&&!x.autoCached)||!window.StudioGeography||window.StudioGeography.check(s,x).allowed));if(valid.length!==existing.length){s.unusedMedia=[...(s.unusedMedia||[]),...existing.filter(x=>!valid.includes(x))];s.mediaItems=valid;s.mediaUrl='';s.mediaVideoUrl='';}
-   if(valid.length){for(const m of valid)await checkMediaItem(m);if(s.illustration)delete s.illustration;d.status='ready';note('reuse','existing');return;}
+   if(valid.length){
+    const checks=await Promise.allSettled(valid.map(m=>checkMediaItem(m)));check();
+    const loaded=valid.filter((m,j)=>checks[j].status==='fulfilled');
+    if(loaded.length){s.mediaItems=loaded;if(s.illustration)delete s.illustration;d.status='ready';note('reuse','existing');return;}
+    s.unusedMedia=[...(s.unusedMedia||[]),...valid];s.mediaItems=[];s.mediaUrl='';s.mediaVideoUrl='';note('reuse-failed','بحث بدائل للمواد المحفوظة التي تعذر تحميلها');
+   }
    if(existing.length){d.status='needs-media';note('existing','المادة لا تطابق النوع المطلوب أو البلد؛ بقيت محفوظة');}
    const local=await window.StudioMediaLibrary?.find(s,kinds,used)||[];
    if(local.length){let added=0;for(const m of local){if(used.has(m.providerId))continue;used.add(m.providerId);try{await checkMediaItem(m);delete s.illustration;addSceneMedia(s,m);added++;if(added>=Math.min(3,Math.max(1,Math.ceil((Number(s.duration)||4)/4))))break;}catch(e){note('library-load',e.message);}}if(added){d.status='ready';note('library','approved local source');s.productionMediaReview={status:'library',note:'مادة مطابقة من مكتبة الجهاز؛ فُحص تحميلها.'};return;}}
@@ -219,7 +224,14 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
    status(`تجهيز وسائط المشهد ${i+1}/${slides.length} — محاولة ${recoveryRound+1}…`);let items=[];
    const orientation=recoveryRound? 'any':$('production-orientation').value;
    const reference=identity?window.StudioEditorialAssets.referenceUrl(s,source()+' '+($('ai-command-input')?.value||'')+' '+slides.map(x=>[x.title,x.voiceover].join(' ')).join(' ')):'';
-   if(identity&&!reference){d.status='reference-required';s.productionMediaReview={status:d.status,note:'المادة المحددة تحتاج مرجعاً مطابقاً؛ لا تُعتمد صورة ستوك بديلاً عنها.'};return;}
+   if(identity&&!reference){
+    const discoveryKey='reference-discovery:'+query;
+    let discovery=state.mediaCache.get(discoveryKey);
+    if(!discovery){discovery=window.StudioEditorialAssets.discoverReferences(query,searchMedia);state.mediaCache.set(discoveryKey,discovery);}
+    try{items=await discovery;check();note('reference-discovery','Commons candidates: '+items.length);}catch(e){state.mediaCache.delete(discoveryKey);throw e;}
+    if(items.length){pending.push({i,s,query,items});d.status='review';return;}
+    d.status='reference-required';s.productionMediaReview={status:d.status,note:'لم يعثر البحث عن المرجع الأصلي على مادة مطابقة؛ لم تُستخدم صورة عشوائية.'};return;
+   }
    const provider=identity?'commons-reference':recoveryRound>=3?'commons':'pexels';
    const type=provider.startsWith('commons')||(recoveryRound>=2&&kinds.includes('image'))?'photo':video&&kinds.includes('video')?'video':'photo';
    if(provider==='commons'&&!kinds.includes('image')){d.status='exhausted';return;}
