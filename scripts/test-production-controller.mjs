@@ -347,3 +347,18 @@ console.log('Six-scene regression: wrong stock artifact removed, exact reference
  const rejected=await api.mediaFor([scene],true);assert.equal(rejected.missing,1);assert.equal(scene.mediaItems.length,0);
 }
 console.log('Production discovery uses Commons directly; a rejected identity stays missing and cannot become stock.');
+
+// One failed review batch must not discard independent successful scenes.
+{
+ const api=ctx.StudioProduction;api.state.reviewCache.clear();
+ const rows=Array.from({length:4},(_,i)=>({i,s:{title:'Generic desk detail',duration:4},query:'desk detail',items:Array.from({length:3},(_,j)=>({id:10000+i*10+j,type:'video',preview:'https://images.pexels.com/videos/'+(10000+i*10+j)+'/a.jpg'}))}));
+ let active=0,peak=0;const requested=[];
+ ctx.fetch=async(url,o)=>{const b=JSON.parse(o.body);requested.push(b);assert(b.reviews.length<=3);assert(b.reviews.reduce((n,r)=>n+r.candidates.length,0)<=9);active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,2));active--;if(b.reviews.some(r=>r.scene===1))throw Error('review unavailable');return {ok:true,json:async()=>({reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:true,score:.95}))}))})};};
+ const result=await api.reviewCandidates(rows);assert.equal(result.get(3).length,3);assert.equal(result.has(0),false);assert.equal(result.failedScenes.size,3);assert(peak<=2);
+ // Later candidates can recover an initially failed scene; completed scenes are skipped.
+ api.state.reviewCache.clear();requested.length=0;
+ ctx.fetch=async(url,o)=>{const b=JSON.parse(o.body);requested.push(b);if(b.reviews[0].candidates[0].id==='11000:video')throw Error('first batch timeout');return {ok:true,json:async()=>({reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:true,score:.9}))}))})};};
+ const row={...rows[0],items:Array.from({length:8},(_,i)=>({id:11000+i,type:'video',preview:'https://images.pexels.com/videos/'+(11000+i)+'/a.jpg'}))};
+ const recovered=await api.reviewCandidates([row]);assert(recovered.get(0).length);assert.equal(requested.length,2);assert.equal(recovered.failedScenes.size,0);
+}
+console.log('Review outage regression: bounded requests, partial success retained, later candidates recover timeout, completed scenes stop reviewing.');

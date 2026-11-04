@@ -165,19 +165,25 @@ async function correctCurrent(){
  if(!visualOnly&&activeTab==='tiktok')await narration(staged,requestedVideoSeconds());check();invalidatePreview();slides.splice(0,slides.length,...staged);updateTikTokInputs();renderCanvas();productionReport();status('طُبّق التصحيح على المشاهد '+targets.map(i=>i+1).join('، ')+' مع حفظ البقية؛ أنشئ معاينة جديدة.','success');}
 
 async function reviewCandidates(rows){
- const combined=new Map();combined.retryQueries=new Map();const batches=[];
- // Keep the service's three-thumbnail limit per scene; inspect later candidates
- // in at most three parallel batches instead of serial 30-second waits.
+ const combined=new Map();combined.retryQueries=new Map();combined.failedScenes=new Map();let lastError,successes=0;
+ // Review only scenes still needing approved shots. At most nine thumbnails per
+ // request and two concurrent requests, instead of three 18-thumbnail requests.
  for(let offset=0;offset<8;offset+=3){
-  const batch=rows.map(r=>({...r,items:r.items.slice(offset,offset+3)})).filter(r=>r.items.length);
-  if(batch.length)batches.push(batch);
+  const pending=rows.filter(r=>(combined.get(r.i)||[]).length<Math.min(3,Math.max(1,Math.ceil((Number(r.s.duration)||4)/4))))
+   .map(r=>({...r,items:r.items.slice(offset,offset+3)})).filter(r=>r.items.length);
+  const batches=[];for(let i=0;i<pending.length;i+=3)batches.push(pending.slice(i,i+3));
+  for(let i=0;i<batches.length;i+=2){
+   const group=batches.slice(i,i+2),results=await Promise.allSettled(group.map(reviewCandidateBatch));check();
+   for(let j=0;j<results.length;j++){
+    const result=results[j];
+    if(result.status==='rejected'){lastError=result.reason;for(const row of group[j])combined.failedScenes.set(row.i,result.reason.message||String(result.reason));continue;}
+    successes++;
+    for(const [scene,items] of result.value){combined.set(scene,[...(combined.get(scene)||[]),...items]);combined.failedScenes.delete(scene);}
+    for(const [scene,q] of result.value.retryQueries)combined.retryQueries.set(scene,q);
+   }
+  }
  }
- const results=await Promise.allSettled(batches.map(reviewCandidateBatch));check();
- const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;
- for(const {value:result} of results){
-  for(const [i,items] of result)combined.set(i,[...(combined.get(i)||[]),...items]);
-  for(const [i,q] of result.retryQueries)combined.retryQueries.set(i,q);
- }
+ if(!successes&&lastError)throw lastError;
  for(const [i,items] of combined)combined.set(i,items.sort((a,b)=>b.review.score-a.review.score));
  return combined;
 }
@@ -245,7 +251,7 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
   }catch(error){check();d.status='failed';d.error=error.message;s.productionMediaReview={status:'failed',note:error.message};}finally{d.elapsedMs=Date.now()-begin;}
  }
  let cursor=0;const workers=await Promise.allSettled(Array.from({length:Math.min(3,slides.length)},async()=>{while(cursor<slides.length)await prepare(cursor++);}));const rejected=workers.find(x=>x.status==='rejected');if(rejected)throw rejected.reason;
- let accepted=new Map();try{if(pending.length)accepted=await reviewCandidates(pending);}catch(e){check();for(const row of pending){diagnostics[row.i].status='review-failed';row.s.productionMediaReview={status:'failed',note:e.message};}}
+ let accepted=new Map();try{if(pending.length)accepted=await reviewCandidates(pending);for(const [i,error] of accepted.failedScenes||[]){diagnostics[i].status='review-failed';diagnostics[i].stages.push({stage:'review-failed',detail:error,elapsedMs:Date.now()-started});slides[i].productionMediaReview={status:'review-failed',note:error};}}catch(e){check();for(const row of pending){diagnostics[row.i].status='review-failed';diagnostics[row.i].stages.push({stage:'review-failed',detail:e.message,elapsedMs:Date.now()-started});row.s.productionMediaReview={status:'review-failed',note:e.message};}}
  async function attachReviewed(row){
   check();if(!accepted.has(row.i))return;const s=row.s,d=diagnostics[row.i],reviewed=(accepted.get(row.i)||[]).filter(x=>!used.has(String(x.id)+':'+x.type)),items=reviewed.filter(x=>!window.StudioGeography||window.StudioGeography.check(s,{...x,illustrative:x.review.intent==='illustrative',editorialReview:x.review}).allowed);
   const held=reviewed.filter(x=>!items.includes(x));if(held.length){candidates.push({i:row.i,s,query:row.query,items:held});d.status='location-review';s.productionMediaReview={status:'location-review',note:'المشهد يحتاج توثيق المكان أو الواقعة؛ المرشحات محفوظة للمراجعة، وليست دليلاً على الحدث.'};}
@@ -269,7 +275,8 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
    status('إعادة إخراج المشاهد التوضيحية المتعطلة تلقائياً مع حفظ التعليق…');
    const rows=reframeRows.slice(0,6),response=await json('gemini-studio-preview',{action:'reframe-media',scenes:rows.map(({s,i})=>({scene:i+1,text:[s.title,s.voiceover].join(' ').slice(0,1600),query:String(s.visualQuery||'').slice(0,200)})),references},60000);check();
    if(!Array.isArray(response.scenes)||response.scenes.length!==rows.length)throw Error('خطة البدائل غير مكتملة');
-   const plans=rows.map(({s,i})=>{const matches=response.scenes.filter(r=>r.scene===i+1);if(matches.length!==1)throw Error('خطة البدائل غير مطابقة');const r=matches[0];if(r.referenceScene){const item=getSceneMedia(slides[r.referenceScene-1]||{}).find(m=>m.loadStatus==='ready'&&window.StudioEditorialAssets.bound(m));if(!item||!mediaKinds(s).includes(item.kind)||r.referenceScene===i+1)throw Error('مرجع بديل غير صالح');return {s,i,r,item};}if(!/^[A-Za-z0-9 ,().'-]{3,180}$/.test(r.query||'')||r.query===s.visualQuery)throw Error('وصف البديل غير صالح');const alternative={...s,visualQuery:r.query};if(window.StudioGeography?.requiresOriginal(alternative)||window.StudioEditorialAssets.identityRequired(alternative))throw Error('البديل يعيد طلب توثيق محدد');return {s,i,r};});
+   const plans=rows.flatMap(({s,i})=>{try{const matches=response.scenes.filter(r=>r.scene===i+1);if(matches.length!==1)throw Error('خطة البدائل غير مطابقة');const r=matches[0];if(r.referenceScene){const item=getSceneMedia(slides[r.referenceScene-1]||{}).find(m=>m.loadStatus==='ready'&&window.StudioEditorialAssets.bound(m));if(!item||!mediaKinds(s).includes(item.kind)||r.referenceScene===i+1)throw Error('مرجع بديل غير صالح');return [{s,i,r,item}];}if(!/^[A-Za-z0-9 ,().'-]{3,180}$/.test(r.query||'')||r.query===s.visualQuery)throw Error('وصف البديل غير صالح');const alternative={...s,visualQuery:r.query};if(window.StudioGeography?.requiresOriginal(alternative)||window.StudioEditorialAssets.identityRequired(alternative))throw Error('البديل يعيد طلب توثيق محدد');return [{s,i,r}];}catch(e){diagnostics[i].stages.push({stage:'reframe-failed',detail:e.message,elapsedMs:Date.now()-started});return [];}});
+   if(!plans.length)throw Error('لم يرجع إعادة الإخراج بدائل صالحة؛ المواد محفوظة.');
    const indices=new Set();for(const {s,i,r,item} of plans){s.editorialReframe={originalQuery:s.visualQuery,query:r.query,referenceScene:r.referenceScene||0,fallbackReferenceScene:Number.isInteger(r.fallbackReferenceScene)&&references.some(x=>x.scene===r.fallbackReferenceScene)&&r.fallbackReferenceScene!==i+1?r.fallbackReferenceScene:0,reason:String(r.reason||'').slice(0,300)};diagnostics[i].stages.push({stage:'reframe',detail:item?'reuse-reference:'+r.referenceScene:r.query,elapsedMs:Date.now()-started});if(item){addSceneMedia(s,{...item,reusedReference:true});diagnostics[i].status='ready';s.productionMediaReview={status:'reference-detail',note:'تفصيل من المرجع الأصلي مع بيان مكان حفظه؛ ليس تصويراً جديداً للمتحف أو الشخصية.'};}else{s.visualQuery=r.query;s.visualQueryOverride=true;indices.add(i);}}
    // Also preserve original recovery eligibility for non-reframed missing scenes.
    for(let i=0;i<slides.length;i++)if(needsMedia(slides[i])&&!getSceneMedia(slides[i]).some(m=>m.loadStatus==='ready')&&diagnostics[i].status!=='location-review'&&!window.StudioEditorialAssets?.identityRequired(slides[i]))indices.add(i);
