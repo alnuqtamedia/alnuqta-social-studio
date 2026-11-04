@@ -21,3 +21,17 @@ console.log('Current Wikimedia thumbnail host accepted; lookalike hosts rejected
 
 assert.equal(G.check({visualType:'illustrative'},{editorialReview:{intent:'specific',score:.99}}).allowed,false);
 console.log('Specific use cannot bypass evidence checks when the report country is absent or ambiguous.');
+
+// Missing URLs trigger source discovery, never implicit identity approval.
+const discoveredCalls=[];
+const discovered=await A.discoverReferences('Donald Trump official portrait',async body=>{
+ discoveredCalls.push(body);
+ if(body.provider==='commons')return {items:[{pageUrl:'https://evil.com/wiki/File:wrong.jpg'},{pageUrl:'https://commons.wikimedia.org/wiki/File:Trump.jpg'},{pageUrl:'https://commons.wikimedia.org/wiki/File:Trump.jpg'},{pageUrl:'https://commons.wikimedia.org/wiki/File:Unavailable.jpg'}]};
+ if(body.referenceUrl.includes('Unavailable'))throw Error('upstream');
+ return {items:[{referenceEvidence:{kind:'commons-file',referenceUrl:body.referenceUrl}}]};
+});
+assert.equal(discoveredCalls.length,3);assert.equal(discovered.length,1);
+assert.equal(A.bound(discovered[0]),false);
+assert(A.bound({...discovered[0],editorialReview:{intent:'specific',identityMatch:true,score:.9}}));
+assert.equal((await A.discoverReferences('missing',async()=>({items:[]}))).length,0);
+console.log('Reference discovery: fixed Commons host, deduplication, partial failure recovery and mandatory identity review verified.');
