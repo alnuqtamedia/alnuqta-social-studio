@@ -362,3 +362,16 @@ console.log('Production discovery uses Commons directly; a rejected identity sta
  const recovered=await api.reviewCandidates([row]);assert(recovered.get(0).length);assert.equal(requested.length,2);assert.equal(recovered.failedScenes.size,0);
 }
 console.log('Review outage regression: bounded requests, partial success retained, later candidates recover timeout, completed scenes stop reviewing.');
+
+// A generic person activity mislabeled portrait must search stock, never original references.
+{
+ const api=ctx.StudioProduction;api.state.mediaCache.clear();api.state.reviewCache.clear();
+ el('studio-source-text').value='Phone account protection';ctx.StudioMediaLibrary={find:async()=>[],candidates(){}};
+ const calls=[];
+ ctx.fetch=async(url,o)=>{const b=JSON.parse(o.body);calls.push(b);
+ const result=b.action==='review-media'?{reviews:b.reviews.map(r=>({scene:r.scene,intent:'illustrative',candidates:r.candidates.map(c=>({id:c.id,safe:true,score:.95}))}))}:{items:[{id:99001,type:'video',provider:'Pexels',mediaUrl:'https://videos.pexels.com/video-files/99001/a.mp4',preview:'https://images.pexels.com/videos/99001/a.jpg',pageUrl:'https://www.pexels.com/video/99001/',creator:'fixture'}]};
+ return {ok:true,json:async()=>result};};
+ const scene={title:'احمِ حسابك',visualType:'portrait',requestedVisualType:'portrait',visualQuery:'person closing smartphone indoors',voiceover:'نص محفوظ',duration:7,mediaItems:[]};ctx.topics.customScript={slides:[scene]};
+ const result=await api.mediaFor([scene],true);assert.equal(result.missing,0);assert.equal(scene.visualType,'illustrative');assert.equal(scene.voiceover,'نص محفوظ');assert(calls.some(c=>c.provider==='pexels'));assert(!calls.some(c=>String(c.provider).startsWith('commons')));assert.equal(scene.mediaItems[0].kind,'video');
+}
+console.log('Generic portrait activity follows stock search and completes without altering narration.');

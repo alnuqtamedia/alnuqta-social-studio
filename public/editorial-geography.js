@@ -27,6 +27,7 @@ function contextualQuery(slide,value){
  return (requiresOriginal(slide)||setting)&&countries.length===1&&!detect(value).length?[countries[0].search,value].join(' '):value;
 }
 function requiresOriginal(slide){
+ root.StudioEditorialAssets?.normalizeIntent(slide);
  if(['document','portrait','real','archive','map'].includes(slide.visualType)||slide.creative?.kind==='document-focus')return true;
  const query=String(slide.visualQuery||''),title=String(slide.title||'');
  if(/\b(?:arrest|raid|protest|demonstration|(?:health|medical|government) (?:inspection team|inspectors)|minister|president|official ceremony|actual footage|real footage)\b|مداهمة|اعتقال|مظاهرة|فريق تفتيش|حملة تفتيش|لقطات أصلية|لقطات موثقة/i.test(query))return true;
