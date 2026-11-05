@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import vm from 'node:vm';
+import {JobStore,Worker,validateInput,classify} from '../production-server/jobs.mjs';import {createServer} from '../production-server/server.mjs';
+const root=await fs.mkdtemp(path.join(os.tmpdir(),'alnuqta-jobs-')),input={requestId:'42702aaa-9d5a-45ee-8077-a209fa6f4c09',command:'تقرير جديد',source:'نص التقرير',duration:40,orientation:'portrait'};
+try{
+ const store=new JobStore(root);await store.init();const first=await store.submit(input);assert.equal((await store.submit(input)).id,first.id);await assert.rejects(store.submit({...input,source:'different'}),/conflict/);assert.throws(()=>validateInput({...input,duration:999}));assert.throws(()=>validateInput({...input,requestId:'../escape'}));assert.throws(()=>validateInput({...input,audio:{mime:'text/html',base64:'AAAA'}}));
+ const calls=[];let fail=true;const adapter={open:async()=>({close:async()=>{},run:async stage=>{calls.push(stage);if(stage==='media'&&fail){fail=false;throw Error('network timeout');}}})};
+ await new Worker(store,adapter).tick();let job=await store.read(first.id);assert.deepEqual(job.completed,['plan']);assert.equal(job.status,'waiting');job.nextAttemptAt=0;await store.write(job);
+ // A fresh worker process resumes the durable job instead of repeating the plan.
+ await new Worker(store,adapter).tick();job=await store.read(first.id);assert.equal(job.status,'completed');assert.deepEqual(calls,['plan','media','media','voice','render']);assert.equal(job.attempts.media,2);
+ const second=await store.submit({...input,requestId:'52702aaa-9d5a-45ee-8077-a209fa6f4c09'});second.status='running';second.completed=['plan','media'];second.stage='voice';await store.write(second);await new JobStore(root).recover();assert.equal((await store.read(second.id)).status,'queued');
+ assert.equal(classify(Error('quota exhausted')).retryable,false);assert.equal(classify(Error('وسائط ناقصة')).kind,'editorial');
+ const token='a'.repeat(40),httpRoot=path.join(root,'api'),instance=await createServer({root:httpRoot,token,origin:'https://alnuqta-social-studio.vercel.app',adapter:{open:async(job,dir)=>({close:async()=>{},run:async stage=>{if(stage==='render')await fs.writeFile(path.join(dir,'output.mp4'),Buffer.from('fixture-mp4'));}})}});
+ await new Promise(r=>instance.server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+instance.server.address().port,headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+ try{assert.equal((await fetch(url+'/v1/jobs')).status,401);assert.equal((await fetch(url+'/v1/jobs',{headers:{...headers,Origin:'https://evil.test'}})).status,403);
+ const submitted=await(await fetch(url+'/v1/jobs',{method:'POST',headers,body:JSON.stringify(input)})).json();assert(!('input' in submitted));assert.equal((await fetch(url+'/v1/jobs/'+submitted.id+'/file',{headers})).status,409);
+ // Original submitter disconnects. The independent worker completes the job.
+ await instance.worker.tick();const status=await(await fetch(url+'/v1/jobs/'+submitted.id,{headers})).json();assert.equal(status.status,'completed');const result=await fetch(url+'/v1/jobs/'+submitted.id+'/file',{headers});assert.equal(result.headers.get('content-type'),'video/mp4');assert.equal(await result.text(),'fixture-mp4');
+ }finally{await new Promise(r=>instance.server.close(r));}
+ const ctx=vm.createContext({});vm.runInContext(await fs.readFile('public/scene-contract.js','utf8'),ctx);const card={evidenceKind:'explanatory_card',visualType:'document',title:'موقف التقديم'};ctx.StudioSceneContract.apply(card);assert.equal(card.visualType,'text-only');const person={evidenceKind:'specific_person',visualType:'broll'};ctx.StudioSceneContract.apply(person);assert.equal(person.visualType,'portrait');assert.throws(()=>ctx.StudioSceneContract.apply({evidenceKind:'anything'}));
+ console.log('PASS: durable stage resume, restart recovery, idempotency/conflicts, auth/CORS/private files, disconnected submitter completion, classified failures and explicit scene intent. Adapter uses fixtures, not live providers.');
+}finally{await fs.rm(root,{recursive:true,force:true});}
