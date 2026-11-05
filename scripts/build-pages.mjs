@@ -8,6 +8,7 @@ const output = path.join(root, 'dist');
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 fs.copyFileSync(path.join(root, 'index.html'), path.join(output, 'index.html'));
+fs.copyFileSync(path.join(root,'background-production.html'),path.join(output,'background-production.html'));
 fs.copyFileSync(path.join(root, 'social-accounts.html'), path.join(output, 'social-accounts.html'));
 fs.copyFileSync(path.join(root, 'project-backup.html'), path.join(output, 'project-backup.html'));
 fs.cpSync(path.join(root,'public'),path.join(output,'public'),{recursive:true});
@@ -21,7 +22,7 @@ for(const name of ['d3-ease','roughjs','hachure-fill','path-data-parser','points
 fs.writeFileSync(path.join(output, '.nojekyll'), '');
 
 const files = fs.readdirSync(output, { withFileTypes: true }).map(entry => entry.name).sort();
-if (files.join(',') !== '.nojekyll,index.html,project-backup.html,public,social-accounts.html') throw new Error(`Unexpected Pages bundle: ${files.join(', ')}`);
+if (files.join(',') !== '.nojekyll,background-production.html,index.html,project-backup.html,public,social-accounts.html') throw new Error(`Unexpected Pages bundle: ${files.join(', ')}`);
 console.log(`Pages bundle ready: ${files.length} files (${files.join(', ')})`);
 
 
