@@ -46,6 +46,8 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           sudo apt-get install -y ffmpeg
+      - name: Verify free production checkpoint reload and recovery
+        run: node scripts/test-production-checkpoints-browser.mjs
       - name: Verify real browser creative export
         run: node scripts/test-creative-browser.mjs
       - name: Verify geographic graphics and local FFmpeg export
