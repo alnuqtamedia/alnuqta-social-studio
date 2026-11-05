@@ -35,3 +35,18 @@ assert.equal(A.bound(discovered[0]),false);
 assert(A.bound({...discovered[0],editorialReview:{intent:'specific',identityMatch:true,score:.9}}));
 assert.equal((await A.discoverReferences('missing',async()=>({items:[]}))).length,0);
 console.log('Reference discovery: fixed Commons host, deduplication, partial failure recovery and mandatory identity review verified.');
+
+// Anonymous activities are stock coverage, not named portraits or original records.
+for(const query of ['person closing smartphone indoors','young woman checking phone at home','close up hands using mobile phone']){
+ const scene={visualType:'portrait',requestedVisualType:'portrait',title:'احمِ حسابك',visualQuery:query};
+ A.normalizeIntent(scene);assert.equal(scene.visualType,'illustrative');assert.equal(scene.requestedVisualType,'illustrative');assert(!A.identityRequired(scene));assert(!G.requiresOriginal(scene));
+}
+for(const scene of [
+ {visualType:'portrait',visualQuery:'Donald Trump holding phone'},
+ {visualType:'portrait',visualQuery:'person using smartphone Baghdad'},
+ {visualType:'portrait',visualQuery:'person using phone',namedSubject:'Named politician'},
+ {visualType:'portrait',visualQuery:'person using phone',referenceUrl:'https://commons.wikimedia.org/wiki/File:Person.jpg'},
+ {visualType:'document',visualQuery:'person using phone'},
+ {visualType:'portrait',visualQuery:'official portrait president'}
+]){A.normalizeIntent(scene);assert(A.identityRequired(scene));assert(G.requiresOriginal(scene));}
+console.log('Anonymous phone activity recovery and named portrait/document protection verified.');

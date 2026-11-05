@@ -101,6 +101,7 @@ function prepareDataScene(s){
 }
 function localDataReady(s){return s.visualType==='data'&&Array.isArray(s.points)&&s.points.length>0&&s.points.length<=4&&s.points.every(x=>typeof x==='string'&&x.trim()&&x.length<=240);}
 function requestedVisual(s){
+ window.StudioEditorialAssets?.normalizeIntent(s);
  if(!s.requestedVisualType){const legacy=/تعويض تلقائي|بديل نصي|رسم توضيحي وليس/.test(s.productionMediaReview?.note||'');s.requestedVisualType=legacy&&!s.explicitGraphics?'illustrative':s.visualType||'illustrative';}
  return s.requestedVisualType;
 }
