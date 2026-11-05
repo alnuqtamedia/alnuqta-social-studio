@@ -1,0 +1,17 @@
+services:
+  worker:
+    build:
+      context: ..
+      dockerfile: production-server/Dockerfile
+    restart: unless-stopped
+    init: true
+    shm_size: 1gb
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      STUDIO_WORKER_TOKEN: ${STUDIO_WORKER_TOKEN:?Set a private random access token}
+      STUDIO_ALLOWED_ORIGIN: https://alnuqta-social-studio.vercel.app
+    volumes:
+      - production-jobs:/data
+volumes:
+  production-jobs:
