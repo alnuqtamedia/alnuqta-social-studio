@@ -85,13 +85,14 @@ function prepareLocalVisual(s){
 function missingVisuals(slides){return slides.flatMap((s,i)=>{const m=getSceneMedia(s),kinds=mediaKinds(s),missing=needsMedia(s)&&!m.some(x=>kinds.includes(x.kind)&&x.loadStatus!=='failed'&&!(x.autoCached&&window.StudioGeography?.requiresOriginal(s))&&((x.local&&!x.autoCached)||!window.StudioGeography||window.StudioGeography.check(s,x).allowed));return missing?[{scene:i+1,title:String(s.title||s.header||'بلا عنوان'),type:requestedVisual(s)}]:[];});}
 function applyReportBaseline(topic,command){
  const slides=topic?.slides||[],text=String(command||'');
+ slides.forEach(s=>window.StudioSceneContract?.apply(s));
  // Explicit all-graphics work remains available. A normal filmed report requires real assets.
  const graphicsOnly=/(?:فقط|بالكامل|حصراً)\s*(?:إنفوغرافيك|انفوغرافيك|جرافيك)|(?:إنفوغرافيك|انفوغرافيك|جرافيك)\s*(?:فقط|بالكامل|حصراً)|(?:بدون|بلا|دون)\s*(?:أي\s*)?صور\s*(?:أو|ولا|و)\s*فيديوهات/.test(text);
  if(graphicsOnly){delete topic.productionContract;return;}
  topic.productionContract={version:1,minMediaRatio:.75,minVideoScenes:1};
  let graphicsBudget=Math.floor(slides.length/4),videoPlanned=false;
  slides.forEach(s=>{
-  if(window.StudioEditorialAssets?.identityRequired(s))return;
+  if(s.evidenceKind==='explanatory_card'||window.StudioEditorialAssets?.identityRequired(s))return;
   if(s.visualType==='data'&&localDataReady(s)&&graphicsBudget>0){graphicsBudget--;s.requestedVisualType='data';return;}
   s.explicitGraphics=false;delete s.illustration;delete s.productionVisual;
   s.requestedVisualType=s.visualType=!videoPlanned?'broll':'illustrative';videoPlanned=true;
@@ -207,6 +208,7 @@ async function acceptCandidate(s,item,country){
  const record=await window.StudioMediaLibrary.addRemote(meta,{country,tags:[s.title,s.visualQuery].join(' ')});if(topics[activeTikTokTopic]!==project||!project.slides.includes(s))throw Error('حُفظت المادة في المكتبة؛ المشروع المفتوح تغيّر.');invalidatePreview();delete s.illustration;addSceneMedia(s,window.StudioMediaLibrary.materialize(record));s.productionMediaReview={status:'editor-reviewed',note:'أكّد المحرر البلد وملاءمة اللقطة؛ حُفظت في المكتبة لإعادة الاستخدام.'};productionReport();
 }
 async function mediaFor(slides,video,recoveryRound=0,recovery={}){
+ for(const scene of slides)window.StudioSceneContract?.apply(scene);
  if(slides.some(s=>s.editorialGeography?.version!==2))window.StudioGeography?.apply(slides,source());
  const started=recovery.started||Date.now(),used=new Set(),pending=[],candidates=[...(recovery.candidates||[])],diagnostics=slides.map((_,i)=>recovery.diagnostics?.[i]||({scene:i+1,stages:[],status:'pending'}));state.mediaDiagnostics=diagnostics;
  for(const s of slides)for(const m of getSceneMedia(s))used.add(m.providerId||m.url);

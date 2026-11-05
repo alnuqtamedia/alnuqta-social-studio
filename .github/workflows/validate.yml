@@ -46,6 +46,8 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           sudo apt-get install -y ffmpeg
+      - name: Verify durable background worker and native MP4
+        run: node scripts/test-background-browser.mjs
       - name: Verify real browser creative export
         run: node scripts/test-creative-browser.mjs
       - name: Verify geographic graphics and local FFmpeg export
@@ -78,5 +80,6 @@ jobs:
             artifacts/media-browser/
             artifacts/scoped-media/
             artifacts/evidence-media/
+            artifacts/background-worker/
           retention-days: 7
           if-no-files-found: ignore
