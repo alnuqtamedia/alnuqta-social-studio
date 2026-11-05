@@ -2,7 +2,7 @@
 (function(root){
 'use strict';
 const tablet='https://commons.wikimedia.org/wiki/File:Complaint_tablet_to_Ea-Nasir,_2023_(transparent).png';
-function identityRequired(s){return ['document','portrait','real','archive'].includes(s.visualType)||s.creative?.kind==='document-focus'||/اللوح الطيني الحقيقي|الوثيقة الأصلية|الوثيقة الاصلية|\b(?:actual|original) (?:tablet|document|artifact|portrait)\b/i.test([s.title,s.visualQuery].join(' '));}
+function identityRequired(s){return ['specific_person','specific_place','specific_event','document'].includes(s.evidenceKind)||['document','portrait','real','archive'].includes(s.visualType)||s.creative?.kind==='document-focus'||/اللوح الطيني الحقيقي|الوثيقة الأصلية|الوثيقة الاصلية|\b(?:actual|original) (?:tablet|document|artifact|portrait)\b/i.test([s.title,s.visualQuery].join(' '));}
 function referenceUrl(s,context=''){
  const raw=String(s.referenceUrl||'')+' '+context;
  const urls=raw.match(/https:\/\/commons\.wikimedia\.org\/wiki\/File:[^\s<>"\]]+/g)||[];
