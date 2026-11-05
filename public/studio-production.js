@@ -45,6 +45,7 @@ async function saveCheckpoint(stage){
  const topic=topics[activeTikTokTopic];if(!topic?.slides?.length)return;
  try{
   const copy=JSON.parse(JSON.stringify(topic)),assets={},seen=new Map();let count=0;
+  copy.slides.forEach((slide,i)=>{slide.mediaItems=JSON.parse(JSON.stringify(getSceneMedia(topic.slides[i])));});
   for(const slide of copy.slides){for(const item of slide.mediaItems||[]){
    if(String(item.url||'').startsWith('blob:')){const url=item.url;let key=seen.get(url);if(!key){key='asset-'+count++;seen.set(url,key);assets[key]=await (await fetch(url)).blob();}item.checkpointAsset=key;delete item.url;}
    if(String(item.preview||'').startsWith('blob:'))item.preview='';
