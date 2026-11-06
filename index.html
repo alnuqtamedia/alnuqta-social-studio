@@ -1984,7 +1984,7 @@
 
         function exportSceneDurations(slides,activeVoice,total,audioDuration,aiDurations){
             const hasAudio=activeVoice&&Number.isFinite(audioDuration)&&audioDuration>0;
-            const useAiTiming=hasAudio&&activeVoice.source==='gemini'&&Array.isArray(aiDurations)&&aiDurations.length===slides.length&&aiDurations.every(d=>Number.isFinite(Number(d))&&Number(d)>0);
+            const useAiTiming=hasAudio&&(activeVoice.source==='gemini'||slides.every(s=>s.newsroom?.version===1))&&Array.isArray(aiDurations)&&aiDurations.length===slides.length&&aiDurations.every(d=>Number.isFinite(Number(d))&&Number(d)>0);
             const weights=slides.map(s=>String(s.voiceover||'').trim().split(/\s+/).filter(Boolean).length);
             let raw=useAiTiming?aiDurations.map(Number):hasAudio?weights.map(w=>Math.max(1,w)):slides.map(s=>Math.max(.05,Number(s.duration)||4));
             const sum=raw.reduce((a,b)=>a+b,0),spokenTotal=hasAudio?audioDuration:total;
@@ -2559,6 +2559,7 @@ function newsDownload(){
 <script src="public/media-library.js?v=20261105-media-intent-r1"></script>
 <script src="public/production-checkpoints.js?v=20261105-media-intent-r1"></script>
 <script src="public/studio-production.js?v=20261105-media-intent-r1"></script>
+<script src="public/newsroom.js?v=20261106-r1"></script>
 </body>
 </html>
 
