@@ -8,9 +8,9 @@ function normalize(value){
  return {version:1,style:value.style,music:value.music!==false,sfx:value.sfx!==false,musicLevel:Number.isFinite(value.musicLevel)?clamp(value.musicLevel,0,.2):.1,sfxLevel:Number.isFinite(value.sfxLevel)?clamp(value.sfxLevel,0,.3):.16,visuals:value.visuals!==false};
 }
 function fromCommand(command){
- const t=String(command||'');let style=/أكشن|اكشن|action/i.test(t)?'action':/استقصا|تحقيق/.test(t)?'investigation':/اقتصاد|مالي|تجارة/.test(t)?'finance':/سينما|cinematic/i.test(t)?'cinematic':/وثائق|وثائقي/.test(t)?'documentary':/جوي|هادئة|ambient/i.test(t)?'ambient':'documentary';
- const music=!/(?:بدون|بلا|دون)\s*(?:أي\s*)?(?:موسيقى|موسيقي|خلفية موسيقية)|تعليق\s*(?:صوتي\s*)?فقط|voice\s*only/i.test(t),sfx=!/(?:بدون|بلا|دون)\s*(?:أي\s*)?(?:مؤثرات|مؤثر صوتي)|تعليق\s*(?:صوتي\s*)?فقط|voice\s*only/i.test(t);
- return normalize({style,music,sfx,visuals:!/(?:بدون|بلا|دون)\s*(?:حركات|حركة|مؤثرات)|ثابتة|بسيط|minimal/i.test(t)});
+ const raw=String(command||''),t=raw.split(/[.،؛\n]/).filter(part=>!/^\s*(?:لا|ولا|ممنوع|بدون|بلا|دون)\s/.test(part)).join(' ');let style=/أكشن|اكشن|action/i.test(t)?'action':/استقصا|تحقيق/.test(t)?'investigation':/اقتصاد|مالي|تجارة/.test(t)?'finance':/سينما|cinematic/i.test(t)?'cinematic':/وثائق|وثائقي/.test(t)?'documentary':/جوي|هادئة|ambient/i.test(t)?'ambient':'documentary';
+ const music=!/(?:بدون|بلا|دون)\s*(?:أي\s*)?(?:موسيقى|موسيقي|خلفية موسيقية)|تعليق\s*(?:صوتي\s*)?فقط|voice\s*only/i.test(raw),sfx=!/(?:بدون|بلا|دون)\s*(?:أي\s*)?(?:مؤثرات|مؤثر صوتي)|تعليق\s*(?:صوتي\s*)?فقط|voice\s*only/i.test(raw);
+ return normalize({style,music,sfx,visuals:!/(?:بدون|بلا|دون)\s*(?:حركات|حركة|مؤثرات)|ثابتة|بسيط|minimal/i.test(raw)});
 }
 function describe(value){const s=normalize(value);return s?`${names[s.style]}؛ ${s.music?'موسيقى مرخّصة منخفضة تحت الكلام':'الموسيقى متوقفة'}؛ ${s.sfx?'مؤثرات تصميمية عند العناوين والانتقالات':'المؤثرات الصوتية متوقفة'}`:'تعليق فقط — الحزمة الصوتية متوقفة';}
 function events(slides,durations,value){

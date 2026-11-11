@@ -19,3 +19,5 @@ assert.equal(followEvents.filter(e=>e.kind==='bell').length,1);
 assert.equal(followEvents.find(e=>e.kind==='bell').at,2.1);
 assert.equal(S.events([{broadcast:{cta:true}}],[3],S.normalize({style:'documentary'})).filter(e=>e.kind==='bell').length,0);
 assert.equal(S.events([{broadcast:{cta:true}}],[8],S.normalize({style:'documentary',sfx:false})).length,0);
+
+assert.equal(S.fromCommand('تقرير عن بابل، لا حاسبة ولا فيديوهات مالية.').style,'documentary');
