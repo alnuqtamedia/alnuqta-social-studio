@@ -204,7 +204,6 @@
                     <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">اختر موضوع التحقيق:</label>
                     <select id="topic-select" onchange="changeTopic(this.value)" class="w-full bg-navy-card border border-navy-light rounded p-2.5 text-xs text-white focus:outline-none focus:border-brandRed font-cairo font-bold">
                         <option value="customScript">السكريبت المخصص (المدخل حديثاً)</option>
-                        <option value="lastBullet">الرصاصة الأخيرة (10 سلايدات استقصائية)</option>
                         <option value="pavement">شهادة على الرصيف (6 سلايدات مع الخاتمة)</option>
                     </select>
                 </div>
@@ -242,7 +241,6 @@
                     <label class="block text-xs font-bold text-gray-400 mb-2 font-cairo">اختر موضوع التحقيق للريلز:</label>
                     <select id="tiktok-topic-select" onchange="changeTikTokTopic(this.value)" class="w-full bg-navy-card border border-navy-light rounded p-2.5 text-xs text-white focus:outline-none focus:border-brandRed font-cairo font-bold mb-3">
                         <option value="customScript">السكريبت المخصص (المدخل حديثاً)</option>
-                        <option value="lastBullet">الرصاصة الأخيرة (10 سلايدات عمودية)</option>
                         <option value="pavement">شهادة على الرصيف (6 سلايدات عمودية)</option>
                     </select>
                 </div>
@@ -698,124 +696,7 @@
 
         // Data Store for Investigations
         const topics = {
-            customScript: {
-                title: "تحقيق مخصص",
-                subtitle: "تم التجميع آلياً من السكريبت",
-                slides: [
-                    {
-                        id: 1,
-                        type: 'cover',
-                        badge: 'تحقيق خاص',
-                        title: 'الرمز السريع للتحقيق',
-                        subtitle: 'أدخل سكريبت المحتوى في الحقل الجانبي لتوزيعه هنا آلياً.',
-                        footer: 'صحافة استقصائية محايدة'
-                    }
-                ]
-            },
-            lastBullet: {
-                title: "الرصاصة الأخيرة",
-                subtitle: "حين يُصبح \"الانتحار\" غطاءً للتصفية في تاريخ العراق",
-                slides: [
-                    {
-                        id: 1,
-                        type: 'cover',
-                        badge: 'تحقيق تاريخي',
-                        title: 'الرصاصة الأخيرة',
-                        subtitle: 'حين يُصبح "الانتحار" غطاءً للتصفية في تاريخ العراق',
-                        footer: 'صحافة استقصائية محايدة'
-                    },
-                    {
-                        id: 2,
-                        type: 'content',
-                        header: 'فرضية قاسية ومجتمع محافظ',
-                        points: [
-                            'الخصوصية العقائدية: ينتمي المجتمع العراقي لبنية دينية واجتماعية صارمة ترفض فكرة الانتحار وتعتبرها محرمة أخلاقياً وعقائدياً.',
-                            'سقوط الفرضية: الإقدام على إنهاء الحياة من قبل شخصيات ذات خلفية عسكرية، دينية، أو أكاديمية رفيعة يُعد سلوكاً نادر الوقوع دون وجود أسباب قاهرة.',
-                            'علامات الاستفهام: الحوادث الأخيرة — كوفاة آمر فوج القوات الخاصة في التاجي داخل مقره — فتحت باب التشكيك الشعبي حول الروايات الرسمية السريعة.'
-                        ]
-                    },
-                    {
-                        id: 3,
-                        type: 'content',
-                        header: 'لماذا يرفض الشارع رواية "الانتحار"؟',
-                        points: [
-                            '1. الحسم الإعلامي السريع: إعلان سبب الوفاة كـ "انتحار" خلال ساعات قليلة وقبل اكتمال تقرير الطب العدلي.',
-                            '2. تغييب الأدلة الفنية: عدم الكشف عن مسار الرصاصة، تحليل البصمات على السلاح، أو وجود آثار مقاومة على الجثة.',
-                            '3. إهمال البروفايل الشخصي: تجاهل الاستقرار الوظيفي والاجتماعي للمتوفى وتقديم شماعة "الأزمة النفسية المفاجئة" كسبب مجرد.'
-                        ]
-                    },
-                    {
-                        id: 4,
-                        type: 'content',
-                        header: 'رحيل السعدون: أول لغز في تاريخ الدولة',
-                        points: [
-                            'الحادثة: وفاة رئيس الوزراء العراقي عبد المحسن السعدون عام 1929 بطلق ناري داخل بيته.',
-                            'الرواية الرسمية: انتحار بسبب الضغوط السياسية البريطانية والشعبية، مع وجود رسالة وداع شهيرة.',
-                            'علامات التصفية: ظلت الشكوك التاريخية قائمة حول دفع الرجل للإقدام على الخطوة أو وجود أيدٍ خفية استفادت من إنهاء حياته لحسم صراع النفوذ مع الاحتلال البريطاني.'
-                        ]
-                    },
-                    {
-                        id: 5,
-                        type: 'content',
-                        header: 'مسرح العهد السابق: الموت خلف الكواليس',
-                        points: [
-                            'تصفية القيادات الأمنية: إبان أحداث ناظم كزار ومحاولات الانقلاب، عُثر على ضباط كبار ميتين في ظروف غامضة سُجل بعضها كـ "سكتات قلبية" أو "انتحار".',
-                            'إخفاء الأدلة: استخدام الإشاعات والوصمة الشخصية لتغطية الإعدامات الميدانية والتصفية السياسية داخل المعتقلات الرسمية.',
-                            'الهدف: امتصاص الغضب الشعبي والعشائري عبر تحويل الاغتيال السياسي إلى قضية شخصية أو مرضية.'
-                        ]
-                    },
-                    {
-                        id: 6,
-                        type: 'content',
-                        header: 'اغتيالات منظمة تحت ستار الجريمة الغامضة',
-                        points: [
-                            'استهداف العقول والضباط: بين عامي 2003 و2006، تعرض المئات من علماء التصنيع العسكري وضباط الطيران العراقي للقتل والاندثار.',
-                            'نمط التغطية: سُجلت عشرات القضايا في بدايتها ضد "مجهول" أو "انتحار بظروف غامضة"، قبل أن يتكشف أنها تصفيات أدارتها شبكات خارجية وميليشيات محلية.',
-                            'الغاية: تفريغ المؤسسات العسكرية والعلمية من كوادرها دون ترك خيط إدانة للفاعل.'
-                        ]
-                    },
-                    {
-                        id: 7,
-                        type: 'content',
-                        header: 'حادثة ميناء الفاو: حين يقتل المال الاستراتيجية',
-                        points: [
-                            'الجريمة: العثور على المدير التنفيذي لشركة "دايو" الكورية المنفذة لميناء الفاو الكبير مقتولاً شنقاً داخل مقر عمله بالبصرة.',
-                            'الرواية الرسمية: انتحار جراء ضغوط العمل والأزمات النفسية.',
-                            'الشكوك الاستقصائية: رفض برلماني وشعبي واسع للرواية، وإشارات متقاطعة إلى تعرضه لابتزاز وتصفية من شبكات نفوذ لإعاقة مشروع الميناء الاستراتيجي.'
-                        ]
-                    },
-                    {
-                        id: 8,
-                        type: 'diagram',
-                        header: 'كيف تُحول المافيا "الجريمة" إلى "انتحار"؟',
-                        steps: ['مسرح جريمة مُعد', 'إطلاق شائعة المرض النفسي', 'إغلاق الملف قضائياً'],
-                        points: [
-                            'استغلال الوصمة: استغلال عدم فهم الشارع للمرض النفسي لإقفال القضية أخلاقياً واجتماعياً.',
-                            'تضييع معالم الجريمة: استخدام نفوذ السلطة للسيطرة على مسرح الجريمة قبل وصول المحققين المستقلين.',
-                            'دفن أسرار الفساد: تصفية الشهود أو المسؤولين الذين يمتلكون وثائق تدين شبكات النفوذ والسلاح.'
-                        ]
-                    },
-                    {
-                        id: 9,
-                        type: 'content',
-                        header: 'تبعات إغلاق القضايا ضد "مجهول"',
-                        points: [
-                            'انهيار الأمان الوظيفي: شعور الضباط والمسؤولين النزهاء بأنهم بلا حماية أمام مافيات السلاح والفساد.',
-                            'فقدان الثقة بالقضاء والأجهزة الأمنية: تعزيز انطباع الشارع بأن القانون يُطبق فقط على الضعفاء، بينما يُحمى الجناة النافذون.',
-                            'ضياع الحقيقة التاريخية: تحول الجرائم الكبرى إلى مجرد أسرار تُدفن مع أصحابها تحت الأرض.'
-                        ]
-                    },
-                    {
-                        id: 10,
-                        type: 'verdict',
-                        header: 'الحقيقة لا تُدفن بالتقارير المقتضبة',
-                        points: [
-                            'النتيجة الاستقصائية: الانتحار في تاريخ العراق السياسي والأمني لم يكن دوماً خياراً للضحية، بل كان في كثير من الأحيان "الطلقة الأخيرة" التي يطلقها الجاني لإخفاء معالم الجريمة.',
-                            'المطلب: إيجاد لجان تحقيق مستقلة وإعادة فتح ملفات الوفيات الغامضة للضباط والمسؤولين لحماية ما تبقى من هيبة الدولة وحرمة الدم.'
-                        ]
-                    }
-                ]
-            },
+            customScript: {title: 'مشروع جديد', subtitle: '', slides: []},
             pavement: {
                 title: "شهادة على الرصيف",
                 subtitle: "كيف يرفع العجز الحكومي والانفجار الأكاديمي كلفة البطالة؟",
@@ -882,12 +763,12 @@
 
         let activeTab = 'carousel';
         let activeGeneratedOutputType = 'carousel';
-        let activeTopic = 'lastBullet';
+        let activeTopic = 'customScript';
         let currentSlideIndex = 0;
         let activeYTAsset = 'avatar';
 
         // Data Store for TikTok / Reels Slides
-        let activeTikTokTopic = 'lastBullet';
+        let activeTikTokTopic = 'customScript';
         let activeTikTokSlide = 0;
 
         // Data Store for YouTube Thumbnail Presets
@@ -895,20 +776,20 @@
         const thumbPresets = [
             {
                 badge: 'تحقيق خاص',
-                title: 'سر الرصاصة الأخيرة!',
-                subtitle: 'كيف تُحول مافيات النفوذ التصفيات إلى ملفات انتحار؟',
+                title: 'عنوان تقريرك الجديد',
+                subtitle: 'أدخل عنوان التقرير ووصفه',
                 style: 'impact'
             },
             {
                 badge: 'وثائق حصرية',
-                title: 'مستندات كشفت المستور!',
-                subtitle: 'أدلة رسمية تُفند الروايات السريعة وتكشف خفايا الملفات المغلقة',
+                title: 'عنوان الصورة المصغرة',
+                subtitle: 'أضف وصف تقريرك هنا',
                 style: 'doc'
             },
             {
                 badge: 'ملف استقصائي',
-                title: 'من القاتل الحقيقي؟',
-                subtitle: 'تسلسل التصفيات الغامضة من السعدون إلى مدير شركة دايو',
+                title: 'عنوان التقرير',
+                subtitle: 'أضف وصف تقريرك هنا',
                 style: 'investigation'
             }
         ];
@@ -1416,6 +1297,17 @@
             const wrapper = document.getElementById('preview-wrapper');
             if (!target || !wrapper) return;
             target.style.backgroundImage='';
+            const previewSlides = topics[activeTab === 'tiktok' ? activeTikTokTopic : activeTopic]?.slides || [];
+            if ((activeTab === 'carousel' || activeTab === 'tiktok') && !previewSlides.length) {
+                wrapper.className = 'preview-social-post shadow-2xl rounded-xl overflow-hidden border border-navy-light/60';
+                target.style.cssText = 'width:360px;height:450px;padding:24px;background:#071220;display:flex;align-items:center;justify-content:center';
+                target.innerHTML = '<div class="text-center"><h2 class="text-xl font-bold">مشروع جديد</h2><p class="text-sm text-gray-400 mt-4">أدخل نص التقرير أو أمر الإنتاج لبدء المعاينة.</p></div>';
+                return;
+            }
+            target.style.display = '';
+            target.style.alignItems = '';
+            target.style.justifyContent = '';
+
 
             if (activeTab === 'carousel') {
                 const presentationMode=activeTopic==='customScript'&&activeGeneratedOutputType==='slides';
@@ -1954,7 +1846,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-11-11-editor-media-r2';
+        const STUDIO_BUILD='2026-11-11-clean-start-r1';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
