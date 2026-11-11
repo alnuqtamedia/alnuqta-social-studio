@@ -6,7 +6,7 @@ vm.runInContext(fs.readFileSync('public/editor-media.js','utf8'),ctx);
 const api=ctx.StudioEditorMedia;
 const plan=api.selectionPlan({title:'قانون بابل',voiceover:'مسلة حمورابي والقانون',visualQuery:'accountant calculator paperwork'});
 assert.equal(plan.entity,'hammurabi');assert(!plan.query.includes('calculator'));
-const babylon=api.selectionPlan({title:'بابل القديمة',voiceover:'مدينة بابل',visualQuery:'ancient ruins'});
+const babylon=api.selectionPlan({title:'بابل القديمة',subtitle:'من بابل القديمة إلى العراق المعاصر',voiceover:'مدينة بابل',visualQuery:'ancient ruins'});
 assert.equal(babylon.entity,'babylon');assert(!api.evidenceMatches(babylon,{pageUrl:'https://example.org/Nineveh_Iraq'}));assert(api.evidenceMatches(babylon,{pageUrl:'https://example.org/Babylon_Iraq'}));
 const flag=api.selectionPlan({title:'علم العراق',voiceover:'العراق اليوم',visualQuery:'american flag'});
 assert.equal(flag.query,'Iraq flag');assert(!api.evidenceMatches(flag,{pageUrl:'https://example.org/American_flag'}));

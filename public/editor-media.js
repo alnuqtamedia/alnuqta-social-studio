@@ -22,8 +22,9 @@ const SELECTION_VERSION=2;
 function selectionPlan(scene,context=''){
  const spoken=[scene.title,scene.header,scene.subtitle,scene.voiceover,(scene.points||[]).join(' ')].filter(Boolean).join(' ');
  let query=String(scene.visualQuery||scene.title||scene.header||'').trim(),entity='';
- const modern=/بغداد|برلمان|مجلس النواب|العراق اليوم|العراق المعاصر|الدستور العراقي|سياسي|سياسيين|مواطن|baghdad|parliament|iraqi flag/i.test(spoken);
- const babylon=/بابل|بابلي|حمورابي|babylon|hammurabi/i.test(spoken);
+ const subject=[scene.title,scene.header,scene.voiceover].filter(Boolean).join(' ');
+ const modern=/بغداد|برلمان|مجلس النواب|العراق اليوم|العراق المعاصر|الدستور العراقي|سياسي|سياسيين|مواطن|baghdad|parliament|iraqi flag/i.test(subject);
+ const babylon=/بابل|بابلي|حمورابي|babylon|hammurabi/i.test(subject);
  const iraq=/العراق|عراقي|بغداد|iraq/i.test(spoken+' '+context);
  if(/حمورابي|hammurabi/i.test(spoken)&&/مسل|نقش|قانون|مادة|حكم|code|stele/i.test(spoken)){entity='hammurabi';query='Code of Hammurabi stele';}
  else if(babylon&&!modern){entity='babylon';query=/خريط|map/i.test(spoken)?'Babylon Hammurabi map':'Babylon Iraq archaeological site';}
@@ -50,7 +51,7 @@ function evidenceMatches(plan,item){
 async function prepare(slides,video,h){
  const used=new Set(),diagnostics=slides.map((_,i)=>({scene:i+1,stages:[],status:'pending'}));let cursor=0;
  const key=m=>m.url||m.mediaUrl;
- const manual=m=>m.editorSelected===true||(m.local===true&&!m.autoCached);
+ const manual=m=>m.editorSelected===true||(m.local===true&&!m.autoCached&&!m.libraryId);
  for(const s of slides)for(const m of h.getMedia(s))if(manual(m)){used.add(identity(m));used.add(key(m));}
  async function sceneAt(i){
   const s=slides[i],d=diagnostics[i],plan=selectionPlan(s,h.context?.()||'');h.check();h.prepareLocal(s);
