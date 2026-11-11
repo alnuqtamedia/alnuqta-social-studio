@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const elements=new Map(),el=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:''});return elements.get(id);};
+let calls=0,request,fail=false;
+const ctx=vm.createContext({console,requestedVideoSeconds:()=>30,AbortController,setTimeout,clearTimeout,document:{readyState:'loading',getElementById:el,addEventListener(){}},getCurrentStudioContent:()=>({activeTab:'carousel'}),runGeminiStudioCommand:async()=>{calls++;request={command:el('ai-command-input').value,content:ctx.getCurrentStudioContent()};if(!fail)ctx.topics.customScript.slides=[{title:'بابل',voiceover:'نص المادة'}];else el('ai-status').textContent='الخدمة غير متاحة';},saveStudioProject(){},restoreStudioProject(){},setAIStatus(){},topics:{customScript:{slides:[]}},activeTikTokTopic:'customScript',invalidateGeneratedVoiceover(){},updateTikTokInputs(){},renderCanvas(){},parseVideoDuration:v=>Number(v)||30});ctx.window=ctx;
+vm.runInContext(fs.readFileSync('public/production-core.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync('public/studio-production.js','utf8').replace("if(document.readyState==='loading')","window.testAPI={ensureVideoScenes,source};if(document.readyState==='loading')"),ctx);
+el('video-total-duration').value='30';el('ai-command-input').value='كمل المعاينة';
+await assert.rejects(ctx.testAPI.ensureVideoScenes(),/ألصق مادة/);assert.equal(calls,0);
+el('studio-source-text').value='السياسة في بابل: مادة التقرير المدخلة';
+assert.equal(await ctx.testAPI.ensureVideoScenes(),true);assert.equal(calls,1);assert.equal(request.content.sourceMaterial,el('studio-source-text').value);assert.equal(request.content.mode,'new-from-source');assert.match(request.command,/فيديو تقرير/);assert.equal(el('ai-command-input').value,'كمل المعاينة');
+assert.equal(await ctx.testAPI.ensureVideoScenes(),false);assert.equal(calls,1);
+ctx.topics.customScript.slides=[];el('studio-source-text').value='';el('raw-script-input').value='مادة بابل من موزع السكريبت';fail=true;
+await assert.rejects(ctx.testAPI.ensureVideoScenes(),/الخدمة غير متاحة/);assert.equal(request.content.sourceMaterial,el('raw-script-input').value);assert.equal(el('ai-command-input').value,'كمل المعاينة');
+console.log('PASS source to scenes: both material inputs, generation before preview, existing scenes preserved, service failure surfaced, command restored.');
