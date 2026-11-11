@@ -1239,15 +1239,16 @@
         }
 
         function addSceneMedia(slide,item){
+            if(window.StudioEditorMedia?.enabled&&item.editorSelected===undefined)item.editorSelected=true;
             slide.mediaItems=getSceneMedia(slide).slice();slide.mediaItems.push(item);
             const first=slide.mediaItems[0];slide.mediaUrl=first.preview||first.url||'';slide.mediaVideoUrl=first.kind==='video'?(first.url||''):'';slide.mediaCredit=first.credit||'';slide.mediaSourceUrl=first.sourceUrl||'';slide.mediaGenerated=Boolean(first.generated);
-            renderCanvas();updateTikTokInputs();
+            renderCanvas();updateTikTokInputs();window.StudioProduction?.mediaChanged?.();
         }
 
         function removeSceneMedia(slide,index){
             const items=getSceneMedia(slide).slice(),removed=items.splice(index,1)[0];if(removed?.local&&removed.url?.startsWith('blob:'))URL.revokeObjectURL(removed.url);
             slide.mediaItems=items;const first=items[0];slide.mediaUrl=first?.preview||first?.url||'';slide.mediaVideoUrl=first?.kind==='video'?(first.url||''):'';slide.mediaCredit=first?.credit||'';slide.mediaSourceUrl=first?.sourceUrl||'';slide.mediaGenerated=Boolean(first?.generated);
-            renderCanvas();updateTikTokInputs();
+            renderCanvas();updateTikTokInputs();window.StudioProduction?.mediaChanged?.();
         }
 
         async function generateSceneAIImage(slide,btn){const prompt=String(slide.visualQuery||slide.title||slide.subtitle||'').trim();if(!prompt){setAIStatus('لا يوجد وصف بصري لهذا المشهد.','error');return false;}const old=btn.innerText;btn.disabled=true;btn.innerText='جاري التوليد…';try{const r=await fetch('https://zsqvmuqlmtnhndwuqlfy.supabase.co/functions/v1/gemini-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(!r.ok){const code=d.code?` [${d.code}]`:'';const detail=d.detail?` — ${d.detail}`:'';throw new Error((d.error||'فشل توليد الصورة')+code+detail);}const bytes=Uint8Array.from(atob(d.image),x=>x.charCodeAt(0));const blob=new Blob([bytes],{type:d.mimeType||'image/jpeg'}),url=URL.createObjectURL(blob);addSceneMedia(slide,{url,preview:url,kind:'image',credit:d.label||'صورة مولدة بالذكاء الاصطناعي',generated:true,local:true});setAIStatus('تم توليد صورة توضيحية AI وإضافتها إلى مواد المشهد.','success');return true;}catch(e){console.error('Gemini image generation error',e);const msg=String(e?.message||e||'خطأ غير معروف');setAIStatus('تعذر توليد الصورة — '+msg+' | انسخ هذه الرسالة إذا استمرت المشكلة.','error');return false;}finally{btn.disabled=false;btn.innerText=old}}
@@ -1916,17 +1917,17 @@
             socialVideo={blob,url:URL.createObjectURL(blob),name:`alnuqta-video-${Date.now()}.${ext}`};
 
         }
-        async function loadExportMedia(item){
+        async function loadExportMedia(item,{timeoutMs=20000,attempts=2}={}){
             const kind=item.kind==='video'?'video':'image',url=String(item.url||(kind==='image'?item.preview:'')||'');
             if(!url)throw new Error('رابط الوسيط مفقود');
-            for(let attempt=0;attempt<2;attempt++){
+            for(let attempt=0;attempt<attempts;attempt++){
                 const element=kind==='video'?document.createElement('video'):new Image();
                 // Set CORS and handlers before src: src starts fetching immediately.
                 element.crossOrigin='anonymous';
                 if(kind==='video'){element.muted=true;element.playsInline=true;element.preload='auto'}
                 try{
                     await new Promise((resolve,reject)=>{
-                        const timer=setTimeout(()=>reject(new Error('انتهت مهلة التحميل')),20000);
+                        const timer=setTimeout(()=>reject(new Error('انتهت مهلة التحميل')),timeoutMs);
                         const loaded=()=>{clearTimeout(timer);resolve()};
                         element.onerror=()=>{clearTimeout(timer);reject(new Error(url.startsWith('blob:')?'الملف المحلي لم يعد متاحاً؛ أعد رفعه من جهازك':'تعذر قراءة الرابط للتصدير؛ قد يكون غير متاح أو يمنع الوصول من المتصفح'))};
                         if(kind==='video')element.onloadeddata=loaded;else element.onload=loaded;
@@ -1936,7 +1937,7 @@
                     return {kind,element};
                 }catch(error){
                     if(kind==='video'){element.pause();element.removeAttribute('src');element.load()}else element.src='';
-                    if(attempt===1||url.startsWith('blob:'))throw error;
+                    if(attempt===attempts-1||url.startsWith('blob:'))throw error;
                 }
             }
         }
@@ -1952,7 +1953,7 @@
             });}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
         }
 
-        const STUDIO_BUILD='2026-11-05-media-intent-r1';
+        const STUDIO_BUILD='2026-11-11-editor-media-r1';
         function drawSceneFallback(slide,W,H){
             const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),u=W/360,fam='Cairo, Tajawal, Arial, sans-serif';
             const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,'#071220');g.addColorStop(.58,'#102a46');g.addColorStop(1,'#050a10');x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -2558,7 +2559,8 @@ function newsDownload(){
 <script src="public/ffmpeg-export.js?v=20261024-media-r17"></script>
 <script src="public/media-library.js?v=20261105-media-intent-r1"></script>
 <script src="public/production-checkpoints.js?v=20261105-media-intent-r1"></script>
-<script src="public/studio-production.js?v=20261105-media-intent-r1"></script>
+<script src="public/editor-media.js?v=20261111-editor-media-r1"></script>
+<script src="public/studio-production.js?v=20261111-editor-media-r1"></script>
 <script src="public/newsroom.js?v=20261106-presenter-r2"></script>
 </body>
 </html>
