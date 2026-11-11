@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const ctx=vm.createContext({console,URL,Blob});ctx.window=ctx;
+vm.runInContext(fs.readFileSync('public/editor-media.js','utf8'),ctx);
+const api=ctx.StudioEditorMedia;
+const plan=api.selectionPlan({title:'قانون بابل',voiceover:'مسلة حمورابي والقانون',visualQuery:'accountant calculator paperwork'});
+assert.equal(plan.entity,'hammurabi');assert(!plan.query.includes('calculator'));
+const babylon=api.selectionPlan({title:'بابل القديمة',voiceover:'مدينة بابل',visualQuery:'ancient ruins'});
+assert.equal(babylon.entity,'babylon');assert(!api.evidenceMatches(babylon,{pageUrl:'https://example.org/Nineveh_Iraq'}));assert(api.evidenceMatches(babylon,{pageUrl:'https://example.org/Babylon_Iraq'}));
+const flag=api.selectionPlan({title:'علم العراق',voiceover:'العراق اليوم',visualQuery:'american flag'});
+assert.equal(flag.query,'Iraq flag');assert(!api.evidenceMatches(flag,{pageUrl:'https://example.org/American_flag'}));
+const parliament=api.selectionPlan({title:'مجلس النواب العراقي',voiceover:'البرلمان العراقي',visualQuery:'US Congress'});
+assert.equal(parliament.entity,'iraq-parliament');assert(!api.evidenceMatches(parliament,{pageUrl:'https://example.org/US_Congress'}));assert(api.evidenceMatches(parliament,{pageUrl:'https://example.org/Iraq_Council_of_Representatives'}));
+let libraryCalls=0;ctx.StudioMediaLibrary={findAny:async()=>{libraryCalls++;throw Error('old library must not be used');}};
+const shot={id:1,type:'photo',provider:'Commons',mediaUrl:'https://example.org/babylon.jpg',pageUrl:'https://commons.wikimedia.org/wiki/File:Babylon_Iraq.jpg'};
+const hooks={getMedia:s=>s.mediaItems||[],checkItem:async()=>{},prepareLocal(){},needsMedia:()=>true,check(){},status(){},search:async()=>({items:[shot]}),review:async r=>r.items.map(x=>({...x,review:{score:.95}})),orientation:()=> 'portrait',done(){}};
+const scenes=[0,1,2].map(i=>({title:'بابل القديمة',voiceover:'مدينة بابل',visualType:'broll',mediaItems:i===0?[{url:'https://example.org/old.mp4',kind:'video'}]:[]}));
+const r=await api.prepare(scenes,true,hooks);
+assert.equal(scenes.flatMap(s=>s.mediaItems).length,1);assert.equal(r.missing,2);assert.equal(libraryCalls,0);assert(!scenes.flatMap(s=>s.mediaItems).some(m=>m.url.includes('old.mp4')));
+// Reopening the same plan preserves reviewed shots; changing scene meaning invalidates them.
+const chosen=scenes.find(s=>s.mediaItems.length);await api.prepare([chosen],true,{...hooks,search:async()=>{throw Error('should reuse current reviewed shot');}});assert.equal(chosen.mediaItems.length,1);
+chosen.title='مجلس النواب العراقي';chosen.voiceover='البرلمان العراقي';await api.prepare([chosen],true,hooks);assert.equal(chosen.mediaItems.length,0);
+const outage={title:'بابل القديمة',voiceover:'بابل',visualType:'broll',mediaItems:[]};const partial=await api.prepare([outage],true,{...hooks,review:async()=>{throw Error('review offline');}});assert.equal(partial.missing,1);
+const manual={title:'علم العراق',mediaItems:[{url:'blob:editor-choice',kind:'image',editorSelected:true}]};await api.prepare([manual],true,hooks);assert.equal(manual.mediaItems[0].url,'blob:editor-choice');
+console.log('PASS semantic selection: exact entities, no unrelated old-library reuse, legacy shots retired, concurrent deduplication, changed scenes rechecked, review outages stay editable, manual choices retained.');

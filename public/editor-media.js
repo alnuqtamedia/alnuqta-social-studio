@@ -17,31 +17,78 @@ async function assign(scene,items,{replace=true,checkItem,getMedia}={}){
  return {added:accepted.length,errors};
 }
 async function files(scene,selected,options){const items=[];for(const file of selected){const kind=kindFor(file),url=URL.createObjectURL(file);items.push({url,preview:kind==='image'?url:'',kind,credit:file.name,local:true,generated:false,editorSelected:true});}try{return await assign(scene,items,options);}finally{for(const item of items)if(!options.getMedia(scene).some(m=>m.url===item.url))URL.revokeObjectURL(item.url);}}
+// Automatic choices are scene-bound and reviewed; editor uploads remain authoritative.
+const SELECTION_VERSION=2;
+function selectionPlan(scene,context=''){
+ const spoken=[scene.title,scene.header,scene.subtitle,scene.voiceover,(scene.points||[]).join(' ')].filter(Boolean).join(' ');
+ let query=String(scene.visualQuery||scene.title||scene.header||'').trim(),entity='';
+ const modern=/بغداد|برلمان|مجلس النواب|العراق اليوم|العراق المعاصر|الدستور العراقي|سياسي|سياسيين|مواطن|baghdad|parliament|iraqi flag/i.test(spoken);
+ const babylon=/بابل|بابلي|حمورابي|babylon|hammurabi/i.test(spoken);
+ const iraq=/العراق|عراقي|بغداد|iraq/i.test(spoken+' '+context);
+ if(/حمورابي|hammurabi/i.test(spoken)&&/مسل|نقش|قانون|مادة|حكم|code|stele/i.test(spoken)){entity='hammurabi';query='Code of Hammurabi stele';}
+ else if(babylon&&!modern){entity='babylon';query=/خريط|map/i.test(spoken)?'Babylon Hammurabi map':'Babylon Iraq archaeological site';}
+ else if(iraq&&/برلمان|مجلس النواب|parliament/i.test(spoken)){entity='iraq-parliament';query='Council of Representatives Iraq parliament Baghdad';}
+ else if(iraq&&/علم|flag/i.test(spoken)){entity='iraq-flag';query='Iraq flag';}
+ else if(iraq&&/دستور|قانون عراقي|constitution/i.test(spoken)){entity='iraq-law';query='Constitution of Iraq';}
+ else if(iraq){entity='iraq';query='Iraq Baghdad '+query.replace(/calculator|accountant|stock market|wall street|american|usa/gi,'');}
+ if(!/قرض|تمويل|حساب|فائدة|فوائد|ميزانية|بورص|financial|loan|calculator|budget/i.test(spoken))query=query.replace(/calculator|accountant|financial paperwork|stock market|wall street/gi,'').trim();
+ return {version:SELECTION_VERSION,entity,query:query.slice(0,200),spoken};
+}
+function identity(item){return String(item.providerId||((item.provider||'')+':'+item.id+':'+item.type)||item.url);}
+function evidenceMatches(plan,item){
+ if(!plan.entity)return true;
+ let text=[item.pageUrl,item.sourceUrl,item.sourceTitle,item.description,item.referenceEvidence?.sourceTitle,item.referenceEvidence?.description].filter(Boolean).join(' ');
+ try{text=decodeURIComponent(text);}catch{}
+ const iraq=/iraq|iraqi|baghdad|العراق|بغداد/i.test(text);
+ if(plan.entity==='babylon')return /babylon|babylonia|بابل/i.test(text)&&!/nineveh|نينوى|ziggurat.of.ur|أور/i.test(text);
+ if(plan.entity==='hammurabi')return /hammurabi|حمورابي/i.test(text);
+ if(plan.entity==='iraq-parliament')return iraq&&/parliament|representatives|برلمان|النواب/i.test(text);
+ if(plan.entity==='iraq-flag')return iraq&&/flag|علم/i.test(text);
+ if(plan.entity==='iraq-law')return iraq&&/constitution|دستور/i.test(text);
+ return iraq;
+}
 async function prepare(slides,video,h){
- const started=Date.now(),used=new Set(),diagnostics=slides.map((_,i)=>({scene:i+1,stages:[],status:'pending'}));let cursor=0;
- for(const s of slides)for(const m of h.getMedia(s))if(m.providerId)used.add(m.providerId);
- async function sceneAt(i){const s=slides[i],d=diagnostics[i];h.check();h.prepareLocal(s);if(!h.needsMedia(s)){d.status='graphics';return;}
-  const existing=h.getMedia(s),ready=[];
-  for(const m of existing)try{await h.checkItem(m);ready.push(m);}catch(e){d.stages.push({stage:'load',detail:e.message});}
-  if(ready.length){d.status='ready';return;}
-  const query=String(s.visualQuery||s.title||s.header||'').trim();if(!query){d.status='missing';return;}
-  try{const local=await root.StudioMediaLibrary?.findAny?.(s,kinds,used)||[];for(const m of local){try{await h.checkItem(m);syncScene(s,[m]);d.status='ready';return;}catch{}}}catch(e){d.stages.push({stage:'library',detail:e.message});}
-  const preferred=video&&['broll','video','illustrative','mixed'].includes(s.requestedVisualType||s.visualType)?'video':'photo';
-  const attempts=[{provider:'pexels',type:preferred},{provider:'pexels',type:preferred==='video'?'photo':'video'},{provider:'commons',type:'photo'}];
-  for(const attempt of attempts){h.check();if(Date.now()-started>45000)break;
-   try{h.status(`البحث عن مادة للمشهد ${i+1}/${slides.length}…`);const data=await h.search({...attempt,query,orientation:h.orientation()});
-    const items=(data.items||[]).filter(x=>/^https?:\/\//i.test(x.mediaUrl||'')&&!(s.excludedMedia||[]).includes(String(x.id)+':'+x.type));
-    const ranked=[...items.filter(x=>!used.has(String(x.id)+':'+x.type)),...items.filter(x=>used.has(String(x.id)+':'+x.type))];
-    for(const item of ranked.slice(0,2)){const id=String(item.id)+':'+item.type,meta={url:item.mediaUrl,preview:item.preview||'',kind:item.type==='video'?'video':'image',credit:item.creator||'',sourceUrl:item.pageUrl||'',licenseUrl:item.licenseUrl||'',providerId:id,local:false,generated:false,editorSelected:false,trimStart:0,maxSeconds:6};
-     try{await h.checkItem(meta);if(existing.length)s.unusedMedia=[...(s.unusedMedia||[]),...existing];syncScene(s,[meta]);used.add(id);s.productionMediaReview={status:'editor-review',note:'مادة مقترحة للمراجعة النهائية؛ يمكنك استبدالها بصورة أو فيديو.'};d.status='ready';return;}catch(e){d.stages.push({stage:'load',detail:e.message});}
-    }
-   }catch(e){h.check();d.stages.push({stage:'search',detail:e.message});}
+ const used=new Set(),diagnostics=slides.map((_,i)=>({scene:i+1,stages:[],status:'pending'}));let cursor=0;
+ const key=m=>m.url||m.mediaUrl;
+ const manual=m=>m.editorSelected===true||(m.local===true&&!m.autoCached);
+ for(const s of slides)for(const m of h.getMedia(s))if(manual(m)){used.add(identity(m));used.add(key(m));}
+ async function sceneAt(i){
+  const s=slides[i],d=diagnostics[i],plan=selectionPlan(s,h.context?.()||'');h.check();h.prepareLocal(s);
+  const signature=JSON.stringify(plan),existing=h.getMedia(s),ready=[];
+  for(const m of existing){
+   const allowed=manual(m)||(m.selectionVersion===SELECTION_VERSION&&m.selectionSignature===signature&&m.editorialReview?.score>=.7&&!used.has(identity(m))&&!used.has(key(m)));
+   if(!allowed)continue;
+   try{await h.checkItem(m);ready.push(m);used.add(identity(m));used.add(key(m));}catch(e){d.stages.push({stage:'load',detail:e.message});}
   }
-  d.status='missing';s.productionMediaReview={status:'missing',note:'ستظهر مساحة قابلة للاستبدال في المعاينة؛ أضف صورة أو فيديو من قائمة المشاهد.'};
+  if(ready.length){syncScene(s,ready);d.status='ready';return;}
+  // Retire legacy automatic shots, including inherited mediaUrl fallbacks.
+  if(existing.length)s.unusedMedia=[...(s.unusedMedia||[]),...existing];syncScene(s,[]);
+  if(!h.needsMedia(s)){d.status='graphics';return;}
+  if(!plan.query){d.status='missing';return;}
+  const preferred=video?'video':'photo';
+  const attempts=plan.entity?[{provider:'commons',type:'photo'},{provider:'pexels',type:preferred},{provider:'pexels',type:preferred==='video'?'photo':'video'}]:[{provider:'pexels',type:preferred},{provider:'pexels',type:preferred==='video'?'photo':'video'},{provider:'commons',type:'photo'}];
+  for(const attempt of attempts){h.check();
+   try{
+    h.status(`البحث عن مادة مطابقة للمشهد ${i+1}/${slides.length}…`);
+    const data=await h.search({...attempt,query:plan.query,orientation:h.orientation()});
+    const items=(data.items||[]).filter(x=>/^https?:\/\//i.test(x.mediaUrl||'')&&!used.has(identity(x))&&!used.has(key(x))&&!(s.excludedMedia||[]).includes(String(x.id)+':'+x.type)&&evidenceMatches(plan,x));
+    if(!items.length)continue;
+    if(!h.review){d.stages.push({stage:'review',detail:'فحص المطابقة غير متاح؛ لم تُعتمد نتيجة عشوائية.'});continue;}
+    const candidates=await h.review({i,s,query:plan.query,items:items.slice(0,6)});h.check();
+    for(const item of candidates){
+     const id=identity(item),url=key(item);if(used.has(id)||used.has(url)||!items.some(x=>x.mediaUrl===item.mediaUrl)||!(item.review?.score>=.7))continue;
+     used.add(id);used.add(url); // Reserve before decoding: concurrent scenes cannot choose the same shot.
+     const meta={url:item.mediaUrl,preview:item.preview||'',kind:item.type==='video'?'video':'image',credit:item.creator||'',sourceUrl:item.pageUrl||'',licenseUrl:item.licenseUrl||'',providerId:id,local:false,generated:false,editorSelected:false,selectionVersion:SELECTION_VERSION,selectionSignature:signature,editorialReview:item.review,trimStart:0,maxSeconds:6};
+     try{await h.checkItem(meta);syncScene(s,[meta]);s.productionMediaReview={status:'relevance-reviewed',note:'فُحصت المعاينة وصلتها بالمشهد؛ قرار النشر للمحرر.'};d.status='ready';return;}catch(e){used.delete(id);used.delete(url);d.stages.push({stage:'load',detail:e.message});}
+    }
+   }catch(e){h.check();d.stages.push({stage:'search-review',detail:e.message});}
+  }
+  d.status='missing';s.productionMediaReview={status:'missing',note:'لم تُعتمد مادة مطابقة؛ المعاينة تستمر بمكان قابل للرفع والاستبدال.'};
  }
  await Promise.all(Array.from({length:Math.min(3,slides.length)},async()=>{while(cursor<slides.length)await sceneAt(cursor++);}));
  const result={clips:slides.filter(s=>h.getMedia(s).some(m=>playable(m)&&m.kind==='video')).length,photos:slides.filter(s=>h.getMedia(s).some(m=>playable(m)&&m.kind==='image')).length,missing:missing(slides,h.getMedia).length,diagnostics};h.done(result);return result;
 }
+
 function el(tag,text){const e=document.createElement(tag);if(text)e.textContent=text;return e;}
 function button(label,action){const b=el('button',label);b.type='button';b.className='border rounded p-2 text-xs';b.onclick=action;return b;}
 async function apply(scene,items,replace=true){if(hooks.busy())throw Error('انتظر انتهاء إنشاء المعاينة، ثم بدّل المادة.');if(!hooks.getSlides().includes(scene))throw Error('المشهد لم يعد مفتوحاً.');const r=await assign(scene,items,{replace,checkItem:hooks.checkItem,getMedia:hooks.getMedia});hooks.changed();return r;}
@@ -59,5 +106,5 @@ function refresh(){if(!hooks||!host)return;const list=host.querySelector('#edito
  });
 }
 function mount(parent,h){hooks=h;host=el('details');host.open=true;host.id='editor-media-panel';host.className='border border-navy-light rounded p-2 text-xs';const summary=el('summary');summary.id='editor-media-summary';const list=el('div');list.id='editor-media-scenes';list.style.cssText='max-height:32rem;overflow:auto';host.append(summary,el('p','اختر موادك بحرية. المراجعة النهائية وقرار النشر إلك؛ نقص الوسائط لا يوقف المعاينة.'),button('البحث عن مواد للنواقص',h.search),button('أكمل المعاينة',h.preview),list);parent.querySelector('#production-report').before(host);refresh();}
-root.StudioEditorMedia={enabled:true,previewCommand,playable,missing,kindFor,syncScene,assign,files,prepare,mount,refresh};
+root.StudioEditorMedia={enabled:true,selectionPlan,evidenceMatches,previewCommand,playable,missing,kindFor,syncScene,assign,files,prepare,mount,refresh};
 })(typeof window==='undefined'?globalThis:window);
