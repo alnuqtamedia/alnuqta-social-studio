@@ -21,3 +21,8 @@ assert.equal(C.requestedDuration('مدة 1:00'),60);
 assert.equal(C.requestedDuration('المشهد 1: 10 ثانية\nمدة الفيديو 60 ثانية'),60);
 assert.throws(()=>C.requestedDuration('فيديو 60 ثانية أو 90 ثانية'),/مدداً مختلفة/);
 const durationCode=page.slice(page.indexOf('function commandVideoDuration('),page.indexOf('function commandVideoDuration(')+250);assert(durationCode.includes('StudioProductionCore.requestedDuration(command)'));
+
+const narrationSource='الأول يحفظ 282 مادة.\n\nالثاني يذكر المادة 5.\n\nالثالث يذكر المواد 53 إلى 56.';
+const narrationParts=C.narrationChunks(narrationSource,7);
+assert.equal(narrationParts.join(' ').replace(/\s+/g,' ').trim(),narrationSource.replace(/\s+/g,' ').trim());assert(narrationParts.every(t=>C.words(t)<=7));assert.equal(C.narrationChunks('').length,0);
+console.log('Long narration chunking preserves every word and number within bounded requests.');

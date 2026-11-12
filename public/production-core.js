@@ -46,6 +46,14 @@ function requestedDuration(command){
  const unique=[...new Set(values)];if(unique.length>1)throw Error('وجدت مدداً مختلفة في الأمر؛ حدّد مدة واحدة للفيديو.');const seconds=unique[0]??null;
  if(seconds!==null&&(seconds<5||seconds>600))throw Error('المدة المدعومة من 5 إلى 600 ثانية.');return seconds;
 }
+function narrationChunks(text,maxWords=110){
+ const paragraphs=String(text||'').trim().split(/\n\s*\n/).filter(Boolean),out=[];let current='';
+ for(const p of paragraphs){
+  const blocks=words(p)>maxWords?p.trim().split(/\s+/).reduce((a,w)=>{if(!a.length||words(a[a.length-1])>=maxWords)a.push(w);else a[a.length-1]+=' '+w;return a;},[]):[p.trim()];
+  for(const block of blocks){if(current&&words(current)+words(block)>maxWords){out.push(current);current='';}current+=(current?'\n\n':'')+block;}
+ }
+ if(current)out.push(current);return out;
+}
 function output(command){return /تلفزيون|يوتيوب|youtube|أفقي|افقي|16\s*:\s*9/i.test(command)?'landscape':'portrait';}
-root.StudioProductionCore={words,numbers,groups,timing,alignedDurations,safePexels,safeMedia,choose,output,requestedDuration};
+root.StudioProductionCore={narrationChunks,words,numbers,groups,timing,alignedDurations,safePexels,safeMedia,choose,output,requestedDuration};
 })(typeof window==='undefined'?globalThis:window);

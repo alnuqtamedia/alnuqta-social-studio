@@ -110,7 +110,9 @@ console.log('Narration fitting uses actual audio duration, never a speculative p
 ctx.StudioProduction.state.audioCache.clear();let fitPasses=0;const durations=[132,110,120];
 ctx.AudioContext=class {async decodeAudioData(){return {duration:durations.shift()};}async close(){}};
 ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration'){fitPasses++;return {ok:true,json:async()=>({slides:[{voiceover:new Array(fitPasses===1?218:238).fill('ملف').join(' ')}]})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
+const savedChunker=ctx.StudioProductionCore.narrationChunks;ctx.StudioProductionCore.narrationChunks=text=>[text];
 const measured=[{voiceover:new Array(240).fill('ملف').join(' ')}];await ctx.StudioProduction.narration(measured,120);assert.equal(fitPasses,2);assert.equal(ctx.aiVoiceoverDuration,120);assert.equal(measured[0].voiceover.split(' ').length,238);
+ctx.StudioProductionCore.narrationChunks=savedChunker;
 console.log('Measured feedback converges after overshoot while keeping one continuous performance.');
 // A high-ranked but unrelated thumbnail must never be selected over the relevant one.
 ctx.StudioProduction.state.reviewCache.clear();ctx.fetch=async()=>({ok:true,json:async()=>({reviews:[{scene:1,candidates:[{id:'1:video',safe:false,score:.99,reason:'عملة أجنبية'},{id:'2:video',safe:true,score:.85,reason:'حساب محايد'}]}]})});
@@ -138,6 +140,7 @@ ctx.requestNarrationTts=async text=>{relaxedOrder.push('tts:'+text.split(' ').le
 ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration'){relaxedOrder.push('fit');return {ok:true,json:async()=>({slides:[{voiceover:Array(91).fill('كلمة').join(' ')}]})};}return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
 const ninetyOne=[{voiceover:Array(120).fill('كلمة').join(' ')}];await ctx.StudioProduction.narration(ninetyOne,40);assert.deepEqual(relaxedOrder,['fit','tts:91']);assert.equal(ctx.aiVoiceoverDuration,40);assert.equal(ninetyOne[0].voiceover.split(' ').length,91);assert.equal(ctx.aiScriptFitNote,'');
 // A failed advisory rewrite must not prevent a complete original reading; no rejected text is committed.
+ctx.StudioProductionCore.narrationChunks=text=>[text];
 ctx.StudioProduction.state.audioCache.clear();let fallbackTts='';
 ctx.requestNarrationTts=async text=>{fallbackTts=text;return {audio:'AA==',mimeType:'audio/wav'};};
 ctx.fetch=async(url,options)=>{const b=JSON.parse(options.body);if(b.action==='fit-narration')return {ok:true,json:async()=>({slides:[{voiceover:'خسر الرقم 4'}]})};return {ok:true,json:async()=>({complete:true,segments:[{scene:1,start:0}]})};};
@@ -145,6 +148,7 @@ const originalText='3 '+Array(120).fill('ملف').join(' '),fallback=[{voiceover
 // Continuing after a rewrite failure cannot make a genuinely overlong recording pass the export duration check.
 ctx.StudioProduction.state.audioCache.clear();ctx.AudioContext=class {async decodeAudioData(){return {duration:52};}async close(){}};
 await ctx.StudioProduction.narration([{voiceover:originalText}],40);assert.equal(ctx.aiVoiceoverDuration,52);assert.equal(ctx.StudioProduction.durationResult(52,52,40,true).passed,false);
+ctx.StudioProductionCore.narrationChunks=savedChunker;
 console.log('Narration regression: 91/80 budget mismatch continues to measured audio; rejected rewrites preserve original numbers/text; real duration remains enforced.');
 // An explicit duration cannot silently inherit the previous preserve-text mode.
 el('ai-command-input').value='حوّل إلى ريلز 45 ثانية';el('video-sync-mode').value='extend-visuals';await ctx.runGeminiStudioCommand();assert.equal(el('video-total-duration').value,'45');assert.equal(el('video-sync-mode').value,'fit-audio');assert.equal(el('ai-command-input').value,'حوّل إلى ريلز 45 ثانية');

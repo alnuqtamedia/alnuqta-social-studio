@@ -350,7 +350,30 @@ async function mediaFor(slides,video,recoveryRound=0,recovery={}){
  const missing=missingVisuals(slides).length,clips=slides.filter(s=>getSceneMedia(s).some(m=>m.kind==='video')).length,photos=slides.filter(s=>getSceneMedia(s).some(m=>m.kind==='image')).length;
  state.mediaElapsedMs=Date.now()-started;updateTikTokInputs();renderCanvas();productionReport();status(`مشاهد بفيديو: ${clips}، بصور: ${photos}، تحتاج وسائط: ${missing}.`+(candidates.length?' افتح مكتبة المواد لمراجعة المرشحات وحفظها مرة واحدة.':''),missing?'info':'success');return {clips,photos,missing};
 }
-async function decodedTts(text,targetSeconds=0){const key=targetSeconds+'|'+($('ai-tts-voice')?.value||'Charon')+'|'+narrationStyle()+'|'+text;if(state.audioCache.has(key))return state.audioCache.get(key);check();const d=await requestNarrationTts(text,targetSeconds?` اقرأ النص كاملاً بإيقاع طبيعي في مدة تقارب ${targetSeconds} ثانية دون تكرار أو حذف كلمات أو سكتات طويلة، ولا تقرأ تعليمات الأداء.`:'');check();const blob=(d.mimeType||'').toLowerCase().includes('l16')?pcm16ToWavBlob(d.audio,24000):new Blob([Uint8Array.from(atob(d.audio),x=>x.charCodeAt(0))],{type:d.mimeType||'audio/wav'});const ctx=new AudioContext();try{const buffer=await ctx.decodeAudioData(await blob.arrayBuffer());const result={buffer,blob};state.audioCache.set(key,result);return result;}finally{await ctx.close();}}
+async function decodedTts(text,targetSeconds=0){
+ const voice=$('ai-tts-voice')?.value||'Charon',style=narrationStyle(),key=targetSeconds+'|'+voice+'|'+style+'|'+text;
+ if(state.audioCache.has(key))return state.audioCache.get(key);check();
+ const chunks=C.narrationChunks(text),ctx=new AudioContext();
+ try{
+  const parts=[];
+  // Long documents use short, ordered requests to avoid provider timeouts.
+  // Commit only after every chunk is decoded. Completed chunks survive retries on this page.
+  for(let i=0;i<chunks.length;i++){
+   check();const chunkKey='tts-part|'+voice+'|'+style+'|'+chunks[i];let part=state.audioCache.get(chunkKey);
+   if(!part){status('توليد التعليق بنفس الصوت — الجزء '+(i+1)+'/'+chunks.length+'…');
+    const hint=chunks.length===1&&targetSeconds?' اقرأ النص كاملاً بإيقاع طبيعي في مدة تقارب '+targetSeconds+' ثانية دون تكرار أو حذف كلمات أو سكتات طويلة، ولا تقرأ تعليمات الأداء.':' اقرأ هذه الفقرة كاملة بنفس الصوت والإيقاع الوثائقي الطبيعي، دون إضافة مقدمة أو خاتمة، ودون تكرار أو حذف أو اختصار.';
+    const d=await requestNarrationTts(chunks[i],hint);check();
+    const blob=(d.mimeType||'').toLowerCase().includes('l16')?pcm16ToWavBlob(d.audio,24000):new Blob([Uint8Array.from(atob(d.audio),x=>x.charCodeAt(0))],{type:d.mimeType||'audio/wav'});
+    part={blob,buffer:await ctx.decodeAudioData(await blob.arrayBuffer())};if(!(part.buffer.duration>0))throw Error('جزء صوتي فارغ؛ الأجزاء المكتملة محفوظة.');state.audioCache.set(chunkKey,part);
+   }
+   parts.push(part);
+  }
+  check();if(parts.length===1){state.audioCache.set(key,parts[0]);return parts[0];}const gap=Math.round(ctx.sampleRate*.16),frames=parts.reduce((n,p)=>n+p.buffer.length,0)+gap*Math.max(0,parts.length-1),buffer=ctx.createBuffer(1,frames,ctx.sampleRate);let offset=0;
+  parts.forEach((part,i)=>{buffer.getChannelData(0).set(part.buffer.getChannelData(0),offset);offset+=part.buffer.length+(i<parts.length-1?gap:0);});
+  const result={buffer,blob:pcmWav(buffer)};state.audioCache.set(key,result);return result;
+ }finally{await ctx.close();}
+}
+
 function pcmWav(buffer){const n=buffer.length,a=new ArrayBuffer(44+n*2),v=new DataView(a);const str=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};str(0,'RIFF');v.setUint32(4,36+n*2,true);str(8,'WAVE');str(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,buffer.sampleRate,true);v.setUint32(28,buffer.sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);str(36,'data');v.setUint32(40,n*2,true);const x=buffer.getChannelData(0);for(let i=0;i<n;i++)v.setInt16(44+i*2,Math.round(Math.max(-1,Math.min(1,x[i]))*(x[i]<0?32768:32767)),true);return new Blob([a],{type:'audio/wav'});}
 async function fitScript(slides,target,ratio=1){
  const count=slides.reduce((n,s)=>n+C.words(s.voiceover),0),budget=Math.max(slides.length,Math.floor(ratio!==1?count*ratio:target*2.05));const expand=ratio>1;if(!expand&&count<=budget)return false;
@@ -388,7 +411,7 @@ async function narration(slides,target){
  }
  if(fit&&Math.abs(entry.buffer.duration-target)>tolerance&&!fitNote)fitNote='انتهت محاولتا الضبط؛ المدة الأقرب محفوظة دون قطع أو تسريع.';
  let duration=entry.buffer.duration;if(!Number.isFinite(duration)||duration<=0)throw Error('لم ينتج تعليق صوتي صالح.');let sceneDurations,method='pauses';
- try{status('مطابقة فقرات التعليق مع بدايات المشاهد عبر Gemini…');sceneDurations=await alignNarration(entry,texts);method='gemini-audio';}catch(e){check();if(/alignment_incomplete|لم تؤكد الخدمة اكتمال الفقرات/.test(e.message))throw Error('تعذر تأكيد وجود جميع فقرات التعليق في الصوت؛ الصوت السابق محفوظ. أعد توليد التعليق قبل المعاينة.');status('المحاذاة الذكية غير متاحة؛ يجري استخدام الوقفات مع إتاحة ضبط الحدود.','info');sceneDurations=await detectNarrationSceneDurations(entry.blob,texts,duration);}
+ try{if(duration>120){status('توزيع التقرير الطويل محلياً بحسب الوقفات؛ التوقيت تقديري وقابل للتعديل…');sceneDurations=await detectNarrationSceneDurations(entry.blob,texts,duration);}else{status('مطابقة فقرات التعليق مع بدايات المشاهد عبر Gemini…');sceneDurations=await alignNarration(entry,texts);method='gemini-audio';}}catch(e){check();if(/alignment_incomplete|لم تؤكد الخدمة اكتمال الفقرات/.test(e.message))throw Error('تعذر تأكيد وجود جميع فقرات التعليق في الصوت؛ الصوت السابق محفوظ. أعد توليد التعليق قبل المعاينة.');status('المحاذاة الذكية غير متاحة؛ يجري استخدام الوقفات مع إتاحة ضبط الحدود.','info');sceneDurations=await detectNarrationSceneDurations(entry.blob,texts,duration);}
  check();if(sceneDurations.length!==slides.length||sceneDurations.some(d=>!Number.isFinite(d)||d<=0)||Math.abs(sceneDurations.reduce((a,b)=>a+b,0)-duration)>.05)throw Error('تعذر توزيع المشاهد؛ الصوت والنص السابقان محفوظان.');
  const outro=boundedOutroSeconds(duration,target,fit&&Boolean(topics[activeTikTokTopic]?.productionContract));
  if(outro){const last=staged.length-1;staged[last].narrationSeconds=sceneDurations[last];const speechSeconds=duration;entry=withMusicalEnding(entry,outro);duration=entry.buffer.duration;sceneDurations[last]+=duration-speechSeconds;fitNote='خاتمة موسيقية '+(duration-speechSeconds).toFixed(2)+' ثانية فوق آخر لقطة؛ التعليق محفوظ دون تغيير سرعته.';}
